@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Xpress Entertainment",
+    "slug": "xpress-client",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "xpressclient",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.xpressentertainment.client"
+    },
+    "android": {
+      "package": "com.xpressentertainment.client",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#4b328e",
+          "imageWidth": 120
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false,
+      "reactCompiler": true
+    }
+  }
+}
