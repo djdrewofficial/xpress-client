@@ -54,6 +54,8 @@ export type SongRow = {
   artwork_url: string | null;
   preview_url: string | null;
   must_play: boolean;
+  do_not_play: boolean;
+  note: string | null;
 };
 
 /** Events this client/guest can plan. */
@@ -150,7 +152,7 @@ export async function loadSection(eventId: string, sectionId: string): Promise<{
   const [{ data: questions }, { data: answers }, { data: songs }] = await Promise.all([
     supabase.from('planning_questions').select('*').eq('section_id', sectionId).order('sort_order'),
     supabase.from('planning_question_answers').select('question_id, answer').eq('event_id', eventId),
-    supabase.from('planning_songs').select('id, title, artist, artwork_url, preview_url, must_play').eq('section_id', sectionId).order('sort_order'),
+    supabase.from('planning_songs').select('*').eq('section_id', sectionId).order('sort_order'),
   ]);
   const ansMap = new Map((answers ?? []).map((a) => [a.question_id, a.answer]));
   return {
@@ -164,8 +166,37 @@ export async function loadSection(eventId: string, sectionId: string): Promise<{
       condition_question_id: q.condition_question_id ?? null,
       condition_values: Array.isArray(q.condition_values) ? q.condition_values : [],
     })),
-    songs: (songs ?? []) as SongRow[],
+    songs: (songs ?? []).map((s) => ({
+      id: s.id,
+      title: s.title,
+      artist: s.artist ?? null,
+      artwork_url: s.artwork_url ?? null,
+      preview_url: s.preview_url ?? null,
+      must_play: !!s.must_play,
+      do_not_play: !!s.do_not_play,
+      note: s.note ?? null,
+    })),
   };
+}
+
+/** Toggle "must play" (clears "do not play" when on). */
+export async function setMustPlay(songId: string, value: boolean): Promise<void> {
+  await supabase.from('planning_songs').update(value ? { must_play: true, do_not_play: false } : { must_play: false }).eq('id', songId);
+}
+
+/** Toggle "do not play" (clears "must play" when on). */
+export async function setDoNotPlay(songId: string, value: boolean): Promise<void> {
+  await supabase.from('planning_songs').update(value ? { do_not_play: true, must_play: false } : { do_not_play: false }).eq('id', songId);
+}
+
+/** Save (or clear) a dedication / instruction note on a song. */
+export async function updateSongNote(songId: string, note: string): Promise<void> {
+  await supabase.from('planning_songs').update({ note: note.trim() || null }).eq('id', songId);
+}
+
+/** Remove a song from a section. */
+export async function removeSong(songId: string): Promise<void> {
+  await supabase.from('planning_songs').delete().eq('id', songId);
 }
 
 export async function saveAnswer(eventId: string, questionId: string, answer: string, userId: string): Promise<void> {
@@ -209,10 +240,20 @@ export async function addSong(
       must_play: false,
       sort_order: count ?? 0,
     })
-    .select('id, title, artist, artwork_url, preview_url, must_play')
+    .select('*')
     .single();
   if (error) throw error;
-  return (data as SongRow) ?? null;
+  if (!data) return null;
+  return {
+    id: data.id,
+    title: data.title,
+    artist: data.artist ?? null,
+    artwork_url: data.artwork_url ?? null,
+    preview_url: data.preview_url ?? null,
+    must_play: !!data.must_play,
+    do_not_play: !!data.do_not_play,
+    note: data.note ?? null,
+  };
 }
 
 export function questionVisible(q: QuestionRow, answers: Record<string, string>): boolean {

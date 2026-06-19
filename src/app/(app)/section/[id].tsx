@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Bar, useC } from '@/components/ui';
 import { SongPicker } from '@/components/SongPicker';
+import { SectionSongs } from '@/components/SectionSongs';
 import { Brand, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { loadSection, saveAnswer, questionVisible, type QuestionRow, type SongRow } from '@/lib/planning';
@@ -114,20 +115,8 @@ export default function SectionScreen() {
 
           {songs.length > 0 && (
             <View style={{ gap: Space.sm }}>
-              <Text style={[styles.lab, { color: c.textTertiary }]}>SONGS</Text>
-              {songs.map((s) => (
-                <View key={s.id} style={[styles.songRow, { backgroundColor: c.card, borderColor: c.border }]}>
-                  {s.artwork_url ? (
-                    <Image source={{ uri: s.artwork_url }} style={{ width: 44, height: 44, borderRadius: 8 }} />
-                  ) : (
-                    <View style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: c.cardAlt, alignItems: 'center', justifyContent: 'center' }}><Text>🎵</Text></View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: c.text, fontWeight: '600' }} numberOfLines={1}>{s.must_play ? '⭐ ' : ''}{s.title}</Text>
-                    <Text style={{ color: c.textSecondary, fontSize: 13 }} numberOfLines={1}>{s.artist}</Text>
-                  </View>
-                </View>
-              ))}
+              <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR SONGS</Text>
+              <SectionSongs songs={songs} setSongs={setSongs} />
             </View>
           )}
 

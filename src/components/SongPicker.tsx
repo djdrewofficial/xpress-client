@@ -9,6 +9,7 @@ import { Brand, Radius, Space } from '@/lib/theme';
 import { addSong, type SongRow } from '@/lib/planning';
 import { searchTracks, resolvePreview, type Track } from '@/lib/musicSearch';
 import { getRecommendations, type RecResult } from '@/lib/recommendations';
+import { connectSpotify, spotifyPlaylistTracks, spotifyPlaylists, spotifyStatus, type SpotifyPlaylist, type SpotifyTrack } from '@/lib/spotify';
 
 type PickItem = {
   key: string;
@@ -23,33 +24,20 @@ type PickItem = {
 function fromTrack(t: Track): PickItem {
   return {
     key: `${t.provider}:${t.providerId}`,
-    title: t.title,
-    artist: t.artist,
-    artworkUrl: t.artworkUrl ?? null,
-    previewUrl: t.previewUrl ?? null,
-    payload: {
-      title: t.title,
-      artist: t.artist,
-      album: t.album ?? null,
-      artwork_url: t.artworkUrl ?? null,
-      preview_url: t.previewUrl ?? null,
-      external_url: t.externalUrl ?? null,
-      provider: t.provider,
-      provider_id: t.providerId,
-    },
+    title: t.title, artist: t.artist, artworkUrl: t.artworkUrl ?? null, previewUrl: t.previewUrl ?? null,
+    payload: { title: t.title, artist: t.artist, album: t.album ?? null, artwork_url: t.artworkUrl ?? null, preview_url: t.previewUrl ?? null, external_url: t.externalUrl ?? null, provider: t.provider, provider_id: t.providerId },
+  };
+}
+function fromSpotify(t: SpotifyTrack): PickItem {
+  return {
+    key: `spotify:${t.providerId}`,
+    title: t.title, artist: t.artist, artworkUrl: t.artworkUrl, previewUrl: t.previewUrl,
+    payload: { title: t.title, artist: t.artist, album: t.album, artwork_url: t.artworkUrl, preview_url: t.previewUrl, external_url: t.externalUrl, provider: 'spotify', provider_id: t.providerId },
   };
 }
 
 export function SongPicker({
-  visible,
-  onClose,
-  mode,
-  eventId,
-  eventName,
-  sectionId,
-  sectionTitle,
-  existingTitles,
-  onAdded,
+  visible, onClose, mode, eventId, eventName, sectionId, sectionTitle, existingTitles, onAdded,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -66,37 +54,39 @@ export function SongPicker({
   const [playingKey, setPlayingKey] = useState<string | null>(null);
   const [added, setAdded] = useState<Record<string, 'busy' | 'done'>>({});
 
-  // For You state
   const [rec, setRec] = useState<RecResult | null>(null);
-  // Search state
+  const [tab, setTab] = useState<'search' | 'spotify'>('search');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Track[]>([]);
   const [searching, setSearching] = useState(false);
   const searchSeq = useRef(0);
 
+  // Spotify
+  const [sp, setSp] = useState<{ connected: boolean; displayName: string | null } | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [playlists, setPlaylists] = useState<SpotifyPlaylist[] | null>(null);
+  const [sel, setSel] = useState<SpotifyPlaylist | null>(null);
+  const [spTracks, setSpTracks] = useState<SpotifyTrack[] | null>(null);
+  const [importingAll, setImportingAll] = useState(false);
+
   useEffect(() => { setAudioModeAsync({ playsInSilentMode: true }).catch(() => {}); }, []);
 
-  // Load recommendations when the For You sheet opens.
   useEffect(() => {
-    if (visible && mode === 'foryou') {
-      setRec(null);
-      getRecommendations({ eventId, eventName, sectionTitle }).then(setRec);
-    }
+    if (visible && mode === 'foryou') { setRec(null); getRecommendations({ eventId, eventName, sectionTitle }).then(setRec); }
   }, [visible, mode, eventId, eventName, sectionTitle]);
 
-  // Stop audio + reset when the sheet closes.
   useEffect(() => {
     if (!visible) {
       try { player.pause(); } catch {}
-      setPlayingKey(null);
-      setAdded({});
-      if (mode === 'search') { setQuery(''); setResults([]); }
+      setPlayingKey(null); setAdded({});
+      setTab('search'); setQuery(''); setResults([]);
+      setSp(null); setPlaylists(null); setSel(null); setSpTracks(null);
     }
-  }, [visible, mode, player]);
+  }, [visible, player]);
 
-  // Debounced search.
+  // Debounced catalog search
   useEffect(() => {
-    if (mode !== 'search') return;
+    if (mode !== 'search' || tab !== 'search') return;
     const q = query.trim();
     if (q.length < 2) { setResults([]); setSearching(false); return; }
     setSearching(true);
@@ -106,19 +96,19 @@ export function SongPicker({
       if (seq === searchSeq.current) { setResults(r); setSearching(false); }
     }, 350);
     return () => clearTimeout(t);
-  }, [query, mode]);
+  }, [query, mode, tab]);
+
+  // Spotify status / playlists / tracks
+  useEffect(() => { if (visible && mode === 'search' && tab === 'spotify' && sp === null) spotifyStatus().then(setSp); }, [visible, mode, tab, sp]);
+  useEffect(() => { if (sp?.connected && playlists === null) spotifyPlaylists().then(setPlaylists); }, [sp, playlists]);
+  useEffect(() => { if (sel) { setSpTracks(null); spotifyPlaylistTracks(sel.id).then(setSpTracks); } }, [sel]);
 
   const togglePlay = useCallback(async (item: PickItem) => {
     if (playingKey === item.key) { try { player.pause(); } catch {} setPlayingKey(null); return; }
     let url = item.previewUrl;
     if (!url) url = await resolvePreview(item.title, item.artist ?? '');
     if (!url) { setPlayingKey(null); return; }
-    try {
-      player.replace({ uri: url });
-      player.seekTo(0);
-      player.play();
-      setPlayingKey(item.key);
-    } catch { setPlayingKey(null); }
+    try { player.replace({ uri: url }); player.seekTo(0); player.play(); setPlayingKey(item.key); } catch { setPlayingKey(null); }
   }, [playingKey, player]);
 
   const handleAdd = useCallback(async (item: PickItem) => {
@@ -127,10 +117,21 @@ export function SongPicker({
       const row = await addSong(eventId, sectionId, item.payload);
       if (row) onAdded(row);
       setAdded((p) => ({ ...p, [item.key]: 'done' }));
-    } catch {
-      setAdded((p) => { const n = { ...p }; delete n[item.key]; return n; });
-    }
+    } catch { setAdded((p) => { const n = { ...p }; delete n[item.key]; return n; }); }
   }, [eventId, sectionId, onAdded]);
+
+  const importAll = useCallback(async () => {
+    if (!spTracks) return;
+    setImportingAll(true);
+    for (const t of spTracks) {
+      const item = fromSpotify(t);
+      if (existingTitles.has(item.title.toLowerCase()) || added[item.key] === 'done') continue;
+      await handleAdd(item);
+    }
+    setImportingAll(false);
+  }, [spTracks, existingTitles, added, handleAdd]);
+
+  const stateFor = (item: PickItem) => added[item.key] ?? (existingTitles.has(item.title.toLowerCase()) ? 'done' : undefined);
 
   const recItems: PickItem[] = rec?.status === 'ok'
     ? rec.songs.map((s) => ({ key: s.id, title: s.title, artist: s.artist, artworkUrl: s.artwork_url, previewUrl: s.preview_url, reason: s.reason, payload: { title: s.title, artist: s.artist, artwork_url: s.artwork_url, preview_url: s.preview_url } }))
@@ -151,55 +152,73 @@ export function SongPicker({
           </View>
 
           {mode === 'search' && (
-            <View style={{ paddingHorizontal: Space.lg, paddingTop: Space.md }}>
-              <View style={[styles.searchBox, { backgroundColor: c.cardAlt, borderColor: c.border }]}>
-                <Text style={{ color: c.textTertiary, fontSize: 16 }}>🔍</Text>
-                <TextInput
-                  style={{ flex: 1, color: c.text, fontSize: 16 }}
-                  value={query}
-                  onChangeText={setQuery}
-                  placeholder="Search songs or artists…"
-                  placeholderTextColor={c.textTertiary}
-                  autoFocus
-                  returnKeyType="search"
-                />
-                {query.length > 0 && (
-                  <Pressable onPress={() => setQuery('')} hitSlop={8}><Text style={{ color: c.textTertiary }}>✕</Text></Pressable>
-                )}
+            <View style={{ paddingHorizontal: Space.lg, paddingTop: Space.md, gap: Space.md }}>
+              <View style={[styles.segment, { backgroundColor: c.cardAlt }]}>
+                <SegBtn label="Search" active={tab === 'search'} onPress={() => setTab('search')} c={c} />
+                <SegBtn label="From Spotify" active={tab === 'spotify'} onPress={() => setTab('spotify')} c={c} />
               </View>
+              {tab === 'search' && (
+                <View style={[styles.searchBox, { backgroundColor: c.cardAlt, borderColor: c.border }]}>
+                  <Text style={{ color: c.textTertiary, fontSize: 16 }}>🔍</Text>
+                  <TextInput style={{ flex: 1, color: c.text, fontSize: 16 }} value={query} onChangeText={setQuery} placeholder="Search songs or artists…" placeholderTextColor={c.textTertiary} autoFocus returnKeyType="search" />
+                  {query.length > 0 && <Pressable onPress={() => setQuery('')} hitSlop={8}><Text style={{ color: c.textTertiary }}>✕</Text></Pressable>}
+                </View>
+              )}
             </View>
           )}
 
           <ScrollView contentContainerStyle={{ padding: Space.lg, gap: Space.sm, paddingBottom: Space.xxl * 2 }} keyboardShouldPersistTaps="handled">
             {mode === 'foryou' ? (
-              !rec ? (
-                <View style={styles.pad}><ActivityIndicator color={Brand.purple} /></View>
-              ) : rec.status === 'needs-profile' ? (
-                <Empty text="Tell us about yourselves in About Us and your Cultural Influence — then we'll pick songs that fit your story." />
-              ) : rec.status === 'unconfigured' || rec.status === 'error' ? (
-                <Empty text="Song picks aren't available right now. Try the Add music search instead." />
-              ) : recItems.length === 0 ? (
-                <Empty text="No picks just yet — check back after you add more about yourselves." />
-              ) : (
+              !rec ? <View style={styles.pad}><ActivityIndicator color={Brand.purple} /></View>
+              : rec.status === 'needs-profile' ? <Empty text="Tell us about yourselves in About Us and your Cultural Influence — then we'll pick songs that fit your story." />
+              : rec.status === 'unconfigured' || rec.status === 'error' ? <Empty text="Song picks aren't available right now. Try the Add music search instead." />
+              : recItems.length === 0 ? <Empty text="No picks just yet — check back after you add more about yourselves." />
+              : (
                 <>
                   {rec.basis.length > 0 && <Text style={{ color: c.textTertiary, fontSize: 12, fontStyle: 'italic', marginBottom: 4 }}>Based on {rec.basis.join(', ')}</Text>}
-                  {recItems.map((item) => (
-                    <SongRowView key={item.key} item={item} c={c} playing={playingKey === item.key} state={added[item.key] ?? (existingTitles.has(item.title.toLowerCase()) ? 'done' : undefined)} onPlay={() => togglePlay(item)} onAdd={() => handleAdd(item)} />
-                  ))}
+                  {recItems.map((item) => <SongRowView key={item.key} item={item} c={c} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => togglePlay(item)} onAdd={() => handleAdd(item)} />)}
                 </>
               )
+            ) : tab === 'search' ? (
+              searching ? <View style={styles.pad}><ActivityIndicator color={Brand.purple} /></View>
+              : query.trim().length < 2 ? <Empty text="Search any song or artist to add it to this moment." />
+              : results.length === 0 ? <Empty text="No results. Try a different search." />
+              : results.map(fromTrack).map((item) => <SongRowView key={item.key} item={item} c={c} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => togglePlay(item)} onAdd={() => handleAdd(item)} />)
             ) : (
-              searching ? (
-                <View style={styles.pad}><ActivityIndicator color={Brand.purple} /></View>
-              ) : query.trim().length < 2 ? (
-                <Empty text="Search any song or artist to add it to this moment." />
-              ) : results.length === 0 ? (
-                <Empty text="No results. Try a different search." />
-              ) : (
-                results.map(fromTrack).map((item) => (
-                  <SongRowView key={item.key} item={item} c={c} playing={playingKey === item.key} state={added[item.key] ?? (existingTitles.has(item.title.toLowerCase()) ? 'done' : undefined)} onPlay={() => togglePlay(item)} onAdd={() => handleAdd(item)} />
-                ))
-              )
+              // ── Spotify tab ──
+              sp === null ? <View style={styles.pad}><ActivityIndicator color={Brand.purple} /></View>
+              : !sp.connected ? (
+                <View style={{ alignItems: 'center', gap: Space.md, paddingVertical: Space.xl }}>
+                  <Text style={{ color: c.textSecondary, textAlign: 'center', fontSize: 14, lineHeight: 20, paddingHorizontal: Space.lg }}>Connect your Spotify to import songs from your own playlists.</Text>
+                  <Pressable disabled={connecting} onPress={async () => { setConnecting(true); const ok = await connectSpotify(); setConnecting(false); if (ok) { setSp({ connected: true, displayName: null }); setPlaylists(null); } }} style={[styles.spotifyBtn]}>
+                    {connecting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Connect Spotify</Text>}
+                  </Pressable>
+                </View>
+              ) : sel ? (
+                spTracks === null ? <View style={styles.pad}><ActivityIndicator color={Brand.purple} /></View>
+                : (
+                  <>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Space.sm }}>
+                      <Pressable onPress={() => { setSel(null); setSpTracks(null); }} hitSlop={8}><Text style={{ color: Brand.purpleLight, fontSize: 14, fontWeight: '600' }}>‹ Playlists</Text></Pressable>
+                      <Pressable disabled={importingAll} onPress={importAll} style={[styles.addAll, { backgroundColor: Brand.purple }]}>
+                        {importingAll ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>+ Add all ({spTracks.length})</Text>}
+                      </Pressable>
+                    </View>
+                    {spTracks.map(fromSpotify).map((item) => <SongRowView key={item.key} item={item} c={c} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => togglePlay(item)} onAdd={() => handleAdd(item)} />)}
+                  </>
+                )
+              ) : playlists === null ? <View style={styles.pad}><ActivityIndicator color={Brand.purple} /></View>
+              : playlists.length === 0 ? <Empty text="No playlists found on your Spotify account." />
+              : playlists.map((p) => (
+                <Pressable key={p.id} onPress={() => setSel(p)} style={[styles.row, { backgroundColor: c.card, borderColor: c.border }]}>
+                  {p.image ? <Image source={{ uri: p.image }} style={styles.art} /> : <View style={[styles.art, { backgroundColor: c.cardAlt, alignItems: 'center', justifyContent: 'center' }]}><Text>🎧</Text></View>}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: c.text, fontWeight: '600', fontSize: 14 }} numberOfLines={1}>{p.name}</Text>
+                    <Text style={{ color: c.textSecondary, fontSize: 12 }} numberOfLines={1}>{p.trackCount} songs{p.owner ? ` · ${p.owner}` : ''}</Text>
+                  </View>
+                  <Text style={{ color: c.textTertiary, fontSize: 20 }}>›</Text>
+                </Pressable>
+              ))
             )}
           </ScrollView>
         </SafeAreaView>
@@ -208,27 +227,20 @@ export function SongPicker({
   );
 }
 
-function SongRowView({
-  item, c, playing, state, onPlay, onAdd,
-}: {
-  item: PickItem;
-  c: ReturnType<typeof useC>;
-  playing: boolean;
-  state?: 'busy' | 'done';
-  onPlay: () => void;
-  onAdd: () => void;
-}) {
+function SegBtn({ label, active, onPress, c }: { label: string; active: boolean; onPress: () => void; c: ReturnType<typeof useC> }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.segBtn, active && { backgroundColor: c.card }]}>
+      <Text style={{ color: active ? c.text : c.textSecondary, fontWeight: '700', fontSize: 13 }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function SongRowView({ item, c, playing, state, onPlay, onAdd }: { item: PickItem; c: ReturnType<typeof useC>; playing: boolean; state?: 'busy' | 'done'; onPlay: () => void; onAdd: () => void }) {
   return (
     <View style={[styles.row, { backgroundColor: c.card, borderColor: c.border }]}>
       <Pressable onPress={onPlay} style={styles.artWrap}>
-        {item.artworkUrl ? (
-          <Image source={{ uri: item.artworkUrl }} style={styles.art} />
-        ) : (
-          <View style={[styles.art, { backgroundColor: c.cardAlt, alignItems: 'center', justifyContent: 'center' }]}><Text>🎵</Text></View>
-        )}
-        <View style={styles.playOverlay}>
-          <Text style={{ color: '#fff', fontSize: 16 }}>{playing ? '⏸' : '▶'}</Text>
-        </View>
+        {item.artworkUrl ? <Image source={{ uri: item.artworkUrl }} style={styles.art} /> : <View style={[styles.art, { backgroundColor: c.cardAlt, alignItems: 'center', justifyContent: 'center' }]}><Text>🎵</Text></View>}
+        <View style={styles.playOverlay}><Text style={{ color: '#fff', fontSize: 16 }}>{playing ? '⏸' : '▶'}</Text></View>
       </Pressable>
       <View style={{ flex: 1 }}>
         <Text style={{ color: c.text, fontWeight: '600', fontSize: 14 }} numberOfLines={1}>{item.title}</Text>
@@ -236,13 +248,9 @@ function SongRowView({
         {item.reason ? <Text style={{ color: c.textTertiary, fontSize: 11, marginTop: 2 }} numberOfLines={1}>{item.reason}</Text> : null}
       </View>
       <Pressable disabled={state != null} onPress={onAdd} hitSlop={8}>
-        {state === 'done' ? (
-          <View style={[styles.addBtn, { backgroundColor: '#16a34a22' }]}><Text style={{ color: '#16a34a', fontWeight: '700', fontSize: 18 }}>✓</Text></View>
-        ) : state === 'busy' ? (
-          <View style={[styles.addBtn, { backgroundColor: c.cardAlt }]}><ActivityIndicator size="small" color={Brand.purple} /></View>
-        ) : (
-          <View style={[styles.addBtn, { backgroundColor: Brand.purple }]}><Text style={{ color: '#fff', fontWeight: '800', fontSize: 20, marginTop: -2 }}>+</Text></View>
-        )}
+        {state === 'done' ? <View style={[styles.addBtn, { backgroundColor: '#16a34a22' }]}><Text style={{ color: '#16a34a', fontWeight: '700', fontSize: 18 }}>✓</Text></View>
+          : state === 'busy' ? <View style={[styles.addBtn, { backgroundColor: c.cardAlt }]}><ActivityIndicator size="small" color={Brand.purple} /></View>
+          : <View style={[styles.addBtn, { backgroundColor: Brand.purple }]}><Text style={{ color: '#fff', fontWeight: '800', fontSize: 20, marginTop: -2 }}>+</Text></View>}
       </Pressable>
     </View>
   );
@@ -256,6 +264,8 @@ function Empty({ text }: { text: string }) {
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: Space.md, padding: Space.lg, borderBottomWidth: StyleSheet.hairlineWidth },
   close: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  segment: { flexDirection: 'row', borderRadius: Radius.md, padding: 3 },
+  segBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: Radius.sm },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, borderWidth: 1, borderRadius: Radius.md, paddingHorizontal: Space.md, height: 46 },
   pad: { paddingVertical: Space.xxl, alignItems: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: Space.md, borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.md, padding: Space.sm },
@@ -263,4 +273,6 @@ const styles = StyleSheet.create({
   art: { width: 48, height: 48, borderRadius: 8 },
   playOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
   addBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  addAll: { borderRadius: Radius.pill, paddingVertical: 8, paddingHorizontal: 14 },
+  spotifyBtn: { backgroundColor: '#1DB954', borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 28, minWidth: 200, alignItems: 'center' },
 });
