@@ -49,7 +49,7 @@ export async function loadAccount(eventId: string, isGuest: boolean): Promise<Ac
 
   const [{ data: eAddons }, { data: company }] = await Promise.all([
     supabase.from('event_addons').select('addon_id, quantity, price_override, price_locked').eq('event_id', eventId),
-    supabase.from('company_settings').select('company_name, from_email, reply_to').maybeSingle(),
+    supabase.from('company_public').select('company_name, from_email, reply_to').maybeSingle(),
   ]);
   // Only pull money when it's allowed to be shown.
   const pays = financialsVisible
