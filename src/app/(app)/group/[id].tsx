@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Bar, useC } from '@/components/ui';
-import { Brand, Radius, Space } from '@/lib/theme';
+import { Brand, Radius, Shadow, Space } from '@/lib/theme';
 import { loadOverview, type SectionRow } from '@/lib/planning';
 
 export default function GroupScreen() {
@@ -35,15 +35,15 @@ export default function GroupScreen() {
               const complete = s.questionCount > 0 && s.answeredCount === s.questionCount;
               const pct = s.questionCount > 0 ? Math.round((s.answeredCount / s.questionCount) * 100) : s.songCount > 0 ? 100 : 0;
               return (
-                <Pressable key={s.id} onPress={() => router.push({ pathname: '/section/[id]', params: { id: s.id, eventId } })}>
-                  <View style={[styles.row, { backgroundColor: c.card, borderColor: c.border }]}>
-                    <Text style={{ fontSize: 24 }}>{s.icon ?? '•'}</Text>
+                <Pressable key={s.id} onPress={() => router.push({ pathname: '/section/[id]', params: { id: s.id, eventId } })} style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.99 : 1 }] }]}>
+                  <View style={[styles.row, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                    <View style={[styles.icon, { backgroundColor: c.cardAlt }]}><Text style={{ fontSize: 22 }}>{s.icon ?? '•'}</Text></View>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{s.title}</Text>
+                      <Text style={{ color: c.text, fontSize: 16, fontWeight: '700' }}>{s.title}</Text>
                       <Bar pct={pct} height={5} />
                     </View>
                     <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                      {s.questionCount > 0 && <Text style={{ color: complete ? '#16a34a' : c.textTertiary, fontSize: 12, fontWeight: '600' }}>{s.answeredCount}/{s.questionCount}</Text>}
+                      {s.questionCount > 0 && <Text style={{ color: complete ? '#16a34a' : c.textTertiary, fontSize: 12, fontWeight: '700' }}>{complete ? '✓ ' : ''}{s.answeredCount}/{s.questionCount}</Text>}
                       {s.songCount > 0 && <Text style={{ color: c.textTertiary, fontSize: 12 }}>🎵 {s.songCount}</Text>}
                     </View>
                   </View>
@@ -61,4 +61,5 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: Space.lg, paddingVertical: Space.md },
   title: { fontSize: 26, fontWeight: '800', marginBottom: Space.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: Space.md, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: Space.md },
+  icon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
 });

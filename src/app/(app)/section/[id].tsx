@@ -5,9 +5,10 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Card, useC } from '@/components/ui';
+import { AiPicks } from '@/components/AiPicks';
 import { Brand, Radius, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
-import { loadSection, saveAnswer, questionVisible, type QuestionRow, type SongRow } from '@/lib/planning';
+import { addSong, loadSection, saveAnswer, questionVisible, type QuestionRow, type SongRow } from '@/lib/planning';
 import { supabase } from '@/lib/supabase';
 
 export default function SectionScreen() {
@@ -15,7 +16,8 @@ export default function SectionScreen() {
   const router = useRouter();
   const { session } = useAuth();
   const { id, eventId } = useLocalSearchParams<{ id: string; eventId: string }>();
-  const [meta, setMeta] = useState<{ title: string; icon: string | null; intro: string | null } | null>(null);
+  const [meta, setMeta] = useState<{ title: string; icon: string | null; intro: string | null; songs_enabled: boolean } | null>(null);
+  const [eventName, setEventName] = useState('');
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [songs, setSongs] = useState<SongRow[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -23,11 +25,13 @@ export default function SectionScreen() {
 
   const load = useCallback(async () => {
     if (!id || !eventId) return;
-    const [{ data: m }, sec] = await Promise.all([
-      supabase.from('planning_sections').select('title, icon, intro').eq('id', id).maybeSingle(),
+    const [{ data: m }, { data: ev }, sec] = await Promise.all([
+      supabase.from('planning_sections').select('title, icon, intro, songs_enabled').eq('id', id).maybeSingle(),
+      supabase.from('events').select('name').eq('id', eventId).maybeSingle(),
       loadSection(eventId, id),
     ]);
-    setMeta(m ?? { title: 'Section', icon: null, intro: null });
+    setMeta(m ?? { title: 'Section', icon: null, intro: null, songs_enabled: false });
+    setEventName(ev?.name ?? '');
     setQuestions(sec.questions);
     setSongs(sec.songs);
     const a: Record<string, string> = {};
@@ -68,6 +72,19 @@ export default function SectionScreen() {
             <Text style={[styles.title, { color: c.text }]}>{meta?.icon ? `${meta.icon} ` : ''}{meta?.title}</Text>
             {meta?.intro ? <Text style={{ color: c.textSecondary, marginTop: 4 }}>{meta.intro}</Text> : null}
           </View>
+
+          {meta?.songs_enabled && (
+            <AiPicks
+              eventId={eventId}
+              eventName={eventName}
+              sectionTitle={meta.title}
+              existingTitles={new Set(songs.map((s) => s.title.toLowerCase()))}
+              onAdd={async (rec) => {
+                const row = await addSong(eventId, id, { title: rec.title, artist: rec.artist, artwork_url: rec.artwork_url, preview_url: rec.preview_url });
+                if (row) setSongs((prev) => [...prev, row]);
+              }}
+            />
+          )}
 
           {songs.length > 0 && (
             <View style={{ gap: Space.sm }}>

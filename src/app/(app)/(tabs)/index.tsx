@@ -4,19 +4,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 
-import { Bar, useC } from '@/components/ui';
-import { Brand, Radius, Space } from '@/lib/theme';
+import { Bar, Ring, Sparkle, useC, useScheme } from '@/components/ui';
+import { Brand, CategoryThemes, Radius, Shadow, Space, type CategoryTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { getMyEvents, loadOverview, type EventLite, type Group, type Overview } from '@/lib/planning';
-
-const TILE_TONES = [
-  { bg: '#EEEDFE', fg: '#3C3489', bar: '#534AB7' },
-  { bg: '#E1F5EE', fg: '#0F6E56', bar: '#0F6E56' },
-  { bg: '#FAEEDA', fg: '#854F0B', bar: '#BA7517' },
-  { bg: '#FBEAF0', fg: '#993556', bar: '#993556' },
-  { bg: '#FAECE7', fg: '#993C1D', bar: '#D85A30' },
-  { bg: '#E6F1FB', fg: '#185FA5', bar: '#378ADD' },
-];
 
 export default function PlanScreen() {
   const c = useC();
@@ -42,6 +33,7 @@ export default function PlanScreen() {
   if (loading) return <View style={[styles.center, { backgroundColor: c.bg }]}><ActivityIndicator color={Brand.purple} /></View>;
 
   const pct = overview && overview.totalQuestions > 0 ? Math.round((overview.answeredQuestions / overview.totalQuestions) * 100) : 0;
+  const countdown = event?.event_date ? daysUntil(event.event_date) : null;
   const dateLabel = event?.event_date
     ? new Date(event.event_date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })
     : null;
@@ -64,9 +56,15 @@ export default function PlanScreen() {
             </View>
           ) : (
             <>
-              <LinearGradient colors={[Brand.purple, '#6a4fb8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+              <LinearGradient colors={[Brand.purple, '#6a4fb8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, Shadow.card]}>
                 {dateLabel && <Text style={styles.heroDate}>{dateLabel.toUpperCase()}</Text>}
                 <Text style={styles.heroTitle}>{event.name || 'Your Event'}</Text>
+                {countdown != null && countdown >= 0 && (
+                  <View style={styles.countPill}>
+                    <Text style={styles.countNum}>{countdown}</Text>
+                    <Text style={styles.countLab}>{countdown === 1 ? 'day to go' : 'days to go'}</Text>
+                  </View>
+                )}
                 <View style={styles.heroProgRow}>
                   <Text style={styles.heroPct}>{pct}%</Text>
                   <Text style={styles.heroSub}>{pct >= 80 ? "You're almost there!" : pct > 0 ? 'Looking great so far' : "Let's get started!"}</Text>
@@ -78,10 +76,10 @@ export default function PlanScreen() {
                 <View>
                   <Text style={[styles.lab, { color: c.textTertiary }]}>PICK UP WHERE YOU LEFT OFF</Text>
                   <Pressable onPress={() => router.push({ pathname: '/section/[id]', params: { id: nextUp.id, eventId: event.id } })}>
-                    <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border, flexDirection: 'row', alignItems: 'center', gap: Space.md }]}>
+                    <View style={[styles.card, Shadow.card, { backgroundColor: c.card, borderColor: c.border, flexDirection: 'row', alignItems: 'center', gap: Space.md }]}>
                       <Text style={{ fontSize: 26 }}>{nextUp.icon ?? '🎵'}</Text>
                       <View style={{ flex: 1 }}>
-                        <Text style={[styles.tileTitle, { color: c.text }]}>{nextUp.title}</Text>
+                        <Text style={[styles.contTitle, { color: c.text }]}>{nextUp.title}</Text>
                         <Text style={{ color: c.textSecondary, fontSize: 13 }}>{nextUp.answeredCount}/{nextUp.questionCount} answered</Text>
                       </View>
                       <View style={styles.cta}><Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>Continue</Text></View>
@@ -90,13 +88,16 @@ export default function PlanScreen() {
                 </View>
               )}
 
-              <View>
+              <View style={{ gap: Space.md }}>
                 <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR PLAN</Text>
-                <View style={styles.grid}>
-                  {overview?.groups.map((g, i) => (
-                    <GroupTile key={g.id} group={g} tone={TILE_TONES[i % TILE_TONES.length]} onPress={() => router.push({ pathname: '/group/[id]', params: { id: g.id, eventId: event.id, title: g.title } })} />
-                  ))}
-                </View>
+                {overview?.groups.map((g, i) => (
+                  <CategoryCard
+                    key={g.id}
+                    group={g}
+                    theme={CategoryThemes[i % CategoryThemes.length]}
+                    onPress={() => router.push({ pathname: '/group/[id]', params: { id: g.id, eventId: event.id, title: g.title } })}
+                  />
+                ))}
               </View>
             </>
           )}
@@ -106,22 +107,69 @@ export default function PlanScreen() {
   );
 }
 
-function GroupTile({ group, tone, onPress }: { group: Group; tone: { bg: string; fg: string; bar: string }; onPress: () => void }) {
-  const pct = group.totalQuestions > 0 ? Math.round((group.answeredQuestions / group.totalQuestions) * 100) : group.songCount > 0 ? 100 : 0;
+function CategoryCard({ group, theme, onPress }: { group: Group; theme: CategoryTheme; onPress: () => void }) {
+  const c = useC();
+  const scheme = useScheme();
+  const dark = scheme === 'dark';
+  const bg = dark ? theme.tintDark : theme.tint;
+  const fg = dark ? theme.grad[1] : theme.accent;
+
+  const pct = group.totalQuestions > 0
+    ? Math.round((group.answeredQuestions / group.totalQuestions) * 100)
+    : group.songCount > 0 ? 100 : 0;
+
+  const peek = group.sections.slice(0, 3);
+  const moreCount = group.sections.length - peek.length;
+  const meta = [
+    `${group.sections.length} ${group.sections.length === 1 ? 'section' : 'sections'}`,
+    group.songCount > 0 ? `${group.songCount} ${group.songCount === 1 ? 'song' : 'songs'}` : null,
+  ].filter(Boolean).join('  ·  ');
+
   return (
-    <Pressable onPress={onPress} style={styles.tile}>
-      <View style={[styles.tileInner, { backgroundColor: tone.bg }]}>
-        <View style={[styles.tileIcon, { backgroundColor: '#ffffffaa' }]}><Text style={{ fontSize: 20 }}>{group.icon ?? '•'}</Text></View>
-        <Text style={[styles.tileName, { color: tone.fg }]} numberOfLines={2}>{group.title}</Text>
-        <View style={{ height: 5, borderRadius: 5, backgroundColor: '#ffffff80', overflow: 'hidden' }}>
-          <View style={{ width: `${pct}%`, height: '100%', backgroundColor: tone.bar }} />
+    <Pressable onPress={onPress} style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.985 : 1 }] }]}>
+      <View style={[styles.cat, Shadow.card, { backgroundColor: bg }]}>
+        <View style={styles.catTop}>
+          <LinearGradient colors={[theme.grad[0], theme.grad[1]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.catIcon}>
+            <Text style={{ fontSize: 24 }}>{group.icon ?? '✨'}</Text>
+          </LinearGradient>
+          <View style={{ flex: 1, gap: 3 }}>
+            <Text style={[styles.catTitle, { color: dark ? c.text : '#1c1630' }]} numberOfLines={2}>{group.title}</Text>
+            <Text style={{ color: fg, fontSize: 12.5, fontWeight: '600', opacity: 0.9 }}>{meta}</Text>
+          </View>
+          <Ring pct={pct} size={54} stroke={6} color={fg} track={fg + '24'} />
         </View>
-        <Text style={{ color: tone.fg, fontSize: 11, opacity: 0.8, marginTop: 4 }}>
-          {group.totalQuestions > 0 ? `${group.answeredQuestions}/${group.totalQuestions} answered` : `${group.sections.length} sections`}
-        </Text>
+
+        {peek.length > 0 && (
+          <View style={styles.chips}>
+            {peek.map((s) => (
+              <View key={s.id} style={[styles.chip, { backgroundColor: dark ? '#ffffff14' : '#ffffffcc' }]}>
+                <Text style={{ fontSize: 12 }}>{s.icon ?? '•'}</Text>
+                <Text style={[styles.chipTxt, { color: dark ? c.textSecondary : '#3a3450' }]} numberOfLines={1}>{s.title}</Text>
+              </View>
+            ))}
+            {moreCount > 0 && (
+              <View style={[styles.chip, { backgroundColor: dark ? '#ffffff14' : '#ffffffcc' }]}>
+                <Text style={[styles.chipTxt, { color: fg }]}>+{moreCount} more</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {group.songCount > 0 && (
+          <View style={{ marginTop: Space.md }}>
+            <Sparkle label="AI picks inside" />
+          </View>
+        )}
       </View>
     </Pressable>
   );
+}
+
+function daysUntil(dateStr: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr + 'T00:00:00');
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
 }
 
 const styles = StyleSheet.create({
@@ -132,15 +180,21 @@ const styles = StyleSheet.create({
   hero: { borderRadius: Radius.xl, padding: Space.xl },
   heroDate: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
   heroTitle: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 4 },
+  countPill: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: Space.md, backgroundColor: 'rgba(255,255,255,0.18)', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill },
+  countNum: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  countLab: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '600' },
   heroProgRow: { flexDirection: 'row', alignItems: 'baseline', gap: Space.sm, marginTop: Space.lg },
   heroPct: { color: '#fff', fontSize: 30, fontWeight: '800' },
   heroSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, flex: 1 },
   lab: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: Space.sm },
-  tileTitle: { fontSize: 16, fontWeight: '600' },
+  contTitle: { fontSize: 16, fontWeight: '600' },
   cta: { backgroundColor: Brand.purple, borderRadius: Radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: Space.md },
-  tile: { width: '48.5%' },
-  tileInner: { borderRadius: Radius.lg, padding: Space.lg, minHeight: 130, justifyContent: 'space-between' },
-  tileIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: Space.sm },
-  tileName: { fontSize: 15, fontWeight: '700', marginBottom: Space.sm, flex: 1 },
+
+  cat: { borderRadius: Radius.xl, padding: Space.lg },
+  catTop: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
+  catIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  catTitle: { fontSize: 18, fontWeight: '800', letterSpacing: -0.2 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: Space.md },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6, paddingHorizontal: 10, borderRadius: Radius.pill, maxWidth: '100%' },
+  chipTxt: { fontSize: 12, fontWeight: '600' },
 });

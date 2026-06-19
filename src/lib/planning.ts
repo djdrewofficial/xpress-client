@@ -171,6 +171,34 @@ export async function saveAnswer(eventId: string, questionId: string, answer: st
     .upsert({ question_id: questionId, event_id: eventId, answer, answered_by: userId, updated_at: new Date().toISOString() }, { onConflict: 'question_id' });
 }
 
+/** Add a song to a section (used by AI picks + search). Returns the new row. */
+export async function addSong(
+  eventId: string,
+  sectionId: string,
+  song: { title: string; artist?: string | null; artwork_url?: string | null; preview_url?: string | null },
+): Promise<SongRow | null> {
+  const { count } = await supabase
+    .from('planning_songs')
+    .select('id', { count: 'exact', head: true })
+    .eq('section_id', sectionId);
+  const { data, error } = await supabase
+    .from('planning_songs')
+    .insert({
+      event_id: eventId,
+      section_id: sectionId,
+      title: song.title,
+      artist: song.artist ?? null,
+      artwork_url: song.artwork_url ?? null,
+      preview_url: song.preview_url ?? null,
+      must_play: false,
+      sort_order: count ?? 0,
+    })
+    .select('id, title, artist, artwork_url, preview_url, must_play')
+    .single();
+  if (error) throw error;
+  return (data as SongRow) ?? null;
+}
+
 export function questionVisible(q: QuestionRow, answers: Record<string, string>): boolean {
   if (!q.condition_question_id) return true;
   const ctrl = answers[q.condition_question_id];
