@@ -8,8 +8,9 @@ import { useC } from '@/components/ui';
 import { Brand, Radius, Space } from '@/lib/theme';
 import { addSong, type SongRow } from '@/lib/planning';
 import { searchTracks, resolvePreview, type Track } from '@/lib/musicSearch';
-import { getRecommendations, type RecResult } from '@/lib/recommendations';
+import { getRecommendations, type RecommendedSong } from '@/lib/recommendations';
 import { connectSpotify, spotifyPlaylistTracks, spotifyPlaylists, spotifyStatus, type SpotifyPlaylist, type SpotifyTrack } from '@/lib/spotify';
+import { MixtapeLoader } from '@/components/MixtapeLoader';
 
 type PickItem = {
   key: string;
@@ -35,6 +36,12 @@ function fromSpotify(t: SpotifyTrack): PickItem {
     payload: { title: t.title, artist: t.artist, album: t.album, artwork_url: t.artworkUrl, preview_url: t.previewUrl, external_url: t.externalUrl, provider: 'spotify', provider_id: t.providerId },
   };
 }
+function fromRec(s: RecommendedSong): PickItem {
+  return {
+    key: s.id, title: s.title, artist: s.artist, artworkUrl: s.artwork_url, previewUrl: s.preview_url, reason: s.reason,
+    payload: { title: s.title, artist: s.artist, artwork_url: s.artwork_url, preview_url: s.preview_url },
+  };
+}
 
 export function SongPicker({
   visible, onClose, mode, eventId, eventName, sectionId, sectionTitle, existingTitles, onAdded,
@@ -54,7 +61,8 @@ export function SongPicker({
   const [playingKey, setPlayingKey] = useState<string | null>(null);
   const [added, setAdded] = useState<Record<string, 'busy' | 'done'>>({});
 
-  const [rec, setRec] = useState<RecResult | null>(null);
+  const [fy, setFy] = useState<{ status: 'loading' | 'needs-profile' | 'unconfigured' | 'error' | 'ok'; items: PickItem[]; basis: string[] }>({ status: 'loading', items: [], basis: [] });
+  const [fyMore, setFyMore] = useState(false);
   const [tab, setTab] = useState<'search' | 'spotify'>('search');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Track[]>([]);
@@ -71,9 +79,35 @@ export function SongPicker({
 
   useEffect(() => { setAudioModeAsync({ playsInSilentMode: true }).catch(() => {}); }, []);
 
+  // Load For You picks when the sheet opens — excluding songs already on the playlist.
   useEffect(() => {
-    if (visible && mode === 'foryou') { setRec(null); getRecommendations({ eventId, eventName, sectionTitle }).then(setRec); }
+    if (!(visible && mode === 'foryou')) return;
+    let cancelled = false;
+    setFy({ status: 'loading', items: [], basis: [] });
+    getRecommendations({ eventId, eventName, sectionTitle, exclude: [...existingTitles] }).then((res) => {
+      if (cancelled) return;
+      if (res.status !== 'ok') { setFy({ status: res.status, items: [], basis: [] }); return; }
+      const seen = new Set(existingTitles);
+      const items = res.songs.filter((s) => !seen.has(s.title.toLowerCase())).map(fromRec);
+      setFy({ status: 'ok', items, basis: res.basis });
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, mode, eventId, eventName, sectionTitle]);
+
+  const loadMoreForYou = async () => {
+    setFyMore(true);
+    const exclude = [...existingTitles, ...fy.items.map((i) => i.title.toLowerCase())];
+    const res = await getRecommendations({ eventId, eventName, sectionTitle, exclude });
+    if (res.status === 'ok') {
+      setFy((prev) => {
+        const seen = new Set([...existingTitles, ...prev.items.map((i) => i.title.toLowerCase())]);
+        const add = res.songs.filter((s) => !seen.has(s.title.toLowerCase())).map(fromRec);
+        return { ...prev, items: [...prev.items, ...add] };
+      });
+    }
+    setFyMore(false);
+  };
 
   useEffect(() => {
     if (!visible) {
@@ -81,6 +115,7 @@ export function SongPicker({
       setPlayingKey(null); setAdded({});
       setTab('search'); setQuery(''); setResults([]);
       setSp(null); setPlaylists(null); setSel(null); setSpTracks(null);
+      setFy({ status: 'loading', items: [], basis: [] }); setFyMore(false);
     }
   }, [visible, player]);
 
@@ -133,10 +168,6 @@ export function SongPicker({
 
   const stateFor = (item: PickItem) => added[item.key] ?? (existingTitles.has(item.title.toLowerCase()) ? 'done' : undefined);
 
-  const recItems: PickItem[] = rec?.status === 'ok'
-    ? rec.songs.map((s) => ({ key: s.id, title: s.title, artist: s.artist, artworkUrl: s.artwork_url, previewUrl: s.preview_url, reason: s.reason, payload: { title: s.title, artist: s.artist, artwork_url: s.artwork_url, preview_url: s.preview_url } }))
-    : [];
-
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -169,14 +200,19 @@ export function SongPicker({
 
           <ScrollView contentContainerStyle={{ padding: Space.lg, gap: Space.sm, paddingBottom: Space.xxl * 2 }} keyboardShouldPersistTaps="handled">
             {mode === 'foryou' ? (
-              !rec ? <View style={styles.pad}><ActivityIndicator color={Brand.purple} /></View>
-              : rec.status === 'needs-profile' ? <Empty text="Head to “Tell us about you” under Let's Get Started and share your story + favorite genres — then we'll fill this with songs picked just for you." />
-              : rec.status === 'unconfigured' || rec.status === 'error' ? <Empty text="Song picks aren't available right now. Try the Add music search instead." />
-              : recItems.length === 0 ? <Empty text="No picks yet. Add your story and favorite genres in “Tell us about you” (Let's Get Started) and we'll tailor songs to you." />
-              : (
+              fy.status === 'loading' ? <MixtapeLoader eventName={eventName} />
+              : fy.status === 'needs-profile' ? <Empty text="Head to “Tell us about you” under Let's Get Started and share your story + favorite genres — then we'll fill this with songs picked just for you." />
+              : fy.status === 'unconfigured' || fy.status === 'error' ? <Empty text="Song picks aren't available right now. Try the Add music search instead." />
+              : fy.items.length === 0 ? (
                 <>
-                  {rec.basis.length > 0 && <Text style={{ color: c.textTertiary, fontSize: 12, fontStyle: 'italic', marginBottom: 4 }}>Based on {rec.basis.join(', ')}</Text>}
-                  {recItems.map((item) => <SongRowView key={item.key} item={item} c={c} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => togglePlay(item)} onAdd={() => handleAdd(item)} />)}
+                  <Empty text="You've already added the obvious ones! Tap below for fresh ideas." />
+                  <LoadMore loading={fyMore} onPress={loadMoreForYou} c={c} />
+                </>
+              ) : (
+                <>
+                  {fy.basis.length > 0 && <Text style={{ color: c.textTertiary, fontSize: 12, fontStyle: 'italic', marginBottom: 4 }}>Based on {fy.basis.join(', ')}</Text>}
+                  {fy.items.map((item) => <SongRowView key={item.key} item={item} c={c} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => togglePlay(item)} onAdd={() => handleAdd(item)} />)}
+                  <LoadMore loading={fyMore} onPress={loadMoreForYou} c={c} />
                 </>
               )
             ) : tab === 'search' ? (
@@ -256,6 +292,14 @@ function SongRowView({ item, c, playing, state, onPlay, onAdd }: { item: PickIte
   );
 }
 
+function LoadMore({ loading, onPress, c }: { loading: boolean; onPress: () => void; c: ReturnType<typeof useC> }) {
+  return (
+    <Pressable onPress={onPress} disabled={loading} style={[styles.loadMore, { backgroundColor: c.cardAlt, borderColor: c.border }]}>
+      {loading ? <ActivityIndicator size="small" color={Brand.purple} /> : <Text style={{ color: Brand.purpleLight, fontWeight: '700', fontSize: 14 }}>Load more songs</Text>}
+    </Pressable>
+  );
+}
+
 function Empty({ text }: { text: string }) {
   const c = useC();
   return <Text style={{ color: c.textSecondary, fontSize: 14, lineHeight: 20, textAlign: 'center', paddingHorizontal: Space.lg, paddingVertical: Space.xxl }}>{text}</Text>;
@@ -274,5 +318,6 @@ const styles = StyleSheet.create({
   playOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
   addBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   addAll: { borderRadius: Radius.pill, paddingVertical: 8, paddingHorizontal: 14 },
+  loadMore: { borderWidth: 1, borderRadius: Radius.md, paddingVertical: 13, alignItems: 'center', marginTop: Space.sm },
   spotifyBtn: { backgroundColor: '#1DB954', borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 28, minWidth: 200, alignItems: 'center' },
 });

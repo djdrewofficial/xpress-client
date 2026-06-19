@@ -90,6 +90,8 @@ export async function getRecommendations(opts: {
   eventName: string;
   sectionTitle: string;
   limit?: number;
+  /** Titles already on the playlist (or already shown) — won't be suggested again. */
+  exclude?: string[];
 }): Promise<RecResult> {
   const apiUrl = process.env.EXPO_PUBLIC_API_URL;
   if (!apiUrl) return { status: 'unconfigured' };
@@ -112,6 +114,7 @@ export async function getRecommendations(opts: {
         // Drew's call: favor well-known, high-confidence floor-fillers tailored to
         // their vibe over deep cuts. The endpoint's prompt should weight popularity.
         style: 'familiar',
+        exclude: (opts.exclude ?? []).slice(0, 200),
         context: {
           eventName: ctx.eventName,
           aboutUs: ctx.aboutUs,
