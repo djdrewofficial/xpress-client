@@ -11,7 +11,7 @@ export default function PeopleScreen() {
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <BrandHeader />
-        <ScrollView contentContainerStyle={{ padding: Space.lg, gap: Space.md }}>
+        <ScrollView contentContainerStyle={{ padding: Space.lg, gap: Space.md, paddingBottom: Space.xxl * 3 }}>
           <Text style={[styles.title, { color: c.text }]}>People</Text>
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <Text style={{ color: c.textSecondary }}>

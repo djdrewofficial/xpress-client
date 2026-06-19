@@ -35,7 +35,7 @@ export default function MusicScreen() {
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <BrandHeader />
-        <ScrollView contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl, gap: Space.md }}>
+        <ScrollView contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl * 3, gap: Space.md }}>
           <Text style={[styles.title, { color: c.text }]}>Music</Text>
 
           <LinearGradient colors={[Brand.purple, '#6a4fb8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.aiHero, Shadow.card]}>

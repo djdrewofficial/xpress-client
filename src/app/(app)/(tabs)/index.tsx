@@ -45,7 +45,7 @@ export default function PlanScreen() {
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <BrandHeader />
         <ScrollView
-          contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl, gap: Space.lg }}
+          contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl * 3, gap: Space.lg }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Brand.purple} />}>
           <View style={styles.topRow}>
             <Text style={[styles.hi, { color: c.textSecondary }]}>Welcome back{profile?.firstName ? `, ${profile.firstName}` : ''}</Text>

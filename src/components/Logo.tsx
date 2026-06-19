@@ -1,4 +1,5 @@
 import { Image, StyleSheet, useColorScheme, View, type ImageStyle } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { useC } from '@/components/ui';
 import { Space } from '@/lib/theme';
 
@@ -35,14 +36,15 @@ export function Logo({
   );
 }
 
-/** Slim branded top bar for the app screens: logo left, optional right slot. */
+/** Slim branded "liquid glass" top bar: frosted blur, logo left, optional right slot. */
 export function BrandHeader({ right }: { right?: React.ReactNode }) {
   const c = useC();
+  const scheme = useColorScheme();
   return (
-    <View style={[styles.header, { borderColor: c.border }]}>
+    <BlurView intensity={50} tint={scheme === 'dark' ? 'dark' : 'light'} style={[styles.header, { borderColor: c.border }]}>
       <Logo variant="full" height={22} />
       <View>{right}</View>
-    </View>
+    </BlurView>
   );
 }
 

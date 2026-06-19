@@ -42,7 +42,7 @@ export default function AccountScreen() {
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <BrandHeader />
         <ScrollView
-          contentContainerStyle={{ padding: Space.lg, gap: Space.lg, paddingBottom: Space.xxl * 2 }}
+          contentContainerStyle={{ padding: Space.lg, gap: Space.lg, paddingBottom: Space.xxl * 3 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Brand.purple} />}>
           <Text style={[styles.title, { color: c.text }]}>My Event</Text>
 
