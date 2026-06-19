@@ -23,7 +23,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: 'Plan', tabBarIcon: icon('📋') }} />
       <Tabs.Screen name="music" options={{ title: 'Music', tabBarIcon: icon('🎵') }} />
       <Tabs.Screen name="people" options={{ title: 'People', tabBarIcon: icon('🥂') }} />
-      <Tabs.Screen name="you" options={{ title: 'You', tabBarIcon: icon('👤') }} />
+      <Tabs.Screen name="you" options={{ title: 'My Event', tabBarIcon: icon('💍') }} />
     </Tabs>
   );
 }

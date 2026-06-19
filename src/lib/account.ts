@@ -1,0 +1,132 @@
+import { supabase } from '@/lib/supabase';
+
+/* Read-only event package + payment summary + team contacts for the Account tab.
+   Mirrors XOS's price logic: override -> locked -> live default; "Investment"
+   wording; pending payments excluded from balance math. */
+
+export type IncludedItem = { name: string; detail: string | null; price: number; qty: number };
+export type PaymentMade = { id: string; amount: number; paidAt: string | null; method: string | null; reason: string | null; pending: boolean };
+export type ScheduledItem = { id: string; label: string | null; dueDate: string | null; amount: number; seq: number };
+export type TeamMember = { id: string; name: string; role: string | null; email: string | null; phone: string | null };
+
+export type AccountData = {
+  packageName: string | null;
+  packageDescription: string | null;
+  includedHours: number | null;
+  packagePrice: number;
+  addons: IncludedItem[];
+  travelFee: number;
+  overtimeFee: number;
+  discounts: { label: string; amount: number }[];
+  total: number;
+  paid: number;
+  balance: number;
+  billingTerms: string | null;
+  payments: PaymentMade[];
+  schedule: ScheduledItem[];
+  team: TeamMember[];
+  officeEmail: string | null;
+  companyName: string | null;
+};
+
+const num = (v: unknown): number => (typeof v === 'number' ? v : v ? Number(v) : 0) || 0;
+
+export async function loadAccount(eventId: string): Promise<AccountData> {
+  const [{ data: ev }, { data: eAddons }, { data: pays }, { data: sched }, { data: staff }, { data: company }] = await Promise.all([
+    supabase.from('events').select('*').eq('id', eventId).maybeSingle(),
+    supabase.from('event_addons').select('addon_id, quantity, price_override, price_locked').eq('event_id', eventId),
+    supabase.from('payments').select('id, amount, status, paid_at, method, reason').eq('event_id', eventId).order('paid_at', { ascending: true }),
+    supabase.from('scheduled_payments').select('id, seq, due_date, amount, label').eq('event_id', eventId).order('seq', { ascending: true }),
+    supabase.from('event_staff').select('employee_id, role, portal_visible').eq('event_id', eventId).eq('portal_visible', true),
+    supabase.from('company_settings').select('company_name, from_email, reply_to').maybeSingle(),
+  ]);
+
+  // Package
+  let packageName: string | null = null;
+  let packageDescription: string | null = null;
+  let includedHours: number | null = null;
+  if (ev?.package_id) {
+    const { data: pkg } = await supabase
+      .from('packages')
+      .select('name, client_facing_name, description, included_hours, default_price')
+      .eq('id', ev.package_id)
+      .maybeSingle();
+    if (pkg) {
+      packageName = pkg.client_facing_name || pkg.name;
+      packageDescription = pkg.description ?? null;
+      includedHours = pkg.included_hours ?? null;
+    }
+  }
+  const pkgDefault = ev?.package_id ? await packageDefaultPrice(ev.package_id) : 0;
+  const packagePrice = num(ev?.package_price_override) || num(ev?.package_price_locked) || pkgDefault;
+
+  // Add-ons (resolve names + prices)
+  const addonIds = (eAddons ?? []).map((a) => a.addon_id).filter(Boolean);
+  const addonMeta = new Map<string, { name: string; description: string | null; default_price: number }>();
+  if (addonIds.length) {
+    const { data: meta } = await supabase.from('addons').select('id, name, client_facing_name, description, default_price').in('id', addonIds);
+    for (const m of meta ?? []) addonMeta.set(m.id, { name: m.client_facing_name || m.name, description: m.description ?? null, default_price: num(m.default_price) });
+  }
+  const addons: IncludedItem[] = (eAddons ?? []).map((a) => {
+    const m = addonMeta.get(a.addon_id);
+    const unit = num(a.price_override) || num(a.price_locked) || (m?.default_price ?? 0);
+    const qty = a.quantity ?? 1;
+    return { name: m?.name ?? 'Add-on', detail: m?.description ?? null, price: unit * qty, qty };
+  });
+
+  const travelFee = num(ev?.travel_fee);
+  const overtimeFee = num(ev?.overtime_fee);
+  const discounts = [
+    { label: ev?.discount1_label || 'Discount', amount: num(ev?.discount1_amount) },
+    { label: ev?.discount2_label || 'Discount', amount: num(ev?.discount2_amount) },
+  ].filter((d) => d.amount > 0);
+
+  const addonsTotal = addons.reduce((s, a) => s + a.price, 0);
+  const discountTotal = discounts.reduce((s, d) => s + d.amount, 0);
+  const total = packagePrice + addonsTotal + travelFee + overtimeFee - discountTotal;
+
+  // Payments: approved counts toward paid; pending shown but excluded from math.
+  const payments: PaymentMade[] = (pays ?? []).map((p) => ({
+    id: p.id, amount: num(p.amount), paidAt: p.paid_at, method: p.method, reason: p.reason, pending: p.status === 'pending',
+  }));
+  const paid = payments.filter((p) => !p.pending).reduce((s, p) => s + p.amount, 0);
+  const balance = total - paid;
+
+  const schedule: ScheduledItem[] = (sched ?? []).map((s) => ({ id: s.id, label: s.label, dueDate: s.due_date, amount: num(s.amount), seq: s.seq ?? 0 }));
+
+  // Team (portal-visible staff)
+  const empIds = (staff ?? []).map((s) => s.employee_id).filter(Boolean);
+  const team: TeamMember[] = [];
+  if (empIds.length) {
+    const { data: emps } = await supabase.from('employees').select('id, first_name, last_name, stage_name, email, phone').in('id', empIds);
+    const byId = new Map((emps ?? []).map((e) => [e.id, e]));
+    for (const s of staff ?? []) {
+      const e = byId.get(s.employee_id);
+      if (!e) continue;
+      team.push({
+        id: e.id,
+        name: e.stage_name || [e.first_name, e.last_name].filter(Boolean).join(' ') || 'Your team',
+        role: s.role ?? null,
+        email: e.email ?? null,
+        phone: e.phone ?? null,
+      });
+    }
+  }
+
+  return {
+    packageName, packageDescription, includedHours, packagePrice, addons, travelFee, overtimeFee, discounts,
+    total, paid, balance, billingTerms: ev?.billing_terms ?? null,
+    payments, schedule, team,
+    officeEmail: company?.reply_to || company?.from_email || null,
+    companyName: company?.company_name ?? null,
+  };
+}
+
+async function packageDefaultPrice(packageId: string): Promise<number> {
+  const { data } = await supabase.from('packages').select('default_price').eq('id', packageId).maybeSingle();
+  return num(data?.default_price);
+}
+
+export function money(n: number): string {
+  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+}
