@@ -24,7 +24,8 @@ export default function AccountScreen() {
     const events = await getMyEvents({ clientId: profile.clientId, eventGuestId: profile.eventGuestId });
     const ev = events[0] ?? null;
     setEventName(ev?.name ?? '');
-    setData(ev ? await loadAccount(ev.id) : null);
+    const isGuest = profile.accountType === 'event_guest';
+    setData(ev ? await loadAccount(ev.id, isGuest) : null);
     setLoading(false);
   }, [profile]);
   useEffect(() => { load(); }, [load]);
@@ -62,14 +63,15 @@ export default function AccountScreen() {
                     {data.addons.map((a, i) => (
                       <View key={i} style={styles.lineRow}>
                         <Text style={{ color: c.text, fontSize: 14, flex: 1 }}>{a.qty > 1 ? `${a.qty}× ` : ''}{a.name}</Text>
-                        <Text style={{ color: c.textSecondary, fontSize: 14 }}>{money(a.price)}</Text>
+                        {data.financialsVisible ? <Text style={{ color: c.textSecondary, fontSize: 14 }}>{money(a.price)}</Text> : null}
                       </View>
                     ))}
                   </View>
                 )}
               </View>
 
-              {/* Investment & payments */}
+              {/* Investment & payments — hidden per event/type, and always for guests */}
+              {data.financialsVisible && (
               <View style={[styles.card, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
                 <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR INVESTMENT</Text>
                 <View style={{ marginTop: Space.sm, gap: 6 }}>
@@ -118,6 +120,7 @@ export default function AccountScreen() {
 
                 {data.billingTerms ? <Text style={{ color: c.textTertiary, fontSize: 12, marginTop: Space.md, lineHeight: 17 }}>{data.billingTerms}</Text> : null}
               </View>
+              )}
 
               {/* Contact the office */}
               <View style={[styles.card, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>

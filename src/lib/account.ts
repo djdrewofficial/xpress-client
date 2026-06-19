@@ -29,18 +29,35 @@ export type AccountData = {
   schedule: ScheduledItem[];
   officeEmail: string | null;
   companyName: string | null;
+  financialsVisible: boolean;
 };
 
 const num = (v: unknown): number => (typeof v === 'number' ? v : v ? Number(v) : 0) || 0;
 
-export async function loadAccount(eventId: string): Promise<AccountData> {
-  const [{ data: ev }, { data: eAddons }, { data: pays }, { data: sched }, { data: company }] = await Promise.all([
-    supabase.from('events').select('*').eq('id', eventId).maybeSingle(),
+export async function loadAccount(eventId: string, isGuest: boolean): Promise<AccountData> {
+  const { data: ev } = await supabase.from('events').select('*').eq('id', eventId).maybeSingle();
+
+  // Visibility: guests NEVER see financials; otherwise per-event override
+  // (true/false) wins, else the event type's default.
+  let typeHide = false;
+  if (ev?.event_type_id) {
+    const { data: et } = await supabase.from('event_types').select('hide_financials').eq('id', ev.event_type_id).maybeSingle();
+    typeHide = !!et?.hide_financials;
+  }
+  const hidden = ev?.hide_financials ?? typeHide;
+  const financialsVisible = !isGuest && !hidden;
+
+  const [{ data: eAddons }, { data: company }] = await Promise.all([
     supabase.from('event_addons').select('addon_id, quantity, price_override, price_locked').eq('event_id', eventId),
-    supabase.from('payments').select('id, amount, status, paid_at, method, reason').eq('event_id', eventId).order('paid_at', { ascending: true }),
-    supabase.from('scheduled_payments').select('id, seq, due_date, amount, label').eq('event_id', eventId).order('seq', { ascending: true }),
     supabase.from('company_settings').select('company_name, from_email, reply_to').maybeSingle(),
   ]);
+  // Only pull money when it's allowed to be shown.
+  const pays = financialsVisible
+    ? (await supabase.from('payments').select('id, amount, status, paid_at, method, reason').eq('event_id', eventId).order('paid_at', { ascending: true })).data
+    : null;
+  const sched = financialsVisible
+    ? (await supabase.from('scheduled_payments').select('id, seq, due_date, amount, label').eq('event_id', eventId).order('seq', { ascending: true })).data
+    : null;
 
   // Package
   let packageName: string | null = null;
@@ -58,8 +75,8 @@ export async function loadAccount(eventId: string): Promise<AccountData> {
       includedHours = pkg.included_hours ?? null;
     }
   }
-  const pkgDefault = ev?.package_id ? await packageDefaultPrice(ev.package_id) : 0;
-  const packagePrice = num(ev?.package_price_override) || num(ev?.package_price_locked) || pkgDefault;
+  const pkgDefault = ev?.package_id && financialsVisible ? await packageDefaultPrice(ev.package_id) : 0;
+  const packagePrice = financialsVisible ? num(ev?.package_price_override) || num(ev?.package_price_locked) || pkgDefault : 0;
 
   // Add-ons (resolve names + prices)
   const addonIds = (eAddons ?? []).map((a) => a.addon_id).filter(Boolean);
@@ -72,15 +89,17 @@ export async function loadAccount(eventId: string): Promise<AccountData> {
     const m = addonMeta.get(a.addon_id);
     const unit = num(a.price_override) || num(a.price_locked) || (m?.default_price ?? 0);
     const qty = a.quantity ?? 1;
-    return { name: m?.name ?? 'Add-on', detail: m?.description ?? null, price: unit * qty, qty };
+    return { name: m?.name ?? 'Add-on', detail: m?.description ?? null, price: financialsVisible ? unit * qty : 0, qty };
   });
 
-  const travelFee = num(ev?.travel_fee);
-  const overtimeFee = num(ev?.overtime_fee);
-  const discounts = [
-    { label: ev?.discount1_label || 'Discount', amount: num(ev?.discount1_amount) },
-    { label: ev?.discount2_label || 'Discount', amount: num(ev?.discount2_amount) },
-  ].filter((d) => d.amount > 0);
+  const travelFee = financialsVisible ? num(ev?.travel_fee) : 0;
+  const overtimeFee = financialsVisible ? num(ev?.overtime_fee) : 0;
+  const discounts = financialsVisible
+    ? [
+        { label: ev?.discount1_label || 'Discount', amount: num(ev?.discount1_amount) },
+        { label: ev?.discount2_label || 'Discount', amount: num(ev?.discount2_amount) },
+      ].filter((d) => d.amount > 0)
+    : [];
 
   const addonsTotal = addons.reduce((s, a) => s + a.price, 0);
   const discountTotal = discounts.reduce((s, d) => s + d.amount, 0);
@@ -97,10 +116,11 @@ export async function loadAccount(eventId: string): Promise<AccountData> {
 
   return {
     packageName, packageDescription, includedHours, packagePrice, addons, travelFee, overtimeFee, discounts,
-    total, paid, balance, billingTerms: ev?.billing_terms ?? null,
+    total, paid, balance, billingTerms: financialsVisible ? ev?.billing_terms ?? null : null,
     payments, schedule,
     officeEmail: company?.reply_to || company?.from_email || null,
     companyName: company?.company_name ?? null,
+    financialsVisible,
   };
 }
 
