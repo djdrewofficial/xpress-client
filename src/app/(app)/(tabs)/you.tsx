@@ -7,7 +7,7 @@ import { useC } from '@/components/ui';
 import { Brand, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { getMyEvents } from '@/lib/planning';
-import { loadAccount, money, type AccountData, type TeamMember } from '@/lib/account';
+import { loadAccount, money, OFFICE_PHONE, OFFICE_EMAIL_FALLBACK, type AccountData } from '@/lib/account';
 
 const fmtDate = (d: string | null) => (d ? new Date(d + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : null);
 
@@ -32,7 +32,8 @@ export default function AccountScreen() {
 
   if (loading) return <View style={[styles.center, { backgroundColor: c.bg }]}><ActivityIndicator color={Brand.purple} /></View>;
 
-  const officeEmail = data?.officeEmail ?? 'info@xpressdjs.com';
+  const officeEmail = data?.officeEmail ?? OFFICE_EMAIL_FALLBACK;
+  const officePhone = OFFICE_PHONE.replace(/[^\d+]/g, '');
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -118,15 +119,28 @@ export default function AccountScreen() {
                 {data.billingTerms ? <Text style={{ color: c.textTertiary, fontSize: 12, marginTop: Space.md, lineHeight: 17 }}>{data.billingTerms}</Text> : null}
               </View>
 
-              {/* Contact team */}
+              {/* Contact the office */}
               <View style={[styles.card, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
-                <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR TEAM</Text>
-                {data.team.map((m) => <TeamRow key={m.id} m={m} c={c} />)}
-                <Pressable onPress={() => Linking.openURL(`mailto:${officeEmail}`)} style={{ marginTop: Space.md }}>
-                  <LinearGradient colors={[Brand.purple, Brand.purpleLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bigBtn}>
-                    <Text style={styles.bigBtnTxt}>✉  Email our team</Text>
-                  </LinearGradient>
-                </Pressable>
+                <Text style={[styles.lab, { color: c.textTertiary }]}>QUESTIONS?</Text>
+                <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginTop: 4 }}>{data.companyName || 'Xpress Entertainment'}</Text>
+                <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 2, marginBottom: Space.md }}>Our team is here to help with anything about your event.</Text>
+                <View style={{ flexDirection: 'row', gap: Space.sm }}>
+                  {officePhone ? (
+                    <>
+                      <Pressable onPress={() => Linking.openURL(`tel:${officePhone}`)} style={[styles.contactBtn, { backgroundColor: c.cardAlt, borderColor: c.border, flex: 1 }]}>
+                        <Text style={{ color: Brand.purpleLight, fontWeight: '700', fontSize: 14 }}>Call</Text>
+                      </Pressable>
+                      <Pressable onPress={() => Linking.openURL(`sms:${officePhone}`)} style={[styles.contactBtn, { backgroundColor: c.cardAlt, borderColor: c.border, flex: 1 }]}>
+                        <Text style={{ color: Brand.purpleLight, fontWeight: '700', fontSize: 14 }}>Text</Text>
+                      </Pressable>
+                    </>
+                  ) : null}
+                  <Pressable onPress={() => Linking.openURL(`mailto:${officeEmail}`)} style={{ flex: officePhone ? 1 : undefined, width: officePhone ? undefined : '100%' }}>
+                    <LinearGradient colors={[Brand.purple, Brand.purpleLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bigBtn}>
+                      <Text style={styles.bigBtnTxt}>Email</Text>
+                    </LinearGradient>
+                  </Pressable>
+                </View>
               </View>
 
               <Pressable onPress={signOut} style={[styles.signOut, { borderColor: c.border }]}>
@@ -156,29 +170,6 @@ function Stat({ label, value, c, color }: { label: string; value: string; c: Ret
       <Text style={{ color: c.textTertiary, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>{label.toUpperCase()}</Text>
       <Text style={{ color: color ?? c.text, fontSize: 17, fontWeight: '800', marginTop: 3 }}>{value}</Text>
     </View>
-  );
-}
-
-function TeamRow({ m, c }: { m: TeamMember; c: ReturnType<typeof useC> }) {
-  const tel = (m.phone ?? '').replace(/[^\d+]/g, '');
-  return (
-    <View style={{ paddingVertical: Space.sm, borderTopWidth: StyleSheet.hairlineWidth, borderColor: c.border }}>
-      <Text style={{ color: c.text, fontSize: 15, fontWeight: '700' }}>{m.name}</Text>
-      {m.role ? <Text style={{ color: c.textTertiary, fontSize: 12, marginBottom: 6 }}>{m.role}</Text> : null}
-      <View style={{ flexDirection: 'row', gap: Space.sm, marginTop: 4 }}>
-        {tel ? <ContactBtn label="Call" onPress={() => Linking.openURL(`tel:${tel}`)} c={c} /> : null}
-        {tel ? <ContactBtn label="Text" onPress={() => Linking.openURL(`sms:${tel}`)} c={c} /> : null}
-        {m.email ? <ContactBtn label="Email" onPress={() => Linking.openURL(`mailto:${m.email}`)} c={c} /> : null}
-      </View>
-    </View>
-  );
-}
-
-function ContactBtn({ label, onPress, c }: { label: string; onPress: () => void; c: ReturnType<typeof useC> }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.contactBtn, { backgroundColor: c.cardAlt, borderColor: c.border }]}>
-      <Text style={{ color: Brand.purpleLight, fontWeight: '700', fontSize: 13 }}>{label}</Text>
-    </Pressable>
   );
 }
 

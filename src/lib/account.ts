@@ -7,7 +7,10 @@ import { supabase } from '@/lib/supabase';
 export type IncludedItem = { name: string; detail: string | null; price: number; qty: number };
 export type PaymentMade = { id: string; amount: number; paidAt: string | null; method: string | null; reason: string | null; pending: boolean };
 export type ScheduledItem = { id: string; label: string | null; dueDate: string | null; amount: number; seq: number };
-export type TeamMember = { id: string; name: string; role: string | null; email: string | null; phone: string | null };
+
+/** Office contact for the "Contact our team" card. Set OFFICE_PHONE to enable Call/Text. */
+export const OFFICE_PHONE = '';
+export const OFFICE_EMAIL_FALLBACK = 'events@xpressdjs.com';
 
 export type AccountData = {
   packageName: string | null;
@@ -24,7 +27,6 @@ export type AccountData = {
   billingTerms: string | null;
   payments: PaymentMade[];
   schedule: ScheduledItem[];
-  team: TeamMember[];
   officeEmail: string | null;
   companyName: string | null;
 };
@@ -32,12 +34,11 @@ export type AccountData = {
 const num = (v: unknown): number => (typeof v === 'number' ? v : v ? Number(v) : 0) || 0;
 
 export async function loadAccount(eventId: string): Promise<AccountData> {
-  const [{ data: ev }, { data: eAddons }, { data: pays }, { data: sched }, { data: staff }, { data: company }] = await Promise.all([
+  const [{ data: ev }, { data: eAddons }, { data: pays }, { data: sched }, { data: company }] = await Promise.all([
     supabase.from('events').select('*').eq('id', eventId).maybeSingle(),
     supabase.from('event_addons').select('addon_id, quantity, price_override, price_locked').eq('event_id', eventId),
     supabase.from('payments').select('id, amount, status, paid_at, method, reason').eq('event_id', eventId).order('paid_at', { ascending: true }),
     supabase.from('scheduled_payments').select('id, seq, due_date, amount, label').eq('event_id', eventId).order('seq', { ascending: true }),
-    supabase.from('event_staff').select('employee_id, role, portal_visible').eq('event_id', eventId).eq('portal_visible', true),
     supabase.from('company_settings').select('company_name, from_email, reply_to').maybeSingle(),
   ]);
 
@@ -94,29 +95,10 @@ export async function loadAccount(eventId: string): Promise<AccountData> {
 
   const schedule: ScheduledItem[] = (sched ?? []).map((s) => ({ id: s.id, label: s.label, dueDate: s.due_date, amount: num(s.amount), seq: s.seq ?? 0 }));
 
-  // Team (portal-visible staff)
-  const empIds = (staff ?? []).map((s) => s.employee_id).filter(Boolean);
-  const team: TeamMember[] = [];
-  if (empIds.length) {
-    const { data: emps } = await supabase.from('employees').select('id, first_name, last_name, stage_name, email, phone').in('id', empIds);
-    const byId = new Map((emps ?? []).map((e) => [e.id, e]));
-    for (const s of staff ?? []) {
-      const e = byId.get(s.employee_id);
-      if (!e) continue;
-      team.push({
-        id: e.id,
-        name: e.stage_name || [e.first_name, e.last_name].filter(Boolean).join(' ') || 'Your team',
-        role: s.role ?? null,
-        email: e.email ?? null,
-        phone: e.phone ?? null,
-      });
-    }
-  }
-
   return {
     packageName, packageDescription, includedHours, packagePrice, addons, travelFee, overtimeFee, discounts,
     total, paid, balance, billingTerms: ev?.billing_terms ?? null,
-    payments, schedule, team,
+    payments, schedule,
     officeEmail: company?.reply_to || company?.from_email || null,
     companyName: company?.company_name ?? null,
   };
