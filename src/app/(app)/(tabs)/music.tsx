@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 
 import { Bar, useC } from '@/components/ui';
+import { BrandHeader } from '@/components/Logo';
 import { Brand, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { getMyEvents, loadOverview, type SectionRow } from '@/lib/planning';
@@ -33,6 +34,7 @@ export default function MusicScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <BrandHeader />
         <ScrollView contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl, gap: Space.md }}>
           <Text style={[styles.title, { color: c.text }]}>Music</Text>
 

@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 
 import { Bar, Ring, Sparkle, useC, useScheme } from '@/components/ui';
+import { BrandHeader } from '@/components/Logo';
 import { Brand, CategoryThemes, Radius, Shadow, Space, type CategoryTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { getMyEvents, loadOverview, type EventLite, type Group, type Overview } from '@/lib/planning';
@@ -42,6 +43,7 @@ export default function PlanScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <BrandHeader />
         <ScrollView
           contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl, gap: Space.lg }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Brand.purple} />}>

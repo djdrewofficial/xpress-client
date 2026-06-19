@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { GradientButton, useC } from '@/components/ui';
+import { Logo } from '@/components/Logo';
 import { Brand, Radius, Space } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
 
@@ -27,10 +28,9 @@ export default function LoginScreen() {
     <LinearGradient colors={[Brand.purple, '#2c1d57']} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView style={styles.form} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.brandMark}>
-            <Text style={styles.brandX}>X</Text>
+          <View style={{ alignItems: 'center', marginBottom: Space.md }}>
+            <Logo variant="full" height={54} tone="#ffffff" />
           </View>
-          <Text style={styles.brand}>Xpress Entertainment</Text>
           <Text style={styles.tagline}>Plan your perfect night</Text>
 
           <View style={styles.card}>
