@@ -68,6 +68,7 @@ export default function SectionScreen() {
   const visible = questions.filter((q) => questionVisible(q, answers));
   const answeredCount = visible.filter((q) => (answers[q.id] ?? '').trim() !== '').length;
   const pct = visible.length > 0 ? Math.round((answeredCount / visible.length) * 100) : 0;
+  const isDoNotPlay = /do ?not play|don'?t play|dont play/i.test(meta?.title ?? '');
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -116,7 +117,7 @@ export default function SectionScreen() {
           {songs.length > 0 && (
             <View style={{ gap: Space.sm }}>
               <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR SONGS</Text>
-              <SectionSongs songs={songs} setSongs={setSongs} />
+              <SectionSongs songs={songs} setSongs={setSongs} allowMustPlay={!isDoNotPlay} allowDoNotPlay={isDoNotPlay} />
             </View>
           )}
 

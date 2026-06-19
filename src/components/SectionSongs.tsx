@@ -11,7 +11,17 @@ import { removeSong, setDoNotPlay, setMustPlay, updateSongNote, type SongRow } f
 const RED = '#e0584f';
 const GOLD = '#d9a521';
 
-export function SectionSongs({ songs, setSongs }: { songs: SongRow[]; setSongs: (fn: (prev: SongRow[]) => SongRow[]) => void }) {
+export function SectionSongs({
+  songs,
+  setSongs,
+  allowMustPlay = true,
+  allowDoNotPlay = false,
+}: {
+  songs: SongRow[];
+  setSongs: (fn: (prev: SongRow[]) => SongRow[]) => void;
+  allowMustPlay?: boolean;
+  allowDoNotPlay?: boolean;
+}) {
   const c = useC();
   const player = useAudioPlayer(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -81,8 +91,8 @@ export function SectionSongs({ songs, setSongs }: { songs: SongRow[]; setSongs: 
             </View>
           ) : (
             <View style={styles.chips}>
-              <Toggle label="⭐ Must play" active={s.must_play} color={GOLD} onPress={() => onMust(s)} c={c} />
-              <Toggle label="🚫 Do not play" active={s.do_not_play} color={RED} onPress={() => onDnp(s)} c={c} />
+              {allowMustPlay && <Toggle label="⭐ Must play" active={s.must_play} color={GOLD} onPress={() => onMust(s)} c={c} />}
+              {allowDoNotPlay && <Toggle label="🚫 Do not play" active={s.do_not_play} color={RED} onPress={() => onDnp(s)} c={c} />}
               <Toggle label={s.note ? '📝 Edit note' : '📝 Note'} active={false} color={Brand.purple} onPress={() => openNote(s)} c={c} />
             </View>
           )}
