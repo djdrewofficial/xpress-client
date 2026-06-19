@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Bar, useC } from '@/components/ui';
 import { SongPicker } from '@/components/SongPicker';
 import { SectionSongs } from '@/components/SectionSongs';
+import { VendorTeam } from '@/components/VendorTeam';
 import { Brand, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { loadSection, saveAnswer, questionVisible, type QuestionRow, type SongRow } from '@/lib/planning';
@@ -17,7 +18,7 @@ export default function SectionScreen() {
   const router = useRouter();
   const { session } = useAuth();
   const { id, eventId } = useLocalSearchParams<{ id: string; eventId: string }>();
-  const [meta, setMeta] = useState<{ title: string; icon: string | null; intro: string | null; songs_enabled: boolean; ai_picks_enabled: boolean } | null>(null);
+  const [meta, setMeta] = useState<{ title: string; icon: string | null; intro: string | null; songs_enabled: boolean; ai_picks_enabled: boolean; module: string | null } | null>(null);
   const [eventName, setEventName] = useState('');
   const [picker, setPicker] = useState<'foryou' | 'search' | null>(null);
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
@@ -38,6 +39,7 @@ export default function SectionScreen() {
       intro: m?.intro ?? null,
       songs_enabled: m?.songs_enabled ?? false,
       ai_picks_enabled: m?.ai_picks_enabled ?? false,
+      module: m?.module ?? null,
     });
     setEventName(ev?.name ?? '');
     setQuestions(sec.questions);
@@ -101,41 +103,47 @@ export default function SectionScreen() {
             )}
           </View>
 
-          {meta?.songs_enabled && (
-            <View style={{ flexDirection: 'row', gap: Space.sm }}>
-              {meta.ai_picks_enabled && (
-                <Pressable onPress={() => setPicker('foryou')} style={({ pressed }) => [styles.actionBtn, { backgroundColor: Brand.purple, opacity: pressed ? 0.9 : 1 }]}>
-                  <Text style={styles.actionTxt}>✨ For You</Text>
-                </Pressable>
+          {meta?.module === 'vendors' ? (
+            <VendorTeam eventId={eventId} />
+          ) : (
+            <>
+              {meta?.songs_enabled && (
+                <View style={{ flexDirection: 'row', gap: Space.sm }}>
+                  {meta.ai_picks_enabled && (
+                    <Pressable onPress={() => setPicker('foryou')} style={({ pressed }) => [styles.actionBtn, { backgroundColor: Brand.purple, opacity: pressed ? 0.9 : 1 }]}>
+                      <Text style={styles.actionTxt}>✨ For You</Text>
+                    </Pressable>
+                  )}
+                  <Pressable onPress={() => setPicker('search')} style={({ pressed }) => [styles.actionBtn, { backgroundColor: c.cardAlt, borderWidth: 1, borderColor: c.border, opacity: pressed ? 0.9 : 1 }]}>
+                    <Text style={[styles.actionTxt, { color: c.text }]}>＋ Add music</Text>
+                  </Pressable>
+                </View>
               )}
-              <Pressable onPress={() => setPicker('search')} style={({ pressed }) => [styles.actionBtn, { backgroundColor: c.cardAlt, borderWidth: 1, borderColor: c.border, opacity: pressed ? 0.9 : 1 }]}>
-                <Text style={[styles.actionTxt, { color: c.text }]}>＋ Add music</Text>
-              </Pressable>
-            </View>
-          )}
 
-          {songs.length > 0 && (
-            <View style={{ gap: Space.sm }}>
-              <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR SONGS</Text>
-              <SectionSongs songs={songs} setSongs={setSongs} allowMustPlay={!isDoNotPlay} allowDoNotPlay={isDoNotPlay} />
-            </View>
-          )}
+              {songs.length > 0 && (
+                <View style={{ gap: Space.sm }}>
+                  <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR SONGS</Text>
+                  <SectionSongs songs={songs} setSongs={setSongs} allowMustPlay={!isDoNotPlay} allowDoNotPlay={isDoNotPlay} />
+                </View>
+              )}
 
-          {visible.length > 0 && (
-            <View style={{ gap: Space.md }}>
-              {songs.length > 0 && <Text style={[styles.lab, { color: c.textTertiary }]}>QUESTIONS</Text>}
-              {visible.map((q, i) => (
-                <QuestionField
-                  key={q.id}
-                  q={q}
-                  index={i + 1}
-                  value={answers[q.id] ?? ''}
-                  onChange={(v) => setLocal(q.id, v)}
-                  onPersist={(v) => persist(q.id, v)}
-                  onPick={(v) => pick(q.id, v)}
-                />
-              ))}
-            </View>
+              {visible.length > 0 && (
+                <View style={{ gap: Space.md }}>
+                  {songs.length > 0 && <Text style={[styles.lab, { color: c.textTertiary }]}>QUESTIONS</Text>}
+                  {visible.map((q, i) => (
+                    <QuestionField
+                      key={q.id}
+                      q={q}
+                      index={i + 1}
+                      value={answers[q.id] ?? ''}
+                      onChange={(v) => setLocal(q.id, v)}
+                      onPersist={(v) => persist(q.id, v)}
+                      onPick={(v) => pick(q.id, v)}
+                    />
+                  ))}
+                </View>
+              )}
+            </>
           )}
         </ScrollView>
 
