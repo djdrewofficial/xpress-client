@@ -155,9 +155,9 @@ function CategoryCard({ group, theme, onPress }: { group: Group; theme: Category
           </View>
         )}
 
-        {group.songCount > 0 && (
+        {group.aiPicks && (
           <View style={{ marginTop: Space.md }}>
-            <Sparkle label="AI picks inside" />
+            <Sparkle label="For You picks" />
           </View>
         )}
       </View>

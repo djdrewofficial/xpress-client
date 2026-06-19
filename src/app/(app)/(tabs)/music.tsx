@@ -37,8 +37,8 @@ export default function MusicScreen() {
           <Text style={[styles.title, { color: c.text }]}>Music</Text>
 
           <LinearGradient colors={[Brand.purple, '#6a4fb8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.aiHero, Shadow.card]}>
-            <Text style={styles.aiTag}>✨ AI PICKS</Text>
-            <Text style={styles.aiTitle}>Songs chosen for you</Text>
+            <Text style={styles.aiTag}>✨ FOR YOU</Text>
+            <Text style={styles.aiTitle}>Songs picked for you</Text>
             <Text style={styles.aiSub}>Open any moment below — we suggest tracks based on your story and cultural influences, so every set feels like yours.</Text>
             {totalSongs > 0 && <Text style={styles.aiCount}>{totalSongs} song{totalSongs === 1 ? '' : 's'} picked so far</Text>}
           </LinearGradient>

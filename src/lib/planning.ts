@@ -10,6 +10,7 @@ export type SectionRow = {
   module: string | null;
   songs_enabled: boolean;
   questions_enabled: boolean;
+  ai_picks_enabled: boolean;
   song_limit: number | null;
   sort_order: number;
   questionCount: number;
@@ -25,6 +26,7 @@ export type Group = {
   totalQuestions: number;
   answeredQuestions: number;
   songCount: number;
+  aiPicks: boolean;
 };
 
 export type Overview = {
@@ -85,7 +87,7 @@ export async function getMyEvents(account: { clientId: string | null; eventGuest
 /** Section list + progress for the home screen. */
 export async function loadOverview(eventId: string): Promise<Overview> {
   const [{ data: sections }, { data: questions }, { data: answers }, { data: songs }] = await Promise.all([
-    supabase.from('planning_sections').select('id, title, icon, section_type, module, songs_enabled, questions_enabled, song_limit, sort_order').eq('event_id', eventId).order('sort_order'),
+    supabase.from('planning_sections').select('*').eq('event_id', eventId).order('sort_order'),
     supabase.from('planning_questions').select('id, section_id').eq('event_id', eventId),
     supabase.from('planning_question_answers').select('question_id, answer').eq('event_id', eventId),
     supabase.from('planning_songs').select('id, section_id').eq('event_id', eventId),
@@ -109,7 +111,7 @@ export async function loadOverview(eventId: string): Promise<Overview> {
 
   const ensureGroup = (): Group => {
     if (!current) {
-      current = { id: 'start', title: 'Your plan', icon: '✨', sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0 };
+      current = { id: 'start', title: 'Your plan', icon: '✨', sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0, aiPicks: false };
       groups.push(current);
     }
     return current;
@@ -117,7 +119,7 @@ export async function loadOverview(eventId: string): Promise<Overview> {
 
   for (const s of sections ?? []) {
     if (s.section_type === 'headline') {
-      current = { id: s.id, title: s.title, icon: s.icon, sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0 };
+      current = { id: s.id, title: s.title, icon: s.icon, sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0, aiPicks: false };
       groups.push(current);
       continue;
     }
@@ -138,6 +140,7 @@ export async function loadOverview(eventId: string): Promise<Overview> {
     g.totalQuestions += qs.length;
     g.answeredQuestions += ans;
     g.songCount += songCount;
+    if (row.ai_picks_enabled) g.aiPicks = true;
   }
 
   return { groups: groups.filter((g) => g.sections.length > 0), sections: flat, totalQuestions, answeredQuestions };
@@ -171,11 +174,20 @@ export async function saveAnswer(eventId: string, questionId: string, answer: st
     .upsert({ question_id: questionId, event_id: eventId, answer, answered_by: userId, updated_at: new Date().toISOString() }, { onConflict: 'question_id' });
 }
 
-/** Add a song to a section (used by AI picks + search). Returns the new row. */
+/** Add a song to a section (used by For You + search + import). Returns the new row. */
 export async function addSong(
   eventId: string,
   sectionId: string,
-  song: { title: string; artist?: string | null; artwork_url?: string | null; preview_url?: string | null },
+  song: {
+    title: string;
+    artist?: string | null;
+    artwork_url?: string | null;
+    preview_url?: string | null;
+    album?: string | null;
+    external_url?: string | null;
+    provider?: 'spotify' | 'apple' | 'youtube' | 'manual';
+    provider_id?: string | null;
+  },
 ): Promise<SongRow | null> {
   const { count } = await supabase
     .from('planning_songs')
@@ -188,8 +200,12 @@ export async function addSong(
       section_id: sectionId,
       title: song.title,
       artist: song.artist ?? null,
+      album: song.album ?? null,
       artwork_url: song.artwork_url ?? null,
       preview_url: song.preview_url ?? null,
+      external_url: song.external_url ?? null,
+      provider: song.provider ?? 'manual',
+      provider_id: song.provider_id ?? null,
       must_play: false,
       sort_order: count ?? 0,
     })

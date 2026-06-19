@@ -81,7 +81,7 @@ export function Ring({
 }
 
 /** Little gradient "AI" pill used to flag smart features. */
-export function Sparkle({ label = 'AI Picks', style }: { label?: string; style?: ViewStyle }) {
+export function Sparkle({ label = 'For You', style }: { label?: string; style?: ViewStyle }) {
   return (
     <LinearGradient
       colors={[Brand.purple, Brand.purpleLight]}
