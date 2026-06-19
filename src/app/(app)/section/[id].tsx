@@ -183,6 +183,24 @@ function QuestionField({
   const c = useC();
   const answered = value.trim() !== '';
   const opts = q.options.map((o) => (typeof o === 'string' ? o : o.label));
+  // Hierarchical options: a parent reveals its children once selected.
+  const entries = q.options.map((o) =>
+    typeof o === 'string' ? { label: o, children: [] as string[] } : { label: o.label, children: Array.isArray(o.children) ? o.children : [] },
+  );
+  const hasTree = entries.some((e) => e.children.length > 0);
+  const selSet = new Set(value ? value.split('|').filter(Boolean) : []);
+  const setMulti = (next: Set<string>) => onPick(Array.from(next).join('|'));
+  const toggleVal = (v: string) => {
+    const next = new Set(selSet);
+    if (next.has(v)) next.delete(v); else next.add(v);
+    setMulti(next);
+  };
+  const toggleParent = (e: { label: string; children: string[] }) => {
+    const next = new Set(selSet);
+    if (next.has(e.label)) { next.delete(e.label); e.children.forEach((ch) => next.delete(ch)); }
+    else next.add(e.label);
+    setMulti(next);
+  };
 
   return (
     <View style={[styles.qCard, Shadow.card, { backgroundColor: c.card, borderColor: answered ? Brand.purple + '55' : c.border }]}>
@@ -229,23 +247,28 @@ function QuestionField({
               );
             })}
           </View>
+        ) : q.answer_type === 'multiselect' && hasTree ? (
+          <View style={{ gap: Space.sm }}>
+            {entries.map((e) => {
+              const sel = selSet.has(e.label);
+              return (
+                <View key={e.label} style={{ gap: 6 }}>
+                  <Chip label={e.label} active={sel} onPress={() => toggleParent(e)} />
+                  {sel && e.children.length > 0 && (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingLeft: Space.md }}>
+                      {e.children.map((ch) => <Chip key={ch} label={ch} active={selSet.has(ch)} onPress={() => toggleVal(ch)} />)}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
         ) : (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm }}>
             {opts.map((o) => {
-              const selected = q.answer_type === 'multiselect' ? value.split('|').includes(o) : value === o;
+              const selected = q.answer_type === 'multiselect' ? selSet.has(o) : value === o;
               return (
-                <Chip
-                  key={o}
-                  label={o}
-                  active={selected}
-                  onPress={() => {
-                    if (q.answer_type === 'multiselect') {
-                      const set = new Set(value ? value.split('|').filter(Boolean) : []);
-                      if (set.has(o)) set.delete(o); else set.add(o);
-                      onPick(Array.from(set).join('|'));
-                    } else onPick(o);
-                  }}
-                />
+                <Chip key={o} label={o} active={selected} onPress={() => (q.answer_type === 'multiselect' ? toggleVal(o) : onPick(o))} />
               );
             })}
           </View>

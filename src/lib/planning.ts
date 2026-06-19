@@ -41,7 +41,7 @@ export type QuestionRow = {
   prompt: string;
   help_text: string | null;
   answer_type: string;
-  options: (string | { label: string; image?: string | null })[];
+  options: (string | { label: string; image?: string | null; children?: string[] })[];
   answer: string | null;
   condition_question_id: string | null;
   condition_values: string[];
