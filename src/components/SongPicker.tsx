@@ -170,9 +170,9 @@ export function SongPicker({
           <ScrollView contentContainerStyle={{ padding: Space.lg, gap: Space.sm, paddingBottom: Space.xxl * 2 }} keyboardShouldPersistTaps="handled">
             {mode === 'foryou' ? (
               !rec ? <View style={styles.pad}><ActivityIndicator color={Brand.purple} /></View>
-              : rec.status === 'needs-profile' ? <Empty text="Tell us about yourselves in About Us and your Cultural Influence — then we'll pick songs that fit your story." />
+              : rec.status === 'needs-profile' ? <Empty text="Head to “Tell us about you” under Let's Get Started and share your story + favorite genres — then we'll fill this with songs picked just for you." />
               : rec.status === 'unconfigured' || rec.status === 'error' ? <Empty text="Song picks aren't available right now. Try the Add music search instead." />
-              : recItems.length === 0 ? <Empty text="No picks just yet — check back after you add more about yourselves." />
+              : recItems.length === 0 ? <Empty text="No picks yet. Add your story and favorite genres in “Tell us about you” (Let's Get Started) and we'll tailor songs to you." />
               : (
                 <>
                   {rec.basis.length > 0 && <Text style={{ color: c.textTertiary, fontSize: 12, fontStyle: 'italic', marginBottom: 4 }}>Based on {rec.basis.join(', ')}</Text>}
