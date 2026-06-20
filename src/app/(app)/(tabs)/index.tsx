@@ -1,11 +1,13 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { Bar, Ring, Sparkle, useC, useScheme } from '@/components/ui';
-import { BrandHeader } from '@/components/Logo';
+import { Logo } from '@/components/Logo';
+import { pickCoverImage, uploadCoverPhoto } from '@/lib/coverPhoto';
 import { Brand, CategoryThemes, Radius, Shadow, Space, type CategoryTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { getMyEvents, loadOverview, type EventLite, type Group, type Overview } from '@/lib/planning';
@@ -18,6 +20,7 @@ export default function PlanScreen() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -32,6 +35,21 @@ export default function PlanScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
+  const onChangePhoto = useCallback(async () => {
+    if (!event) return;
+    try {
+      const asset = await pickCoverImage();
+      if (!asset) return;
+      setUploading(true);
+      await uploadCoverPhoto(event.id, asset);
+      await load();
+    } catch (e) {
+      Alert.alert('Could not update photo', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  }, [event, load]);
+
   if (loading) return <View style={[styles.center, { backgroundColor: c.bg }]}><ActivityIndicator color={Brand.purple} /></View>;
 
   const pct = overview && overview.totalQuestions > 0 ? Math.round((overview.answeredQuestions / overview.totalQuestions) * 100) : 0;
@@ -44,22 +62,49 @@ export default function PlanScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <BrandHeader />
         <ScrollView
           contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl * 3, gap: Space.lg }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Brand.purple} />}>
-          <View style={styles.topRow}>
-            <Text style={[styles.hi, { color: c.textSecondary }]}>Welcome back{profile?.firstName ? `, ${profile.firstName}` : ''}</Text>
-            <Pressable onPress={signOut}><Text style={{ color: c.textTertiary, fontSize: 13 }}>Sign out</Text></Pressable>
-          </View>
-
           {!event ? (
-            <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
-              <Text style={{ color: c.textSecondary }}>No event is linked to your account yet. Your DJ will set this up shortly.</Text>
-            </View>
+            <>
+              <View style={styles.topRow}>
+                <Logo variant="full" height={30} />
+                <Pressable onPress={signOut}><Text style={{ color: c.textTertiary, fontSize: 13 }}>Sign out</Text></Pressable>
+              </View>
+              <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Text style={{ color: c.textSecondary }}>No event is linked to your account yet. Your DJ will set this up shortly.</Text>
+              </View>
+            </>
           ) : (
             <>
-              <LinearGradient colors={[Brand.purple, '#6a4fb8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, Shadow.card]}>
+              <View style={[styles.hero, Shadow.card]}>
+                {event.cover_photo_url ? (
+                  <Image source={{ uri: event.cover_photo_url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
+                ) : (
+                  <LinearGradient colors={[Brand.purple, '#6a4fb8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                )}
+                <LinearGradient
+                  colors={event.cover_photo_url
+                    ? ['rgba(18,10,38,0.45)', 'rgba(18,10,38,0.20)', 'rgba(8,4,20,0.88)']
+                    : ['rgba(0,0,0,0.04)', 'rgba(0,0,0,0.18)']}
+                  style={StyleSheet.absoluteFill}
+                />
+
+                <View style={styles.heroTopRow}>
+                  <Logo variant="full" height={30} tone="#ffffff" />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.md }}>
+                    <Pressable onPress={onChangePhoto} disabled={uploading} hitSlop={8} style={styles.camBtn}>
+                      {uploading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ fontSize: 15 }}>📷</Text>}
+                    </Pressable>
+                    <Pressable onPress={signOut} hitSlop={8}>
+                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '600' }}>Sign out</Text>
+                    </Pressable>
+                  </View>
+                </View>
+
+                <View style={{ flex: 1, minHeight: Space.xl }} />
+
+                <Text style={styles.heroWelcome}>Welcome back{profile?.firstName ? `, ${profile.firstName}` : ''}</Text>
                 {dateLabel && <Text style={styles.heroDate}>{dateLabel.toUpperCase()}</Text>}
                 <Text style={styles.heroTitle}>{event.name || 'Your Event'}</Text>
                 {countdown != null && countdown >= 0 && (
@@ -73,7 +118,13 @@ export default function PlanScreen() {
                   <Text style={styles.heroSub}>{pct >= 80 ? "You're almost there!" : pct > 0 ? 'Looking great so far' : "Let's get started!"}</Text>
                 </View>
                 <View style={{ marginTop: Space.sm }}><Bar pct={pct} height={6} track="rgba(255,255,255,0.25)" /></View>
-              </LinearGradient>
+
+                {!event.cover_photo_url && (
+                  <Pressable onPress={onChangePhoto} disabled={uploading} style={styles.addPhotoHint} hitSlop={6}>
+                    <Text style={styles.addPhotoHintText}>📷  Add a photo of you two</Text>
+                  </Pressable>
+                )}
+              </View>
 
               {nextUp && (
                 <View>
@@ -180,7 +231,12 @@ const styles = StyleSheet.create({
   card: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: Space.lg },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   hi: { fontSize: 15 },
-  hero: { borderRadius: Radius.xl, padding: Space.xl },
+  hero: { borderRadius: Radius.xl, padding: Space.xl, overflow: 'hidden', minHeight: 320 },
+  heroTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  camBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
+  heroWelcome: { color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '600', marginBottom: 4 },
+  addPhotoHint: { marginTop: Space.md, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 14, paddingVertical: 9, borderRadius: Radius.pill },
+  addPhotoHintText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   heroDate: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
   heroTitle: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 4 },
   countPill: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: Space.md, backgroundColor: 'rgba(255,255,255,0.18)', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill },
