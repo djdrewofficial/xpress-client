@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { Bar, useC } from '@/components/ui';
 import { BrandHeader } from '@/components/Logo';
@@ -27,7 +27,7 @@ export default function MusicScreen() {
       setSections(ov.sections.filter((s) => s.songs_enabled));
     } else setSections([]);
   }, [profile]);
-  useEffect(() => { load(); }, [load]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const totalSongs = (sections ?? []).reduce((n, s) => n + s.songCount, 0);
 

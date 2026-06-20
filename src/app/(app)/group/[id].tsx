@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Bar, useC } from '@/components/ui';
 import { Brand, Radius, Shadow, Space } from '@/lib/theme';
@@ -18,7 +18,7 @@ export default function GroupScreen() {
     const ov = await loadOverview(eventId);
     setSections(ov.groups.find((g) => g.id === id)?.sections ?? []);
   }, [eventId, id]);
-  useEffect(() => { load(); }, [load]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>

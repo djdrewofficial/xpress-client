@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { Bar, Ring, Sparkle, useC, useScheme } from '@/components/ui';
 import { BrandHeader } from '@/components/Logo';
@@ -28,7 +28,8 @@ export default function PlanScreen() {
     setLoading(false);
   }, [profile]);
 
-  useEffect(() => { load(); }, [load]);
+  // refetch progress every time the screen regains focus (e.g. after answering)
+  useFocusEffect(useCallback(() => { load(); }, [load]));
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
   if (loading) return <View style={[styles.center, { backgroundColor: c.bg }]}><ActivityIndicator color={Brand.purple} /></View>;
