@@ -15,6 +15,7 @@ import {
   type Backdrop,
   type BoothDesign,
   type BoothFilters,
+  type FilterOption,
 } from '@/lib/photobooth';
 
 const PER_PAGE = 24;
@@ -135,16 +136,9 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
         <Text style={[styles.lab, { color: c.textTertiary }]}>PHOTO-STRIP DESIGN{design ? ` · ${(design.type_name ?? 'SELECTED').toUpperCase()}` : ''}</Text>
 
         {/* Filters */}
-        <FilterRow label="Photos" values={filters.no_of_images} active={active.no_of_images} onPick={(v) => toggle('no_of_images', v)} c={c} />
-        <FilterRow label="Layout" values={filters.layout} active={active.layout} onPick={(v) => toggle('layout', v)} c={c} />
-        <FilterRow
-          label="Type"
-          values={filters.type.map((t) => t.value)}
-          labels={Object.fromEntries(filters.type.map((t) => [t.value, t.label]))}
-          active={active.type}
-          onPick={(v) => toggle('type', v)}
-          c={c}
-        />
+        <FilterRow label="Photos" options={filters.no_of_images} active={active.no_of_images} onPick={(v) => toggle('no_of_images', v)} c={c} />
+        <FilterRow label="Layout" options={filters.layout} active={active.layout} onPick={(v) => toggle('layout', v)} c={c} />
+        <FilterRow label="Type" options={filters.type} active={active.type} onPick={(v) => toggle('type', v)} c={c} />
 
         {loading ? (
           <ActivityIndicator color={Brand.purple} style={{ marginVertical: Space.lg }} />
@@ -183,25 +177,24 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
 }
 
 function FilterRow({
-  label, values, labels, active, onPick, c,
+  label, options, active, onPick, c,
 }: {
   label: string;
-  values: string[];
-  labels?: Record<string, string>;
+  options: FilterOption[];
   active: string | undefined;
   onPick: (v: string) => void;
   c: ReturnType<typeof useC>;
 }) {
-  if (values.length === 0) return null;
+  if (options.length === 0) return null;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
       <Text style={{ width: 52, fontSize: 10, fontWeight: '800', letterSpacing: 0.5, color: c.textTertiary }}>{label.toUpperCase()}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingRight: Space.lg }}>
-        {values.map((v) => {
-          const on = active === v;
+        {options.map((o) => {
+          const on = active === o.value;
           return (
-            <Pressable key={v} onPress={() => onPick(v)} style={[styles.chip, on ? { backgroundColor: Brand.purple, borderColor: Brand.purple } : { backgroundColor: c.cardAlt, borderColor: c.border }]}>
-              <Text style={{ color: on ? '#fff' : c.text, fontSize: 12, fontWeight: '600' }}>{labels?.[v] ?? v}</Text>
+            <Pressable key={o.value} onPress={() => onPick(o.value)} style={[styles.chip, on ? { backgroundColor: Brand.purple, borderColor: Brand.purple } : { backgroundColor: c.cardAlt, borderColor: c.border }]}>
+              <Text style={{ color: on ? '#fff' : c.text, fontSize: 12, fontWeight: '600' }}>{o.label}</Text>
             </Pressable>
           );
         })}

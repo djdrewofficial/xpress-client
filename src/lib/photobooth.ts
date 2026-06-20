@@ -22,10 +22,11 @@ export type BoothDesign = {
 
 export type BoothSelection = { backdrop_id: string | null; design: BoothDesign | null } | null;
 
+export type FilterOption = { value: string; label: string };
 export type BoothFilters = {
-  no_of_images: string[];
-  layout: string[];
-  type: { value: string; label: string }[];
+  no_of_images: FilterOption[];
+  layout: FilterOption[];
+  type: FilterOption[];
 };
 
 function apiBase(): string | null {
@@ -124,6 +125,28 @@ export async function fetchBoothTemplates(params: Record<string, string | number
   }
 }
 
+/** TemplatesBooth /filters returns value→label maps (layout_size/image_type/
+    no_of_images/type/text_display) and an array for tags. Normalize either to
+    {value,label}[]. */
+function toOpts(v: unknown): FilterOption[] {
+  if (Array.isArray(v)) {
+    return v
+      .map((x) =>
+        x && typeof x === 'object'
+          ? {
+              value: String((x as Record<string, unknown>).value ?? (x as Record<string, unknown>).slug ?? ''),
+              label: String((x as Record<string, unknown>).label ?? (x as Record<string, unknown>).name ?? (x as Record<string, unknown>).value ?? ''),
+            }
+          : { value: String(x), label: String(x) },
+      )
+      .filter((o) => o.value);
+  }
+  if (v && typeof v === 'object') {
+    return Object.entries(v as Record<string, unknown>).map(([value, label]) => ({ value, label: String(label) }));
+  }
+  return [];
+}
+
 export async function fetchBoothFilters(): Promise<BoothFilters> {
   const empty: BoothFilters = { no_of_images: [], layout: [], type: [] };
   const base = apiBase();
@@ -132,22 +155,7 @@ export async function fetchBoothFilters(): Promise<BoothFilters> {
     const res = await fetch(`${base}/api/mobile/booth-filters`, { headers: await authHeader() });
     if (!res.ok) return empty;
     const o = (await res.json()) as Record<string, unknown>;
-    const list = (v: unknown): string[] =>
-      Array.isArray(v) ? v.map((x) => (x && typeof x === 'object' && 'value' in x ? String((x as { value: unknown }).value) : String(x))).filter(Boolean) : [];
-    const typed = (v: unknown): { value: string; label: string }[] =>
-      Array.isArray(v)
-        ? v
-            .map((x) =>
-              x && typeof x === 'object'
-                ? {
-                    value: String((x as Record<string, unknown>).value ?? (x as Record<string, unknown>).slug ?? ''),
-                    label: String((x as Record<string, unknown>).label ?? (x as Record<string, unknown>).name ?? (x as Record<string, unknown>).value ?? ''),
-                  }
-                : { value: String(x), label: String(x) },
-            )
-            .filter((t) => t.value)
-        : [];
-    return { no_of_images: list(o.no_of_images), layout: list(o.layout_size ?? o.layout), type: typed(o.type) };
+    return { no_of_images: toOpts(o.no_of_images), layout: toOpts(o.layout_size ?? o.layout), type: toOpts(o.type) };
   } catch {
     return empty;
   }
