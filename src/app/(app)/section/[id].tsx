@@ -8,6 +8,7 @@ import { Bar, useC } from '@/components/ui';
 import { SongPicker } from '@/components/SongPicker';
 import { SectionSongs } from '@/components/SectionSongs';
 import { VendorTeam } from '@/components/VendorTeam';
+import { PhotoBoothSection } from '@/components/PhotoBoothSection';
 import { Brand, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { loadSection, saveAnswer, questionVisible, type QuestionRow, type SongRow } from '@/lib/planning';
@@ -103,7 +104,9 @@ export default function SectionScreen() {
             )}
           </View>
 
-          {meta?.module === 'vendors' ? (
+          {meta?.module === 'photobooth' ? (
+            <PhotoBoothSection eventId={eventId} />
+          ) : meta?.module === 'vendors' ? (
             <VendorTeam eventId={eventId} />
           ) : (
             <>
