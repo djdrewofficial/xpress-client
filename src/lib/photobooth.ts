@@ -24,9 +24,9 @@ export type BoothSelection = { backdrop_id: string | null; design: BoothDesign |
 
 export type FilterOption = { value: string; label: string };
 export type BoothFilters = {
-  no_of_images: FilterOption[];
   layout: FilterOption[];
-  type: FilterOption[];
+  image_type: FilterOption[];
+  no_of_images: FilterOption[];
 };
 
 function apiBase(): string | null {
@@ -148,14 +148,14 @@ function toOpts(v: unknown): FilterOption[] {
 }
 
 export async function fetchBoothFilters(): Promise<BoothFilters> {
-  const empty: BoothFilters = { no_of_images: [], layout: [], type: [] };
+  const empty: BoothFilters = { layout: [], image_type: [], no_of_images: [] };
   const base = apiBase();
   if (!base) return empty;
   try {
     const res = await fetch(`${base}/api/mobile/booth-filters`, { headers: await authHeader() });
     if (!res.ok) return empty;
     const o = (await res.json()) as Record<string, unknown>;
-    return { no_of_images: toOpts(o.no_of_images), layout: toOpts(o.layout_size ?? o.layout), type: toOpts(o.type) };
+    return { layout: toOpts(o.layout_size ?? o.layout), image_type: toOpts(o.image_type), no_of_images: toOpts(o.no_of_images) };
   } catch {
     return empty;
   }
