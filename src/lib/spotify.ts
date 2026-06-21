@@ -91,3 +91,42 @@ export async function spotifyPlaylistTracks(id: string): Promise<SpotifyTrack[]>
     return [];
   }
 }
+
+/** Bind a section to live-sync a playlist (auto-updates hourly). Returns how
+    many songs the initial sync added, or null on failure. */
+export async function enablePlaylistSync(
+  eventId: string,
+  sectionId: string,
+  playlistId: string,
+  playlistName: string,
+): Promise<{ added: number; removed: number } | null> {
+  const base = apiBase();
+  if (!base) return null;
+  try {
+    const res = await fetch(`${base}/api/mobile/planning/spotify-sync`, {
+      method: 'POST',
+      headers: { ...(await authHeader()), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'enable', eventId, sectionId, playlistId, playlistName }),
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { added?: number; removed?: number };
+    return { added: j.added ?? 0, removed: j.removed ?? 0 };
+  } catch {
+    return null;
+  }
+}
+
+export async function disablePlaylistSync(eventId: string, sectionId: string): Promise<boolean> {
+  const base = apiBase();
+  if (!base) return false;
+  try {
+    const res = await fetch(`${base}/api/mobile/planning/spotify-sync`, {
+      method: 'POST',
+      headers: { ...(await authHeader()), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'disable', eventId, sectionId }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}

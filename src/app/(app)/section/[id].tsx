@@ -161,6 +161,7 @@ export default function SectionScreen() {
             sectionTitle={meta.title}
             existingTitles={new Set(songs.map((s) => s.title.toLowerCase()))}
             onAdded={(row) => setSongs((prev) => (prev.some((s) => s.id === row.id) ? prev : [...prev, row]))}
+            onReload={load}
           />
         )}
       </SafeAreaView>

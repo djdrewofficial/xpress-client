@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
@@ -9,7 +9,7 @@ import { Brand, Radius, Space } from '@/lib/theme';
 import { addSong, type SongRow } from '@/lib/planning';
 import { searchTracks, resolvePreview, type Track } from '@/lib/musicSearch';
 import { getRecommendations, type RecommendedSong } from '@/lib/recommendations';
-import { connectSpotify, spotifyPlaylistTracks, spotifyPlaylists, spotifyStatus, type SpotifyPlaylist, type SpotifyTrack } from '@/lib/spotify';
+import { connectSpotify, enablePlaylistSync, spotifyPlaylistTracks, spotifyPlaylists, spotifyStatus, type SpotifyPlaylist, type SpotifyTrack } from '@/lib/spotify';
 import { MixtapeLoader } from '@/components/MixtapeLoader';
 
 type PickItem = {
@@ -44,7 +44,7 @@ function fromRec(s: RecommendedSong): PickItem {
 }
 
 export function SongPicker({
-  visible, onClose, mode, eventId, eventName, sectionId, sectionTitle, existingTitles, onAdded,
+  visible, onClose, mode, eventId, eventName, sectionId, sectionTitle, existingTitles, onAdded, onReload,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -55,6 +55,7 @@ export function SongPicker({
   sectionTitle: string;
   existingTitles: Set<string>;
   onAdded: (row: SongRow) => void;
+  onReload?: () => void;
 }) {
   const c = useC();
   const player = useAudioPlayer(null);
@@ -76,6 +77,7 @@ export function SongPicker({
   const [sel, setSel] = useState<SpotifyPlaylist | null>(null);
   const [spTracks, setSpTracks] = useState<SpotifyTrack[] | null>(null);
   const [importingAll, setImportingAll] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => { setAudioModeAsync({ playsInSilentMode: true }).catch(() => {}); }, []);
 
@@ -166,6 +168,27 @@ export function SongPicker({
     setImportingAll(false);
   }, [spTracks, existingTitles, added, handleAdd]);
 
+  const startSync = useCallback(() => {
+    if (!sel) return;
+    Alert.alert(
+      'Keep this playlist in sync?',
+      `We'll mirror “${sel.name}” into this section and auto-update about every hour — songs you add or remove on Spotify update here automatically.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start sync',
+          onPress: async () => {
+            setSyncing(true);
+            const res = await enablePlaylistSync(eventId, sectionId, sel.id, sel.name);
+            setSyncing(false);
+            if (res) { onReload?.(); onClose(); }
+            else Alert.alert('Could not start sync', 'Please try again.');
+          },
+        },
+      ],
+    );
+  }, [sel, eventId, sectionId, onReload, onClose]);
+
   const stateFor = (item: PickItem) => added[item.key] ?? (existingTitles.has(item.title.toLowerCase()) ? 'done' : undefined);
 
   return (
@@ -236,9 +259,14 @@ export function SongPicker({
                   <>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Space.sm }}>
                       <Pressable onPress={() => { setSel(null); setSpTracks(null); }} hitSlop={8}><Text style={{ color: Brand.purpleLight, fontSize: 14, fontWeight: '600' }}>‹ Playlists</Text></Pressable>
-                      <Pressable disabled={importingAll} onPress={importAll} style={[styles.addAll, { backgroundColor: Brand.purple }]}>
-                        {importingAll ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>+ Add all ({spTracks.length})</Text>}
-                      </Pressable>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.sm }}>
+                        <Pressable disabled={syncing} onPress={startSync} style={[styles.addAll, { backgroundColor: c.cardAlt }]}>
+                          {syncing ? <ActivityIndicator size="small" color={Brand.purple} /> : <Text style={{ color: Brand.purpleLight, fontWeight: '700', fontSize: 13 }}>🔄 Keep in sync</Text>}
+                        </Pressable>
+                        <Pressable disabled={importingAll} onPress={importAll} style={[styles.addAll, { backgroundColor: Brand.purple }]}>
+                          {importingAll ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>+ Add all ({spTracks.length})</Text>}
+                        </Pressable>
+                      </View>
                     </View>
                     {spTracks.map(fromSpotify).map((item) => <SongRowView key={item.key} item={item} c={c} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => togglePlay(item)} onAdd={() => handleAdd(item)} />)}
                   </>
