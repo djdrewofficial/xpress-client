@@ -10,7 +10,7 @@ import { SongPicker } from '@/components/SongPicker';
 import { SectionSongs } from '@/components/SectionSongs';
 import { VendorTeam } from '@/components/VendorTeam';
 import { PhotoBoothSection } from '@/components/PhotoBoothSection';
-import { Brand, Radius, Shadow, Space } from '@/lib/theme';
+import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { loadSection, saveAnswer, questionVisible, type QuestionRow, type SongRow } from '@/lib/planning';
 import { supabase } from '@/lib/supabase';
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Space.lg, paddingVertical: Space.md },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   countPill: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: Radius.pill },
-  title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.3 },
+  title: { fontSize: 28, fontFamily: Fonts.display, letterSpacing: -0.3 },
   lab: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   songRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: Space.sm },
   qCard: { borderRadius: Radius.lg, borderWidth: 1, padding: Space.lg },

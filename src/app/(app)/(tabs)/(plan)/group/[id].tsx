@@ -7,7 +7,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Bar, useC } from '@/components/ui';
 import { Encourager } from '@/components/Encourager';
 import { useAuth } from '@/lib/auth';
-import { Brand, Radius, Shadow, Space } from '@/lib/theme';
+import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import {
   deleteSection,
   loadOverview,
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
   editBtn: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: Radius.pill },
   hdrBody: { flexDirection: 'row', alignItems: 'center', gap: Space.md, paddingHorizontal: Space.lg, paddingTop: Space.md },
   hdrIcon: { width: 58, height: 58, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  hdrTitle: { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.3 },
+  hdrTitle: { color: '#fff', fontSize: 27, fontFamily: Fonts.display, letterSpacing: -0.3 },
   hdrSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '600', marginTop: 2 },
   hdrPctPill: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
   hdrPct: { color: '#fff', fontSize: 15, fontWeight: '800' },

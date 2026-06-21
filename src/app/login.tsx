@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { GradientButton, useC } from '@/components/ui';
 import { Logo } from '@/components/Logo';
-import { Brand, Radius, Space } from '@/lib/theme';
+import { Brand, Fonts, Radius, Space } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
 
 export default function LoginScreen() {
@@ -67,8 +67,8 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   form: { flex: 1, justifyContent: 'center', paddingHorizontal: Space.xl, gap: Space.md },
   brandMark: { width: 64, height: 64, borderRadius: 18, backgroundColor: '#000', alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },
-  brandX: { color: '#fff', fontSize: 34, fontWeight: '800' },
-  brand: { color: '#fff', fontSize: 24, fontWeight: '700', textAlign: 'center', marginTop: Space.md },
+  brandX: { color: '#fff', fontSize: 40, fontFamily: Fonts.display },
+  brand: { color: '#fff', fontSize: 26, fontFamily: Fonts.display, textAlign: 'center', marginTop: Space.md },
   tagline: { color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center', marginBottom: Space.lg },
   card: { backgroundColor: '#ffffff', borderRadius: Radius.xl, padding: Space.xl, gap: Space.md },
   input: { borderRadius: Radius.md, paddingHorizontal: Space.lg, paddingVertical: 14, fontSize: 16 },

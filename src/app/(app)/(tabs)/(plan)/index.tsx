@@ -10,7 +10,7 @@ import { Ring, Sparkle, useC, useScheme } from '@/components/ui';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { Logo } from '@/components/Logo';
 import { pickCoverImage, uploadCoverPhoto } from '@/lib/coverPhoto';
-import { Brand, CategoryThemes, Radius, Shadow, Space, type CategoryTheme } from '@/lib/theme';
+import { Brand, CategoryThemes, Fonts, Radius, Shadow, Space, type CategoryTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { getMyEvents, loadOverview, type EventLite, type Group, type Overview } from '@/lib/planning';
 
@@ -286,8 +286,8 @@ const styles = StyleSheet.create({
   addPhotoHint: { marginTop: Space.md, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 14, paddingVertical: 9, borderRadius: Radius.pill },
   addPhotoHintText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   heroDate: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
-  heroTitle: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 4 },
-  countPill: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: Space.md, backgroundColor: 'rgba(255,255,255,0.18)', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill },
+  heroTitle: { color: '#fff', fontSize: 32, fontFamily: Fonts.display, marginTop: 4 },
+  countPill: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: Space.md, backgroundColor: Brand.red, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill },
   countNum: { color: '#fff', fontWeight: '800', fontSize: 16 },
   countLab: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '600' },
   heroProgRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md, marginTop: Space.lg },
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   cat: { borderRadius: Radius.xl, padding: Space.lg },
   catTop: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
   catIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  catTitle: { fontSize: 18, fontWeight: '800', letterSpacing: -0.2 },
+  catTitle: { fontSize: 20, fontFamily: Fonts.display, letterSpacing: -0.2 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: Space.md },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6, paddingHorizontal: 10, borderRadius: Radius.pill, maxWidth: '100%' },
   chipTxt: { fontSize: 12, fontWeight: '600' },

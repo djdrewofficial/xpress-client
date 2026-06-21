@@ -1,8 +1,21 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useFonts, DMSerifDisplay_400Regular } from '@expo-google-fonts/dm-serif-display';
+import {
+  Montserrat_400Regular,
+  Montserrat_500Medium,
+  Montserrat_600SemiBold,
+  Montserrat_700Bold,
+  Montserrat_800ExtraBold,
+} from '@expo-google-fonts/montserrat';
 
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { patchTextFonts } from '@/lib/fontPatch';
+
+// Route every <Text> through Montserrat (weight-aware); DM Serif headlines opt in
+// via an explicit fontFamily.
+patchTextFonts();
 
 function RootNavigator() {
   const { session, loading } = useAuth();
@@ -22,6 +35,16 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    DMSerifDisplay_400Regular,
+    Montserrat_400Regular,
+    Montserrat_500Medium,
+    Montserrat_600SemiBold,
+    Montserrat_700Bold,
+    Montserrat_800ExtraBold,
+  });
+  if (!fontsLoaded) return null;
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>

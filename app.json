@@ -34,7 +34,8 @@
         {
           "photosPermission": "Allow Xpress to use your photos to set your event header photo."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": false,

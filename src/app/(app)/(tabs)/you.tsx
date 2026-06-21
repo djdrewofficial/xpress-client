@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { useC } from '@/components/ui';
 import { BrandHeader } from '@/components/Logo';
-import { Brand, Radius, Shadow, Space } from '@/lib/theme';
+import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { getMyEvents } from '@/lib/planning';
 import { loadAccount, money, OFFICE_PHONE, OFFICE_EMAIL_FALLBACK, type AccountData } from '@/lib/account';
@@ -180,7 +180,7 @@ function Stat({ label, value, c, color }: { label: string; value: string; c: Ret
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 28, fontWeight: '800' },
+  title: { fontSize: 30, fontFamily: Fonts.display },
   card: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: Space.lg },
   lab: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   lineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.md },

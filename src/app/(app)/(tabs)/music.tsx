@@ -6,7 +6,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 
 import { Bar, useC } from '@/components/ui';
 import { BrandHeader } from '@/components/Logo';
-import { Brand, Radius, Shadow, Space } from '@/lib/theme';
+import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { getMyEvents, loadOverview, type SectionRow } from '@/lib/planning';
 
@@ -77,7 +77,7 @@ export default function MusicScreen() {
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 28, fontWeight: '800' },
+  title: { fontSize: 30, fontFamily: Fonts.display },
   aiHero: { borderRadius: Radius.xl, padding: Space.xl, gap: 4 },
   aiTag: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
   aiTitle: { color: '#fff', fontSize: 22, fontWeight: '800' },

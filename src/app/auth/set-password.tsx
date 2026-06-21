@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 
 import { GradientButton, useC } from '@/components/ui';
-import { Brand, Radius, Space } from '@/lib/theme';
+import { Brand, Fonts, Radius, Space } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
 
 /** Parse #fragment (or ?query) params from a deep link URL. */
@@ -107,7 +107,7 @@ export default function SetPasswordScreen() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, justifyContent: 'center', paddingHorizontal: Space.xl, gap: Space.md },
-  brand: { color: '#fff', fontSize: 24, fontWeight: '700', textAlign: 'center' },
+  brand: { color: '#fff', fontSize: 26, fontFamily: Fonts.display, textAlign: 'center' },
   tagline: { color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center', marginBottom: Space.lg },
   card: { backgroundColor: '#fff', borderRadius: Radius.xl, padding: Space.xl, gap: Space.md },
   input: { borderRadius: Radius.md, paddingHorizontal: Space.lg, paddingVertical: 14, fontSize: 16 },

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { Brand, Radius, Space } from '@/lib/theme';
+import { Brand, Fonts, Radius, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 
 /* First-run walkthrough. Full-screen, swipeable slides that explain the app —
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   skip: { paddingHorizontal: 12, paddingVertical: 6 },
   skipTxt: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontWeight: '600' },
   iconWrap: { width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: Space.xl },
-  title: { color: '#fff', fontSize: 26, fontWeight: '800', textAlign: 'center', letterSpacing: -0.3, marginBottom: Space.md },
+  title: { color: '#fff', fontSize: 28, fontFamily: Fonts.display, textAlign: 'center', letterSpacing: -0.3, marginBottom: Space.md },
   body: { color: 'rgba(255,255,255,0.85)', fontSize: 16, lineHeight: 24, textAlign: 'center' },
   mockWrap: { alignItems: 'center', marginTop: Space.xl },
   mockPill: { backgroundColor: '#fff', borderRadius: Radius.pill, paddingVertical: 11, paddingHorizontal: 22 },

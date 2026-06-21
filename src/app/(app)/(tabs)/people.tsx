@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useC } from '@/components/ui';
 import { BrandHeader } from '@/components/Logo';
-import { Radius, Space } from '@/lib/theme';
+import { Fonts, Radius, Space } from '@/lib/theme';
 
 export default function PeopleScreen() {
   const c = useC();
@@ -25,6 +25,6 @@ export default function PeopleScreen() {
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 28, fontWeight: '800' },
+  title: { fontSize: 30, fontFamily: Fonts.display },
   card: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: Space.lg },
 });

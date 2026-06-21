@@ -1,10 +1,13 @@
-/* Xpress Entertainment brand — matches the XOS web Tailwind theme. */
-import { Platform } from 'react-native';
+/* Xpress Entertainment brand — matches the XOS web Tailwind theme.
+   Primary #4b328e (purple), secondary #fe3a3b (red).
+   Primary type: DM Serif Display (display), secondary: Montserrat (UI/body). */
 
 export const Brand = {
   purple: '#4b328e',
   purpleLight: '#8b6fd6',
   purpleLighter: '#b9a5ef',
+  red: '#fe3a3b',
+  redLight: '#ff6f70',
 } as const;
 
 export const Colors = {
@@ -71,7 +74,13 @@ export const Shadow = {
 export const Radius = { sm: 10, md: 14, lg: 20, xl: 28, pill: 999 } as const;
 export const Space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
 
-export const Fonts = Platform.select({
-  ios: { rounded: 'ui-rounded', sans: 'system-ui' },
-  default: { rounded: 'System', sans: 'System' },
-})!;
+/* Brand type. `display` = DM Serif Display (logo/headlines); the rest are
+   Montserrat weights (the global Text patch maps fontWeight → these). */
+export const Fonts = {
+  display: 'DMSerifDisplay_400Regular',
+  body: 'Montserrat_400Regular',
+  medium: 'Montserrat_500Medium',
+  semibold: 'Montserrat_600SemiBold',
+  bold: 'Montserrat_700Bold',
+  heavy: 'Montserrat_800ExtraBold',
+} as const;
