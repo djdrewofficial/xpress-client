@@ -29,7 +29,7 @@ const CATEGORIES: Opt[] = [
 ];
 const LAYOUTS: Opt[] = [
   { value: '26strip', label: '2×6 Strip' },
-  { value: '46postcard-p', label: '4×6 Portrait' },
+  { value: '46postcard-l', label: '4×6 Horizontal' },
 ];
 const PHOTO_COUNTS: Opt[] = [
   { value: '1images', label: '1 photo' },
