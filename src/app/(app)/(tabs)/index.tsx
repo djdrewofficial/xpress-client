@@ -6,7 +6,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { Sparkle, WeddingRing, useC, useScheme } from '@/components/ui';
+import { Ring, Sparkle, useC, useScheme } from '@/components/ui';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { Logo } from '@/components/Logo';
 import { pickCoverImage, uploadCoverPhoto } from '@/lib/coverPhoto';
@@ -134,7 +134,7 @@ export default function PlanScreen() {
                   </View>
                 )}
                 <View style={styles.heroProgRow}>
-                  <WeddingRing pct={pct} size={88} />
+                  <Ring pct={pct} size={78} stroke={7} color="#fff" track="rgba(255,255,255,0.28)" />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.heroCheer}>{pct >= 80 ? "You're almost there!" : pct > 0 ? 'Looking great so far' : "Let's get started!"}</Text>
                     {overview && overview.totalQuestions > 0 && (

@@ -1,6 +1,6 @@
 import { useColorScheme, View, Text, Pressable, StyleSheet, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle, Polygon, Defs, LinearGradient as SvgGrad, Stop } from 'react-native-svg';
+import Svg, { Circle } from 'react-native-svg';
 
 import { Colors, Brand, Radius, Space, type Scheme } from '@/lib/theme';
 
@@ -76,73 +76,6 @@ export function Ring({
         />
       </Svg>
       <Text style={{ color, fontWeight: '800', fontSize: size * 0.27 }}>{label ?? `${Math.round(clamped)}%`}</Text>
-    </View>
-  );
-}
-
-/**
- * Wedding-ring progress: a gold band that fills as you progress, with a diamond
- * solitaire mounted at the top and the percentage centered. For the hero on the
- * couple's home screen.
- */
-export function WeddingRing({ pct, size = 88, label }: { pct: number; size?: number; label?: string }) {
-  const clamped = Math.max(0, Math.min(100, pct));
-  const stroke = Math.max(6, Math.round(size * 0.09));
-  const r = (size - stroke) / 2;
-  const c = size / 2;
-  const circ = 2 * Math.PI * r;
-  const dash = (clamped / 100) * circ;
-
-  // Diamond mounted on the top of the band (12 o'clock).
-  const gw = size * 0.22;
-  const gh = size * 0.2;
-  const gy = Math.max(1, Math.round(stroke * 0.35));
-  const gem = [
-    [c - gw / 2, gy + gh * 0.34],
-    [c - gw * 0.22, gy],
-    [c + gw * 0.22, gy],
-    [c + gw / 2, gy + gh * 0.34],
-    [c, gy + gh],
-  ]
-    .map((p) => p.join(','))
-    .join(' ');
-  const facet = `${c - gw * 0.22},${gy} ${c + gw * 0.22},${gy} ${c},${gy + gh * 0.34}`;
-
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
-        <Defs>
-          <SvgGrad id="wr-gold" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#f7e6a8" />
-            <Stop offset="0.5" stopColor="#e6c25c" />
-            <Stop offset="1" stopColor="#bf972f" />
-          </SvgGrad>
-          <SvgGrad id="wr-gem" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor="#ffffff" />
-            <Stop offset="0.55" stopColor="#cdeaff" />
-            <Stop offset="1" stopColor="#8fbfe8" />
-          </SvgGrad>
-        </Defs>
-
-        {/* Band: faint track + gold progress arc (starts at the top) */}
-        <Circle cx={c} cy={c} r={r} stroke="rgba(255,255,255,0.22)" strokeWidth={stroke} fill="none" />
-        <Circle
-          cx={c}
-          cy={c}
-          r={r}
-          stroke="url(#wr-gold)"
-          strokeWidth={stroke}
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${circ}`}
-          transform={`rotate(-90 ${c} ${c})`}
-        />
-
-        {/* Diamond solitaire */}
-        <Polygon points={gem} fill="url(#wr-gem)" stroke="#ffffff" strokeWidth={0.8} />
-        <Polygon points={facet} fill="#ffffff" opacity={0.4} />
-      </Svg>
-      <Text style={{ color: '#fff', fontWeight: '800', fontSize: size * 0.22 }}>{label ?? `${Math.round(clamped)}%`}</Text>
     </View>
   );
 }
