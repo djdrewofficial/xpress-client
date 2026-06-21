@@ -26,6 +26,7 @@ export default function SectionScreen() {
   const [songs, setSongs] = useState<SongRow[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [songsExpanded, setSongsExpanded] = useState(false);
 
   const load = useCallback(async () => {
     if (!id || !eventId) return;
@@ -110,6 +111,25 @@ export default function SectionScreen() {
             <VendorTeam eventId={eventId} />
           ) : (
             <>
+              {/* Questions first — never buried under a long playlist. */}
+              {visible.length > 0 && (
+                <View style={{ gap: Space.md }}>
+                  {songs.length > 0 && <Text style={[styles.lab, { color: c.textTertiary }]}>QUESTIONS</Text>}
+                  {visible.map((q, i) => (
+                    <QuestionField
+                      key={q.id}
+                      q={q}
+                      index={i + 1}
+                      value={answers[q.id] ?? ''}
+                      onChange={(v) => setLocal(q.id, v)}
+                      onPersist={(v) => persist(q.id, v)}
+                      onPick={(v) => pick(q.id, v)}
+                    />
+                  ))}
+                </View>
+              )}
+
+              {/* Music */}
               {meta?.songs_enabled && (
                 <View style={{ flexDirection: 'row', gap: Space.sm }}>
                   {meta.ai_picks_enabled && (
@@ -125,25 +145,20 @@ export default function SectionScreen() {
 
               {songs.length > 0 && (
                 <View style={{ gap: Space.sm }}>
-                  <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR SONGS</Text>
-                  <SectionSongs songs={songs} setSongs={setSongs} allowMustPlay={!isDoNotPlay} allowDoNotPlay={isDoNotPlay} />
-                </View>
-              )}
-
-              {visible.length > 0 && (
-                <View style={{ gap: Space.md }}>
-                  {songs.length > 0 && <Text style={[styles.lab, { color: c.textTertiary }]}>QUESTIONS</Text>}
-                  {visible.map((q, i) => (
-                    <QuestionField
-                      key={q.id}
-                      q={q}
-                      index={i + 1}
-                      value={answers[q.id] ?? ''}
-                      onChange={(v) => setLocal(q.id, v)}
-                      onPersist={(v) => persist(q.id, v)}
-                      onPick={(v) => pick(q.id, v)}
-                    />
-                  ))}
+                  <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR SONGS · {songs.length}</Text>
+                  <SectionSongs
+                    songs={songsExpanded ? songs : songs.slice(0, 4)}
+                    setSongs={setSongs}
+                    allowMustPlay={!isDoNotPlay}
+                    allowDoNotPlay={isDoNotPlay}
+                  />
+                  {songs.length > 4 && (
+                    <Pressable onPress={() => setSongsExpanded((o) => !o)} style={[styles.showAll, { borderColor: Brand.purple }]}>
+                      <Text style={{ color: Brand.purple, fontWeight: '800', fontSize: 14 }}>
+                        {songsExpanded ? 'Show fewer ▲' : `Show all ${songs.length} songs ▼`}
+                      </Text>
+                    </Pressable>
+                  )}
                 </View>
               )}
             </>
@@ -313,4 +328,5 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: Radius.md, paddingHorizontal: Space.md, paddingVertical: 12, fontSize: 16 },
   chip: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 18 },
   imgOpt: { width: 96, borderWidth: 2, borderRadius: Radius.md, overflow: 'hidden' },
+  showAll: { borderWidth: 2, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center', backgroundColor: Brand.purple + '12', marginTop: 2 },
 });
