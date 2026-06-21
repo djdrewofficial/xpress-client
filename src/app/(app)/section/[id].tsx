@@ -5,6 +5,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Bar, useC } from '@/components/ui';
+import { Encourager } from '@/components/Encourager';
 import { SongPicker } from '@/components/SongPicker';
 import { SectionSongs } from '@/components/SectionSongs';
 import { VendorTeam } from '@/components/VendorTeam';
@@ -163,6 +164,8 @@ export default function SectionScreen() {
               )}
             </>
           )}
+
+          <Encourager />
         </ScrollView>
 
         {meta && (

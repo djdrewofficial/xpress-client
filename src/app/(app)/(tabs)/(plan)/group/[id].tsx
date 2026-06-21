@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Bar, useC } from '@/components/ui';
+import { Encourager } from '@/components/Encourager';
 import { useAuth } from '@/lib/auth';
 import { Brand, Radius, Shadow, Space } from '@/lib/theme';
 import {
@@ -40,21 +41,6 @@ export default function GroupScreen() {
     setRemoved(ov.removed);
   }, [eventId, id]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
-
-  // Gentle "dancing" bounce for the mascot.
-  const t = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const a = Animated.loop(
-      Animated.sequence([
-        Animated.timing(t, { toValue: 1, duration: 460, useNativeDriver: true }),
-        Animated.timing(t, { toValue: 0, duration: 460, useNativeDriver: true }),
-      ]),
-    );
-    a.start();
-    return () => a.stop();
-  }, [t]);
-  const danceY = t.interpolate({ inputRange: [0, 1], outputRange: [0, -12] });
-  const danceR = t.interpolate({ inputRange: [0, 1], outputRange: ['-9deg', '9deg'] });
 
   const move = async (index: number, dir: -1 | 1) => {
     if (!sections) return;
@@ -106,14 +92,6 @@ export default function GroupScreen() {
   const catPct = totalQ > 0 ? Math.round((ansQ / totalQ) * 100) : (group?.songCount ?? 0) > 0 ? 100 : 0;
   const doneCount = (sections ?? []).filter((s) => s.questionCount > 0 && s.answeredCount === s.questionCount).length;
   const total = sections?.length ?? 0;
-  const allDone = total > 0 && doneCount === total;
-  const cheer = allDone
-    ? "Woof! You've finished this section! 🎉"
-    : catPct > 50
-      ? "Pawsitively crushing it — keep going! 🐾"
-      : total > 0
-        ? "Your pup's cheering you on! 🐾"
-        : 'Nothing to fill out here yet.';
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -245,17 +223,8 @@ export default function GroupScreen() {
           </View>
         )}
 
-        {/* Dancing mascot fills the empty space */}
-        {sections && !editing && (
-          <View style={styles.mascot}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
-              <Text style={{ fontSize: 22, opacity: 0.7 }}>🎶</Text>
-              <Animated.Text style={{ fontSize: 68, transform: [{ translateY: danceY }, { rotate: danceR }] }}>🐶</Animated.Text>
-              <Text style={{ fontSize: 22, opacity: 0.7 }}>🎶</Text>
-            </View>
-            <Text style={{ color: c.textTertiary, fontSize: 13, fontWeight: '600', textAlign: 'center', marginTop: Space.sm }}>{cheer}</Text>
-          </View>
-        )}
+        {/* Branded encouragement fills the empty space */}
+        {sections && !editing && <Encourager />}
       </ScrollView>
     </View>
   );
@@ -281,5 +250,4 @@ const styles = StyleSheet.create({
   trash: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   removedRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md, borderRadius: Radius.lg, borderWidth: 1, borderStyle: 'dashed', paddingVertical: Space.sm, paddingHorizontal: Space.md },
   restoreBtn: { paddingHorizontal: 12, paddingVertical: 6 },
-  mascot: { alignItems: 'center', justifyContent: 'center', paddingTop: Space.xxl, paddingBottom: Space.lg },
 });
