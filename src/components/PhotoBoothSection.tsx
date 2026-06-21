@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 
 import { useC } from '@/components/ui';
@@ -58,6 +58,7 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [preview, setPreview] = useState<BoothDesign | null>(null);
   const reqId = useRef(0);
 
   // Initial: selection + backdrops.
@@ -104,9 +105,25 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
     setBackdropId(b.id);
     if (userId) saveBackdrop(eventId, b.id, userId);
   };
-  const chooseDesign = (d: BoothDesign) => {
+  const applyDesign = (d: BoothDesign) => {
     setDesign(d);
+    setPreview(null);
     if (userId) saveBoothDesign(eventId, d, userId);
+  };
+  // From the preview modal — confirm before replacing an existing pick.
+  const useDesign = (d: BoothDesign) => {
+    if (design && design.src !== d.src) {
+      Alert.alert(
+        'Replace your design?',
+        'You already picked a photo-strip design. Using this one will replace your current selection.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Use This Design', style: 'destructive', onPress: () => applyDesign(d) },
+        ],
+      );
+    } else {
+      applyDesign(d);
+    }
   };
 
   const cardW = Math.min(280, width * 0.72);
@@ -177,7 +194,7 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
             renderItem={({ item: d }) => {
               const sel = design?.src === d.src;
               return (
-                <Pressable onPress={() => chooseDesign(d)} style={[styles.dCard, { borderColor: sel ? Brand.purple : c.border, backgroundColor: c.cardAlt }]}>
+                <Pressable onPress={() => setPreview(d)} style={[styles.dCard, { borderColor: sel ? Brand.purple : c.border, backgroundColor: c.cardAlt }]}>
                   <Image source={{ uri: d.src }} style={{ width: 130, height: 200 }} contentFit="contain" />
                   {sel && <View style={styles.check}><Text style={{ color: '#fff', fontWeight: '800' }}>✓</Text></View>}
                   {(d.no_of_images || d.type_name) ? (
@@ -192,6 +209,40 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
           />
         )}
       </View>
+
+      {/* ── Design preview modal ── */}
+      <Modal visible={!!preview} transparent animationType="fade" onRequestClose={() => setPreview(null)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setPreview(null)}>
+          <Pressable style={[styles.modalCard, { backgroundColor: c.card }]} onPress={() => {}}>
+            {preview ? (
+              <>
+                <Image source={{ uri: preview.src }} style={{ width: '100%', height: 360, backgroundColor: '#fff' }} contentFit="contain" />
+                <View style={{ padding: Space.lg, gap: Space.md }}>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {preview.no_of_images ? <Text style={[styles.metaTag, { backgroundColor: c.cardAlt, color: c.textSecondary }]}>{preview.no_of_images}</Text> : null}
+                    {preview.layout_size ? <Text style={[styles.metaTag, { backgroundColor: c.cardAlt, color: c.textSecondary }]}>{preview.layout_size}</Text> : null}
+                  </View>
+                  {design?.src === preview.src ? (
+                    <View style={styles.selectedNote}>
+                      <Text style={{ color: '#10b981', fontWeight: '700' }}>✓ This is your selected design</Text>
+                    </View>
+                  ) : (
+                    <Pressable onPress={() => useDesign(preview)} style={styles.useBtn}>
+                      <Text style={styles.useBtnTxt}>Use This Design</Text>
+                    </Pressable>
+                  )}
+                  {design && design.src !== preview.src ? (
+                    <Text style={{ color: '#d9822b', fontSize: 12, textAlign: 'center' }}>This will replace your current selection.</Text>
+                  ) : null}
+                  <Pressable onPress={() => setPreview(null)} style={styles.closeBtn}>
+                    <Text style={{ color: c.textSecondary, fontWeight: '600' }}>Close</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -233,4 +284,11 @@ const styles = StyleSheet.create({
   tag: { color: '#fff', fontSize: 9, fontWeight: '700', backgroundColor: '#ffffff33', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, overflow: 'hidden' },
   check: { position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 14, backgroundColor: Brand.purple, alignItems: 'center', justifyContent: 'center' },
   chip: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 7, paddingHorizontal: 14 },
+  modalOverlay: { flex: 1, backgroundColor: '#000000aa', alignItems: 'center', justifyContent: 'center', padding: Space.lg },
+  modalCard: { width: '100%', maxWidth: 420, borderRadius: Radius.lg, overflow: 'hidden' },
+  metaTag: { fontSize: 11, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill, overflow: 'hidden' },
+  selectedNote: { backgroundColor: '#10b98122', borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center' },
+  useBtn: { backgroundColor: Brand.purple, borderRadius: Radius.pill, paddingVertical: 14, alignItems: 'center' },
+  useBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  closeBtn: { paddingVertical: 10, alignItems: 'center' },
 });
