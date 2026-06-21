@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 
 import { useC } from '@/components/ui';
@@ -15,7 +15,8 @@ import {
   type BoothDesign,
 } from '@/lib/photobooth';
 
-const PER_PAGE = 24;
+const PER_PAGE = 12; // grid page size
+const GAP = 10;
 
 type Opt = { value: string; label: string };
 
@@ -55,9 +56,8 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
 
   const [designs, setDesigns] = useState<BoothDesign[]>([]);
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [preview, setPreview] = useState<BoothDesign | null>(null);
   const reqId = useRef(0);
 
@@ -75,10 +75,10 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
   }, [eventId]);
 
   const loadDesigns = useCallback(
-    async (nextPage: number, replace: boolean) => {
+    async (nextPage: number) => {
       const id = ++reqId.current;
-      if (replace) setLoading(true); else setLoadingMore(true);
-      const items = await fetchBoothTemplates({
+      setLoading(true);
+      const { designs: items, totalPages: tp } = await fetchBoothTemplates({
         page: nextPage,
         per_page: PER_PAGE,
         type: 'static', // exclude welcome screens + animated overlays
@@ -87,16 +87,16 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
         no_of_images: active.no_of_images,
       });
       if (id !== reqId.current) return;
-      setHasMore(items.length >= PER_PAGE);
-      setDesigns((prev) => (replace ? items : [...prev, ...items]));
+      setDesigns(items);
+      setTotalPages(tp);
       setPage(nextPage);
       setLoading(false);
-      setLoadingMore(false);
     },
     [active],
   );
 
-  useEffect(() => { loadDesigns(1, true); }, [loadDesigns]);
+  // Reload page 1 whenever filters change.
+  useEffect(() => { loadDesigns(1); }, [loadDesigns]);
 
   const setFilter = (key: 'tags' | 'layout' | 'no_of_images', value: string) =>
     setActive((p) => ({ ...p, [key]: value }));
@@ -126,14 +126,16 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
     }
   };
 
-  const cardW = Math.min(280, width * 0.72);
+  // Two-column grid sized to the screen (the section sits inside a ScrollView,
+  // so we lay items out with flex-wrap rather than a nested FlatList).
+  const cardW = Math.floor((width - Space.lg * 2 - GAP) / 2);
 
   return (
     <View style={{ gap: Space.xl }}>
       <View style={[styles.why, { backgroundColor: Brand.purple + '14', borderColor: Brand.purple + '33' }]}>
         <Text style={{ color: c.text, fontWeight: '700', fontSize: 14, marginBottom: 4 }}>📸 Design your photo booth</Text>
         <Text style={{ color: c.textSecondary, fontSize: 13, lineHeight: 19 }}>
-          Swipe through our backdrops and photo-strip designs, then tap to pick your favorites. Your choices go straight to our team.
+          Browse our backdrops and photo-strip designs, then tap to pick your favorites. Your choices go straight to our team.
         </Text>
       </View>
 
@@ -143,19 +145,16 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
         {backdrops.length === 0 ? (
           <Text style={{ color: c.textTertiary, fontSize: 13, paddingVertical: Space.md }}>No backdrops available yet — check back soon!</Text>
         ) : (
-          <FlatList
-            data={backdrops}
-            keyExtractor={(b) => b.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={cardW + Space.md}
-            decelerationRate="fast"
-            contentContainerStyle={{ gap: Space.md, paddingRight: Space.lg }}
-            renderItem={({ item: b }) => {
+          <View style={styles.grid}>
+            {backdrops.map((b) => {
               const sel = b.id === backdropId;
               return (
-                <Pressable onPress={() => chooseBackdrop(b)} style={[styles.bdCard, Shadow.card, { width: cardW, borderColor: sel ? Brand.purple : c.border, backgroundColor: c.card }]}>
-                  <Image source={{ uri: b.image_url }} style={{ width: '100%', height: cardW * 1.25 }} contentFit="cover" />
+                <Pressable
+                  key={b.id}
+                  onPress={() => chooseBackdrop(b)}
+                  style={[styles.bdCard, Shadow.card, { width: cardW, borderColor: sel ? Brand.purple : c.border, backgroundColor: c.card }]}
+                >
+                  <Image source={{ uri: b.image_url }} style={{ width: '100%', height: cardW * 1.2 }} contentFit="cover" />
                   {sel && <View style={styles.check}><Text style={{ color: '#fff', fontWeight: '800' }}>✓</Text></View>}
                   <View style={styles.bdLabel}>
                     <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }} numberOfLines={1}>{b.name}</Text>
@@ -163,14 +162,14 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
                   </View>
                 </Pressable>
               );
-            }}
-          />
+            })}
+          </View>
         )}
       </View>
 
       {/* ── Designs ── */}
       <View style={{ gap: Space.sm }}>
-        <Text style={[styles.lab, { color: c.textTertiary }]}>PHOTO-STRIP DESIGN{design ? ` · ${(design.type_name ?? 'SELECTED').toUpperCase()}` : ''}</Text>
+        <Text style={[styles.lab, { color: c.textTertiary }]}>PHOTO-STRIP DESIGN{design ? ' · SELECTED' : ''}</Text>
 
         {/* Filters */}
         <FilterRow label="Theme" options={CATEGORIES} active={active.tags} onPick={(v) => setFilter('tags', v)} c={c} />
@@ -178,35 +177,51 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
         <FilterRow label="Photos" options={PHOTO_COUNTS} active={active.no_of_images} onPick={(v) => setFilter('no_of_images', v)} c={c} />
 
         {loading ? (
-          <ActivityIndicator color={Brand.purple} style={{ marginVertical: Space.lg }} />
+          <ActivityIndicator color={Brand.purple} style={{ marginVertical: Space.xl }} />
         ) : designs.length === 0 ? (
           <Text style={{ color: c.textTertiary, fontSize: 13, paddingVertical: Space.md }}>No designs match these options.</Text>
         ) : (
-          <FlatList
-            data={designs}
-            keyExtractor={(d, i) => `${d.src}-${i}`}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: Space.sm, paddingRight: Space.lg }}
-            onEndReachedThreshold={0.5}
-            onEndReached={() => { if (hasMore && !loadingMore) loadDesigns(page + 1, false); }}
-            ListFooterComponent={loadingMore ? <ActivityIndicator color={Brand.purple} style={{ marginLeft: Space.md, alignSelf: 'center' }} /> : null}
-            renderItem={({ item: d }) => {
-              const sel = design?.src === d.src;
-              return (
-                <Pressable onPress={() => setPreview(d)} style={[styles.dCard, { borderColor: sel ? Brand.purple : c.border, backgroundColor: c.cardAlt }]}>
-                  <Image source={{ uri: d.src }} style={{ width: 130, height: 200 }} contentFit="contain" />
-                  {sel && <View style={styles.check}><Text style={{ color: '#fff', fontWeight: '800' }}>✓</Text></View>}
-                  {(d.no_of_images || d.type_name) ? (
-                    <View style={styles.dLabel}>
-                      {d.no_of_images ? <Text style={styles.tag}>{d.no_of_images}</Text> : null}
-                      {d.type_name ? <Text style={styles.tag} numberOfLines={1}>{d.type_name}</Text> : null}
-                    </View>
-                  ) : null}
-                </Pressable>
-              );
-            }}
-          />
+          <>
+            <View style={styles.grid}>
+              {designs.map((d, i) => {
+                const sel = design?.src === d.src;
+                return (
+                  <Pressable
+                    key={`${d.src}-${i}`}
+                    onPress={() => setPreview(d)}
+                    style={[styles.dCard, { width: cardW, borderColor: sel ? Brand.purple : c.border, backgroundColor: c.cardAlt }]}
+                  >
+                    <Image source={{ uri: d.src }} style={{ width: '100%', height: cardW * 1.35, backgroundColor: '#fff' }} contentFit="contain" />
+                    {sel && <View style={styles.check}><Text style={{ color: '#fff', fontWeight: '800' }}>✓</Text></View>}
+                    {d.no_of_images ? (
+                      <View style={styles.dLabel}>
+                        <Text style={styles.tag}>{d.no_of_images}</Text>
+                      </View>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Pager */}
+            <View style={styles.pager}>
+              <Pressable
+                onPress={() => loadDesigns(page - 1)}
+                disabled={page <= 1}
+                style={[styles.pageBtn, { backgroundColor: c.cardAlt, opacity: page <= 1 ? 0.4 : 1 }]}
+              >
+                <Text style={{ color: c.text, fontWeight: '700' }}>‹ Prev</Text>
+              </Pressable>
+              <Text style={{ color: c.textSecondary, fontSize: 13, fontWeight: '600' }}>Page {page} of {totalPages}</Text>
+              <Pressable
+                onPress={() => loadDesigns(page + 1)}
+                disabled={page >= totalPages}
+                style={[styles.pageBtn, { backgroundColor: c.cardAlt, opacity: page >= totalPages ? 0.4 : 1 }]}
+              >
+                <Text style={{ color: c.text, fontWeight: '700' }}>Next ›</Text>
+              </Pressable>
+            </View>
+          </>
         )}
       </View>
 
@@ -277,6 +292,7 @@ function FilterRow({
 const styles = StyleSheet.create({
   why: { borderRadius: Radius.lg, borderWidth: 1, padding: Space.md },
   lab: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
   bdCard: { borderRadius: Radius.lg, borderWidth: 2, overflow: 'hidden' },
   bdLabel: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: Space.sm, backgroundColor: '#00000066' },
   dCard: { borderRadius: Radius.md, borderWidth: 2, overflow: 'hidden' },
@@ -284,6 +300,8 @@ const styles = StyleSheet.create({
   tag: { color: '#fff', fontSize: 9, fontWeight: '700', backgroundColor: '#ffffff33', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, overflow: 'hidden' },
   check: { position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 14, backgroundColor: Brand.purple, alignItems: 'center', justifyContent: 'center' },
   chip: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 7, paddingHorizontal: 14 },
+  pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Space.lg, marginTop: Space.md },
+  pageBtn: { borderRadius: Radius.pill, paddingVertical: 9, paddingHorizontal: 18 },
   modalOverlay: { flex: 1, backgroundColor: '#000000aa', alignItems: 'center', justifyContent: 'center', padding: Space.lg },
   modalCard: { width: '100%', maxWidth: 420, borderRadius: Radius.lg, overflow: 'hidden' },
   metaTag: { fontSize: 11, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill, overflow: 'hidden' },

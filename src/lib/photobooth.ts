@@ -111,17 +111,28 @@ function normalizeDesigns(payload: unknown): BoothDesign[] {
     .filter((d) => d.src);
 }
 
-export async function fetchBoothTemplates(params: Record<string, string | number>): Promise<BoothDesign[]> {
+function totalPagesOf(payload: unknown): number {
+  if (payload && typeof payload === 'object') {
+    const tp = (payload as Record<string, unknown>).total_pages;
+    if (typeof tp === 'number' && tp > 0) return tp;
+  }
+  return 1;
+}
+
+export async function fetchBoothTemplates(
+  params: Record<string, string | number>,
+): Promise<{ designs: BoothDesign[]; totalPages: number }> {
   const base = apiBase();
-  if (!base) return [];
+  if (!base) return { designs: [], totalPages: 1 };
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== '' && v != null) qs.set(k, String(v));
   try {
     const res = await fetch(`${base}/api/mobile/booth-templates?${qs.toString()}`, { headers: await authHeader() });
-    if (!res.ok) return [];
-    return normalizeDesigns(await res.json());
+    if (!res.ok) return { designs: [], totalPages: 1 };
+    const json = await res.json();
+    return { designs: normalizeDesigns(json), totalPages: totalPagesOf(json) };
   } catch {
-    return [];
+    return { designs: [], totalPages: 1 };
   }
 }
 
