@@ -1,16 +1,20 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { Bar, Ring, Sparkle, useC, useScheme } from '@/components/ui';
+import { OnboardingTour } from '@/components/OnboardingTour';
 import { Logo } from '@/components/Logo';
 import { pickCoverImage, uploadCoverPhoto } from '@/lib/coverPhoto';
 import { Brand, CategoryThemes, Radius, Shadow, Space, type CategoryTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { getMyEvents, loadOverview, type EventLite, type Group, type Overview } from '@/lib/planning';
+
+const TOUR_KEY = 'onboarding_seen_v1';
 
 export default function PlanScreen() {
   const c = useC();
@@ -21,6 +25,19 @@ export default function PlanScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showTour, setShowTour] = useState(false);
+  const tourChecked = useRef(false);
+
+  // First run after sign-in: show the walkthrough once (per device).
+  useEffect(() => {
+    if (tourChecked.current || !profile) return;
+    tourChecked.current = true;
+    AsyncStorage.getItem(TOUR_KEY).then((v) => { if (!v) setShowTour(true); }).catch(() => {});
+  }, [profile]);
+  const closeTour = useCallback(() => {
+    setShowTour(false);
+    AsyncStorage.setItem(TOUR_KEY, '1').catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -93,6 +110,9 @@ export default function PlanScreen() {
                 <View style={styles.heroTopRow}>
                   <Logo variant="full" height={30} tone="#ffffff" />
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.md }}>
+                    <Pressable onPress={() => setShowTour(true)} hitSlop={8} style={styles.camBtn}>
+                      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>?</Text>
+                    </Pressable>
                     <Pressable onPress={onChangePhoto} disabled={uploading} hitSlop={8} style={styles.camBtn}>
                       {uploading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ fontSize: 15 }}>📷</Text>}
                     </Pressable>
@@ -157,6 +177,7 @@ export default function PlanScreen() {
           )}
         </ScrollView>
       </SafeAreaView>
+      <OnboardingTour visible={showTour} onClose={closeTour} />
     </View>
   );
 }
