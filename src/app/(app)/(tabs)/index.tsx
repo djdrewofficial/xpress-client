@@ -6,7 +6,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { Bar, Ring, Sparkle, useC, useScheme } from '@/components/ui';
+import { Ring, Sparkle, useC, useScheme } from '@/components/ui';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { Logo } from '@/components/Logo';
 import { pickCoverImage, uploadCoverPhoto } from '@/lib/coverPhoto';
@@ -134,10 +134,14 @@ export default function PlanScreen() {
                   </View>
                 )}
                 <View style={styles.heroProgRow}>
-                  <Text style={styles.heroPct}>{pct}%</Text>
-                  <Text style={styles.heroSub}>{pct >= 80 ? "You're almost there!" : pct > 0 ? 'Looking great so far' : "Let's get started!"}</Text>
+                  <Ring pct={pct} size={78} stroke={7} color="#fff" track="rgba(255,255,255,0.28)" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.heroCheer}>{pct >= 80 ? "You're almost there!" : pct > 0 ? 'Looking great so far' : "Let's get started!"}</Text>
+                    {overview && overview.totalQuestions > 0 && (
+                      <Text style={styles.heroSub}>{overview.answeredQuestions} of {overview.totalQuestions} questions answered</Text>
+                    )}
+                  </View>
                 </View>
-                <View style={{ marginTop: Space.sm }}><Bar pct={pct} height={6} track="rgba(255,255,255,0.25)" /></View>
 
                 {!event.cover_photo_url && (
                   <Pressable onPress={onChangePhoto} disabled={uploading} style={styles.addPhotoHint} hitSlop={6}>
@@ -211,7 +215,22 @@ function CategoryCard({ group, theme, onPress }: { group: Group; theme: Category
             <Text style={[styles.catTitle, { color: dark ? c.text : '#1c1630' }]} numberOfLines={2}>{group.title}</Text>
             <Text style={{ color: fg, fontSize: 12.5, fontWeight: '600', opacity: 0.9 }}>{meta}</Text>
           </View>
-          <Ring pct={pct} size={54} stroke={6} color={fg} track={fg + '24'} />
+        </View>
+
+        {/* Progress line with the % inside + a word of encouragement */}
+        <View style={{ marginTop: Space.md, gap: 6 }}>
+          <Text style={{ color: fg, fontSize: 13, fontWeight: '700' }}>{cheer(pct)}</Text>
+          <View style={[styles.barTrack, { backgroundColor: fg + '2e' }]}>
+            {pct > 0 && (
+              <LinearGradient
+                colors={[theme.grad[0], theme.grad[1]]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.barFill, { width: `${Math.max(6, pct)}%` }]}
+              />
+            )}
+            <View style={styles.barLabelWrap}><Text style={styles.barLabel}>{pct}%</Text></View>
+          </View>
         </View>
 
         {peek.length > 0 && (
@@ -240,6 +259,14 @@ function CategoryCard({ group, theme, onPress }: { group: Group; theme: Category
   );
 }
 
+function cheer(pct: number): string {
+  if (pct >= 100) return 'All done — you nailed it! 🎉';
+  if (pct >= 67) return 'Almost there — keep going!';
+  if (pct >= 34) return 'Great progress!';
+  if (pct > 0) return 'Nice start — keep it up!';
+  return "Let's get started!";
+}
+
 function daysUntil(dateStr: string): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -263,9 +290,9 @@ const styles = StyleSheet.create({
   countPill: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: Space.md, backgroundColor: 'rgba(255,255,255,0.18)', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill },
   countNum: { color: '#fff', fontWeight: '800', fontSize: 16 },
   countLab: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '600' },
-  heroProgRow: { flexDirection: 'row', alignItems: 'baseline', gap: Space.sm, marginTop: Space.lg },
-  heroPct: { color: '#fff', fontSize: 30, fontWeight: '800' },
-  heroSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, flex: 1 },
+  heroProgRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md, marginTop: Space.lg },
+  heroCheer: { color: '#fff', fontSize: 17, fontWeight: '800' },
+  heroSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 2 },
   lab: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: Space.sm },
   contTitle: { fontSize: 16, fontWeight: '600' },
   cta: { backgroundColor: Brand.purple, borderRadius: Radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
@@ -277,4 +304,8 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: Space.md },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6, paddingHorizontal: 10, borderRadius: Radius.pill, maxWidth: '100%' },
   chipTxt: { fontSize: 12, fontWeight: '600' },
+  barTrack: { height: 26, borderRadius: 13, overflow: 'hidden', justifyContent: 'center' },
+  barFill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 13 },
+  barLabelWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  barLabel: { color: '#fff', fontWeight: '800', fontSize: 12.5, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 });
