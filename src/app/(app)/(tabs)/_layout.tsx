@@ -32,7 +32,7 @@ export default function TabsLayout() {
         ),
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}>
-      <Tabs.Screen name="index" options={{ title: 'Plan', tabBarIcon: icon('📋') }} />
+      <Tabs.Screen name="(plan)" options={{ title: 'Plan', tabBarIcon: icon('📋') }} />
       <Tabs.Screen name="music" options={{ title: 'Music', tabBarIcon: icon('🎵') }} />
       <Tabs.Screen name="people" options={{ title: 'People', tabBarIcon: icon('🥂') }} />
       <Tabs.Screen name="you" options={{ title: 'My Event', tabBarIcon: icon('💍') }} />
