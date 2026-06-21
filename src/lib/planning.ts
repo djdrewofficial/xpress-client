@@ -29,9 +29,12 @@ export type Group = {
   aiPicks: boolean;
 };
 
+export type RemovedSection = { id: string; title: string; icon: string | null };
+
 export type Overview = {
   groups: Group[];
   sections: SectionRow[]; // flat content sections (non-headline)
+  removed: RemovedSection[]; // host-deleted sections (restorable by staff/host)
   totalQuestions: number;
   answeredQuestions: number;
 };
@@ -108,6 +111,7 @@ export async function loadOverview(eventId: string): Promise<Overview> {
   let totalQuestions = 0;
   let answeredQuestions = 0;
   const flat: SectionRow[] = [];
+  const removed: RemovedSection[] = [];
   const groups: Group[] = [];
   let current: Group | null = null;
 
@@ -120,6 +124,11 @@ export async function loadOverview(eventId: string): Promise<Overview> {
   };
 
   for (const s of sections ?? []) {
+    // Host-deleted sections drop out of the live plan but stay restorable.
+    if (s.deleted_by_host_at) {
+      if (s.section_type !== 'headline') removed.push({ id: s.id, title: s.title, icon: s.icon ?? null });
+      continue;
+    }
     if (s.section_type === 'headline') {
       current = { id: s.id, title: s.title, icon: s.icon, sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0, aiPicks: false };
       groups.push(current);
@@ -145,8 +154,46 @@ export async function loadOverview(eventId: string): Promise<Overview> {
     if (row.ai_picks_enabled) g.aiPicks = true;
   }
 
-  return { groups: groups.filter((g) => g.sections.length > 0), sections: flat, totalQuestions, answeredQuestions };
+  return { groups: groups.filter((g) => g.sections.length > 0), sections: flat, removed, totalQuestions, answeredQuestions };
 }
+
+// ── Section management (staff + hosts) — writes go through an XOS admin route
+//    because hosts can't write planning_sections under RLS. ────────────────────
+
+function apiBase(): string | null {
+  const url = process.env.EXPO_PUBLIC_API_URL;
+  return url ? url.replace(/\/$/, '') : null;
+}
+
+async function sectionAction(body: Record<string, unknown>): Promise<boolean> {
+  const base = apiBase();
+  if (!base) return false;
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) return false;
+  try {
+    const res = await fetch(`${base}/api/mobile/planning/sections`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Reorder a set of sections (e.g. within a group). Staff + hosts. */
+export const reorderSections = (eventId: string, orderedIds: string[]): Promise<boolean> =>
+  sectionAction({ action: 'reorder', eventId, orderedIds });
+
+/** Delete a section — staff permanent, host soft (restorable). */
+export const deleteSection = (eventId: string, sectionId: string): Promise<boolean> =>
+  sectionAction({ action: 'delete', eventId, sectionId });
+
+/** Restore a host-deleted section. Staff + hosts. */
+export const restoreSection = (eventId: string, sectionId: string): Promise<boolean> =>
+  sectionAction({ action: 'restore', eventId, sectionId });
 
 export async function loadSection(eventId: string, sectionId: string): Promise<{ questions: QuestionRow[]; songs: SongRow[] }> {
   const [{ data: questions }, { data: answers }, { data: songs }] = await Promise.all([
