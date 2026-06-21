@@ -6,7 +6,6 @@ import { useC } from '@/components/ui';
 import { Brand, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import {
-  fetchBoothFilters,
   fetchBoothTemplates,
   getBoothSelection,
   listBackdrops,
@@ -14,19 +13,27 @@ import {
   saveBoothDesign,
   type Backdrop,
   type BoothDesign,
-  type BoothFilters,
-  type FilterOption,
 } from '@/lib/photobooth';
 
 const PER_PAGE = 24;
 
-// Categories we expose (TemplatesBooth `tags`), default Wedding. Welcome screens
-// and animated overlays are excluded by forcing type = "static".
-const CATEGORIES = [
+type Opt = { value: string; label: string };
+
+// Curated, fixed option sets. Designs are always static (no welcome screens /
+// animated overlays) and one of these themes + sizes + photo counts.
+const CATEGORIES: Opt[] = [
   { value: 'wedding', label: 'Wedding' },
   { value: 'minimalist', label: 'Minimalist' },
   { value: 'corporate', label: 'Corporate' },
-] as const;
+];
+const LAYOUTS: Opt[] = [
+  { value: '26strip', label: '2×6 Strip' },
+  { value: '46postcard-p', label: '4×6 Portrait' },
+];
+const PHOTO_COUNTS: Opt[] = [
+  { value: '1images', label: '1 photo' },
+  { value: '3images', label: '3 photos' },
+];
 
 export function PhotoBoothSection({ eventId }: { eventId: string }) {
   const c = useC();
@@ -38,8 +45,12 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
   const [backdropId, setBackdropId] = useState<string | null>(null);
   const [design, setDesign] = useState<BoothDesign | null>(null);
 
-  const [filters, setFilters] = useState<BoothFilters>({ layout: [], image_type: [], no_of_images: [] });
-  const [active, setActive] = useState<{ tags: string; layout?: string; image_type?: string; no_of_images?: string }>({ tags: 'wedding' });
+  // All three required (single-select). Defaults: Wedding · 2×6 Strip · 3 photos.
+  const [active, setActive] = useState<{ tags: string; layout: string; no_of_images: string }>({
+    tags: 'wedding',
+    layout: '26strip',
+    no_of_images: '3images',
+  });
 
   const [designs, setDesigns] = useState<BoothDesign[]>([]);
   const [page, setPage] = useState(1);
@@ -48,16 +59,15 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const reqId = useRef(0);
 
-  // Initial: selection + backdrops + filter values.
+  // Initial: selection + backdrops.
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [sel, bds, f] = await Promise.all([getBoothSelection(eventId), listBackdrops(), fetchBoothFilters()]);
+      const [sel, bds] = await Promise.all([getBoothSelection(eventId), listBackdrops()]);
       if (!alive) return;
       setBackdrops(bds);
       setBackdropId(sel?.backdrop_id ?? null);
       setDesign(sel?.design ?? null);
-      setFilters(f);
     })();
     return () => { alive = false; };
   }, [eventId]);
@@ -71,9 +81,8 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
         per_page: PER_PAGE,
         type: 'static', // exclude welcome screens + animated overlays
         tags: active.tags,
-        ...(active.layout ? { layout: active.layout } : {}),
-        ...(active.image_type ? { image_type: active.image_type } : {}),
-        ...(active.no_of_images ? { no_of_images: active.no_of_images } : {}),
+        layout: active.layout,
+        no_of_images: active.no_of_images,
       });
       if (id !== reqId.current) return;
       setHasMore(items.length >= PER_PAGE);
@@ -87,9 +96,8 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
 
   useEffect(() => { loadDesigns(1, true); }, [loadDesigns]);
 
-  const toggle = (key: 'layout' | 'image_type' | 'no_of_images', value: string) =>
-    setActive((p) => ({ ...p, [key]: p[key] === value ? undefined : value }));
-  const setCategory = (value: string) => setActive((p) => ({ ...p, tags: value }));
+  const setFilter = (key: 'tags' | 'layout' | 'no_of_images', value: string) =>
+    setActive((p) => ({ ...p, [key]: value }));
 
   const chooseBackdrop = (b: Backdrop) => {
     setBackdropId(b.id);
@@ -147,15 +155,14 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
         <Text style={[styles.lab, { color: c.textTertiary }]}>PHOTO-STRIP DESIGN{design ? ` · ${(design.type_name ?? 'SELECTED').toUpperCase()}` : ''}</Text>
 
         {/* Filters */}
-        <FilterRow label="Category" options={CATEGORIES.map((cat) => ({ ...cat }))} active={active.tags} onPick={setCategory} c={c} />
-        <FilterRow label="Layout" options={filters.layout} active={active.layout} onPick={(v) => toggle('layout', v)} c={c} />
-        <FilterRow label="Image" options={filters.image_type} active={active.image_type} onPick={(v) => toggle('image_type', v)} c={c} />
-        <FilterRow label="Photos" options={filters.no_of_images} active={active.no_of_images} onPick={(v) => toggle('no_of_images', v)} c={c} />
+        <FilterRow label="Theme" options={CATEGORIES} active={active.tags} onPick={(v) => setFilter('tags', v)} c={c} />
+        <FilterRow label="Size" options={LAYOUTS} active={active.layout} onPick={(v) => setFilter('layout', v)} c={c} />
+        <FilterRow label="Photos" options={PHOTO_COUNTS} active={active.no_of_images} onPick={(v) => setFilter('no_of_images', v)} c={c} />
 
         {loading ? (
           <ActivityIndicator color={Brand.purple} style={{ marginVertical: Space.lg }} />
         ) : designs.length === 0 ? (
-          <Text style={{ color: c.textTertiary, fontSize: 13, paddingVertical: Space.md }}>No designs match these filters.</Text>
+          <Text style={{ color: c.textTertiary, fontSize: 13, paddingVertical: Space.md }}>No designs match these options.</Text>
         ) : (
           <FlatList
             data={designs}
@@ -192,7 +199,7 @@ function FilterRow({
   label, options, active, onPick, c,
 }: {
   label: string;
-  options: FilterOption[];
+  options: Opt[];
   active: string | undefined;
   onPick: (v: string) => void;
   c: ReturnType<typeof useC>;
