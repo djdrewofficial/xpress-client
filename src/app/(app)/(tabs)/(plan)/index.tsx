@@ -204,12 +204,16 @@ function CategoryCard({ group, index, onPress }: { group: Group; index: number; 
           <Text style={[styles.catEyebrow, { color: done ? Brand.red : Brand.purpleLight }]}>
             {done ? '✓ COMPLETE' : `STEP ${index + 1}`}
           </Text>
-          {group.aiPicks && <Text style={[styles.catEyebrow, { color: Brand.purpleLight }]}>✦ FOR YOU</Text>}
           <View style={{ flex: 1 }} />
           <Text style={[styles.catPct, { color: c.textTertiary }]}>{pct}%</Text>
         </View>
 
-        <Text style={[styles.catTitle, { color: c.text }]} numberOfLines={2}>{group.title}</Text>
+        <View style={styles.catTitleRow}>
+          <Text style={[styles.catTitle, { color: c.text }]} numberOfLines={2}>{group.title}</Text>
+          <View style={[styles.catChevron, { backgroundColor: Brand.purple + '14' }]}>
+            <Text style={{ color: Brand.purpleLight, fontSize: 22, fontWeight: '700', marginTop: -2 }}>›</Text>
+          </View>
+        </View>
         <Text style={[styles.catMeta, { color: c.textTertiary }]}>{meta}</Text>
 
         <View style={[styles.catBarTrack, { backgroundColor: c.cardAlt }]}>
@@ -259,9 +263,11 @@ const styles = StyleSheet.create({
 
   cat: { borderRadius: Radius.xl, borderWidth: StyleSheet.hairlineWidth, padding: Space.xl, gap: 6 },
   catHead: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
-  catEyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
+  catEyebrow: { fontSize: 13, fontWeight: '800', letterSpacing: 1.4 },
   catPct: { fontSize: 13, fontWeight: '700' },
-  catTitle: { fontSize: 26, fontFamily: Fonts.display, letterSpacing: -0.3, marginTop: 2 },
+  catTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, marginTop: 2 },
+  catTitle: { flex: 1, fontSize: 26, fontFamily: Fonts.display, letterSpacing: -0.3 },
+  catChevron: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   catMeta: { fontSize: 13, fontWeight: '500', marginBottom: Space.sm },
   catBarTrack: { height: 7, borderRadius: 4, overflow: 'hidden' },
   catBarFill: { height: 7, borderRadius: 4 },
