@@ -15,9 +15,11 @@ import { useFocusEffect } from 'expo-router';
 import { useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
 import { BrandHeader } from '@/components/Logo';
+import { TimePickerSheet } from '@/components/TimePickerSheet';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
-import { getMyEvents, loadOverview, reorderSections, setSectionOnTimeline, onTimeline, type SectionRow } from '@/lib/planning';
+import { getMyEvents, loadOverview, reorderSections, setSectionOnTimeline, setSectionTime, onTimeline, type SectionRow } from '@/lib/planning';
+import { getPlannerTimeline, pickAndUploadPlannerTimeline, type PlannerTimelineFile } from '@/lib/eventFiles';
 
 type TLGroup = { id: string; title: string; icon: string | null; on: SectionRow[] };
 type OffItem = { section: SectionRow; groupId: string; groupTitle: string };
@@ -29,6 +31,9 @@ export default function TimelineScreen() {
   const [groups, setGroups] = useState<TLGroup[]>([]);
   const [off, setOff] = useState<OffItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [timeEditing, setTimeEditing] = useState<SectionRow | null>(null);
+  const [pt, setPt] = useState<PlannerTimelineFile>(null);
+  const [ptBusy, setPtBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -36,7 +41,7 @@ export default function TimelineScreen() {
     const ev = events[0] ?? null;
     setEventId(ev?.id ?? null);
     if (ev) {
-      const ov = await loadOverview(ev.id);
+      const [ov, plannerFile] = await Promise.all([loadOverview(ev.id), getPlannerTimeline(ev.id)]);
       const g: TLGroup[] = [];
       const offList: OffItem[] = [];
       for (const grp of ov.groups) {
@@ -46,10 +51,31 @@ export default function TimelineScreen() {
       }
       setGroups(g);
       setOff(offList);
+      setPt(plannerFile);
     }
     setLoading(false);
   }, [profile]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const saveTime = useCallback((section: SectionRow, time: string | null) => {
+    if (!eventId) return;
+    setTimeEditing(null);
+    setGroups((prev) => prev.map((g) => ({ ...g, on: g.on.map((s) => (s.id === section.id ? { ...s, time_label: time } : s)) })));
+    setSectionTime(eventId, section.id, time);
+  }, [eventId]);
+
+  const uploadPlanner = useCallback(async () => {
+    if (!eventId) return;
+    setPtBusy(true);
+    try {
+      const res = await pickAndUploadPlannerTimeline(eventId);
+      if (res) { await load(); Alert.alert('Uploaded ✓', `We saved "${res.name}" and shared it with your Xpress team.`); }
+    } catch (e) {
+      Alert.alert('Upload failed', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setPtBusy(false);
+    }
+  }, [eventId, load]);
 
   const reorderInGroup = useCallback((groupId: string, { from, to }: ReorderableListReorderEvent) => {
     if (!eventId) return;
@@ -100,6 +126,29 @@ export default function TimelineScreen() {
               </Text>
             </View>
 
+            {/* Official timeline from the planner — optional */}
+            <View style={[styles.planner, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Text style={[styles.offLab, { color: c.textTertiary }]}>OFFICIAL PLANNER TIMELINE</Text>
+              {pt ? (
+                <>
+                  <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', marginTop: 4 }} numberOfLines={1}>✓ {pt.name}</Text>
+                  <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 2, marginBottom: Space.md }}>Shared with your Xpress team. You can replace it anytime.</Text>
+                  <Pressable onPress={uploadPlanner} disabled={ptBusy} style={[styles.plannerBtn, { borderColor: Brand.purple }]}>
+                    {ptBusy ? <ActivityIndicator color={Brand.purple} /> : <Text style={{ color: Brand.purpleLight, fontWeight: '700' }}>Replace file</Text>}
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 4, marginBottom: Space.md, lineHeight: 19 }}>
+                    Have a timeline from your wedding planner? Upload it (PDF or photo) and we&apos;ll work from it. No planner or don&apos;t have it yet? No worries — we&apos;ll coordinate with them directly.
+                  </Text>
+                  <Pressable onPress={uploadPlanner} disabled={ptBusy} style={[styles.plannerBtn, { backgroundColor: Brand.purple, borderColor: Brand.purple }]}>
+                    {ptBusy ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800' }}>⬆  Upload timeline</Text>}
+                  </Pressable>
+                </>
+              )}
+            </View>
+
             {groups.map((g) => g.on.length > 0 && (
               <View key={g.id} style={{ marginBottom: Space.lg }}>
                 <View style={styles.catHead}>
@@ -113,7 +162,7 @@ export default function TimelineScreen() {
                   keyExtractor={(s) => s.id}
                   onReorder={(e) => reorderInGroup(g.id, e)}
                   contentContainerStyle={{ gap: Space.sm }}
-                  renderItem={({ item }) => <Row section={item} onHide={() => hide(g.id, g.title, item)} c={c} />}
+                  renderItem={({ item }) => <Row section={item} onHide={() => hide(g.id, g.title, item)} onEditTime={() => setTimeEditing(item)} c={c} />}
                 />
               </View>
             ))}
@@ -141,11 +190,18 @@ export default function TimelineScreen() {
           </ScrollViewContainer>
         )}
       </SafeAreaView>
+      <TimePickerSheet
+        visible={timeEditing !== null}
+        initial={timeEditing?.time_label ?? null}
+        title={timeEditing ? `${timeEditing.title} time` : 'Set time'}
+        onClose={() => setTimeEditing(null)}
+        onSave={(time) => { if (timeEditing) saveTime(timeEditing, time); }}
+      />
     </View>
   );
 }
 
-function Row({ section, onHide, c }: { section: SectionRow; onHide: () => void; c: ReturnType<typeof useC> }) {
+function Row({ section, onHide, onEditTime, c }: { section: SectionRow; onHide: () => void; onEditTime: () => void; c: ReturnType<typeof useC> }) {
   const drag = useReorderableDrag();
   const active = useIsActive();
   const swipe = useRef<SwipeableMethods>(null);
@@ -185,6 +241,15 @@ function Row({ section, onHide, c }: { section: SectionRow; onHide: () => void; 
           <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }} numberOfLines={1}>{section.title}</Text>
           {meta ? <Text style={{ color: c.textTertiary, fontSize: 12, marginTop: 1 }}>{meta}</Text> : null}
         </View>
+        {section.time_enabled && !section.locked ? (
+          <Pressable onPress={onEditTime} hitSlop={6} style={[styles.timePill, section.time_label ? { backgroundColor: Brand.purple } : { borderWidth: 1, borderColor: Brand.purple }]}>
+            <Text style={{ color: section.time_label ? '#fff' : Brand.purpleLight, fontWeight: '700', fontSize: 13 }}>
+              {section.time_label ?? '＋ Time'}
+            </Text>
+          </Pressable>
+        ) : section.time_label ? (
+          <Text style={{ color: c.textSecondary, fontWeight: '700', fontSize: 13 }}>{section.time_label}</Text>
+        ) : null}
       </Pressable>
     </ReanimatedSwipeable>
   );
@@ -201,4 +266,7 @@ const styles = StyleSheet.create({
   hideTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
   offRow: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, borderWidth: 1, borderRadius: Radius.md, paddingVertical: 10, paddingHorizontal: Space.md },
   addBtn: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 6, paddingHorizontal: 14 },
+  timePill: { borderRadius: Radius.pill, paddingVertical: 6, paddingHorizontal: 12 },
+  planner: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: Space.lg, marginBottom: Space.lg },
+  plannerBtn: { borderWidth: 1, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center' },
 });

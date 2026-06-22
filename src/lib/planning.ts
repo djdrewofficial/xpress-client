@@ -14,6 +14,9 @@ export type SectionRow = {
   song_limit: number | null;
   sort_order: number;
   on_timeline: boolean | null; // per-event override; null = auto (on when section_type==='timeline')
+  time_enabled: boolean; // section supports a time
+  time_label: string | null; // the time shown on the timeline, e.g. "5:00 PM"
+  locked: boolean;
   questionCount: number;
   answeredCount: number;
   songCount: number;
@@ -200,6 +203,10 @@ export const deleteSection = (eventId: string, sectionId: string): Promise<boole
 /** Show/hide a section on the couple's client Timeline view (per-event only). */
 export const setSectionOnTimeline = (eventId: string, sectionId: string, on: boolean): Promise<boolean> =>
   sectionAction({ action: 'set_timeline', eventId, sectionId, on });
+
+/** Set or clear the time shown for a section (time_label). Pass null to clear. */
+export const setSectionTime = (eventId: string, sectionId: string, time: string | null): Promise<boolean> =>
+  sectionAction({ action: 'set_time', eventId, sectionId, time });
 
 /** Restore a host-deleted section. Staff + hosts. */
 export const restoreSection = (eventId: string, sectionId: string): Promise<boolean> =>
