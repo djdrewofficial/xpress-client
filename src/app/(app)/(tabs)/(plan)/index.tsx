@@ -6,11 +6,11 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { Ring, Sparkle, useC, useScheme } from '@/components/ui';
+import { Ring, useC } from '@/components/ui';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { Logo } from '@/components/Logo';
 import { pickCoverImage, uploadCoverPhoto } from '@/lib/coverPhoto';
-import { Brand, CategoryThemes, Fonts, Radius, Shadow, Space, type CategoryTheme } from '@/lib/theme';
+import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { getMyEvents, loadOverview, type EventLite, type Group, type Overview } from '@/lib/planning';
 
@@ -172,7 +172,7 @@ export default function PlanScreen() {
                   <CategoryCard
                     key={g.id}
                     group={g}
-                    theme={CategoryThemes[i % CategoryThemes.length]}
+                    index={i}
                     onPress={() => router.push({ pathname: '/group/[id]', params: { id: g.id, eventId: event.id, title: g.title } })}
                   />
                 ))}
@@ -186,19 +186,12 @@ export default function PlanScreen() {
   );
 }
 
-function CategoryCard({ group, theme, onPress }: { group: Group; theme: CategoryTheme; onPress: () => void }) {
+function CategoryCard({ group, index, onPress }: { group: Group; index: number; onPress: () => void }) {
   const c = useC();
-  const scheme = useScheme();
-  const dark = scheme === 'dark';
-  const bg = dark ? theme.tintDark : theme.tint;
-  const fg = dark ? theme.grad[1] : theme.accent;
-
   const pct = group.totalQuestions > 0
     ? Math.round((group.answeredQuestions / group.totalQuestions) * 100)
     : group.songCount > 0 ? 100 : 0;
-
-  const peek = group.sections.slice(0, 3);
-  const moreCount = group.sections.length - peek.length;
+  const done = pct >= 100;
   const meta = [
     `${group.sections.length} ${group.sections.length === 1 ? 'section' : 'sections'}`,
     group.songCount > 0 ? `${group.songCount} ${group.songCount === 1 ? 'song' : 'songs'}` : null,
@@ -206,65 +199,32 @@ function CategoryCard({ group, theme, onPress }: { group: Group; theme: Category
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.985 : 1 }] }]}>
-      <View style={[styles.cat, Shadow.card, { backgroundColor: bg }]}>
-        <View style={styles.catTop}>
-          <LinearGradient colors={[theme.grad[0], theme.grad[1]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.catIcon}>
-            <Text style={{ fontSize: 24 }}>{group.icon ?? '✨'}</Text>
-          </LinearGradient>
-          <View style={{ flex: 1, gap: 3 }}>
-            <Text style={[styles.catTitle, { color: dark ? c.text : '#1c1630' }]} numberOfLines={2}>{group.title}</Text>
-            <Text style={{ color: fg, fontSize: 12.5, fontWeight: '600', opacity: 0.9 }}>{meta}</Text>
-          </View>
+      <View style={[styles.cat, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
+        <View style={styles.catHead}>
+          <Text style={[styles.catEyebrow, { color: done ? Brand.red : Brand.purpleLight }]}>
+            {done ? '✓ COMPLETE' : `STEP ${index + 1}`}
+          </Text>
+          {group.aiPicks && <Text style={[styles.catEyebrow, { color: Brand.purpleLight }]}>✦ FOR YOU</Text>}
+          <View style={{ flex: 1 }} />
+          <Text style={[styles.catPct, { color: c.textTertiary }]}>{pct}%</Text>
         </View>
 
-        {/* Progress line with the % inside + a word of encouragement */}
-        <View style={{ marginTop: Space.md, gap: 6 }}>
-          <Text style={{ color: fg, fontSize: 13, fontWeight: '700' }}>{cheer(pct)}</Text>
-          <View style={[styles.barTrack, { backgroundColor: fg + '2e' }]}>
-            {pct > 0 && (
-              <LinearGradient
-                colors={[theme.grad[0], theme.grad[1]]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[styles.barFill, { width: `${Math.max(6, pct)}%` }]}
-              />
-            )}
-            <View style={styles.barLabelWrap}><Text style={styles.barLabel}>{pct}%</Text></View>
-          </View>
+        <Text style={[styles.catTitle, { color: c.text }]} numberOfLines={2}>{group.title}</Text>
+        <Text style={[styles.catMeta, { color: c.textTertiary }]}>{meta}</Text>
+
+        <View style={[styles.catBarTrack, { backgroundColor: c.cardAlt }]}>
+          {pct > 0 && (
+            <LinearGradient
+              colors={[Brand.purple, Brand.purpleLight]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.catBarFill, { width: `${Math.max(3, pct)}%` }]}
+            />
+          )}
         </View>
-
-        {peek.length > 0 && (
-          <View style={styles.chips}>
-            {peek.map((s) => (
-              <View key={s.id} style={[styles.chip, { backgroundColor: dark ? '#ffffff14' : '#ffffffcc' }]}>
-                <Text style={{ fontSize: 12 }}>{s.icon ?? '•'}</Text>
-                <Text style={[styles.chipTxt, { color: dark ? c.textSecondary : '#3a3450' }]} numberOfLines={1}>{s.title}</Text>
-              </View>
-            ))}
-            {moreCount > 0 && (
-              <View style={[styles.chip, { backgroundColor: dark ? '#ffffff14' : '#ffffffcc' }]}>
-                <Text style={[styles.chipTxt, { color: fg }]}>+{moreCount} more</Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {group.aiPicks && (
-          <View style={{ marginTop: Space.md }}>
-            <Sparkle label="For You picks" />
-          </View>
-        )}
       </View>
     </Pressable>
   );
-}
-
-function cheer(pct: number): string {
-  if (pct >= 100) return 'All done — you nailed it! 🎉';
-  if (pct >= 67) return 'Almost there — keep going!';
-  if (pct >= 34) return 'Great progress!';
-  if (pct > 0) return 'Nice start — keep it up!';
-  return "Let's get started!";
 }
 
 function daysUntil(dateStr: string): number {
@@ -297,15 +257,12 @@ const styles = StyleSheet.create({
   contTitle: { fontSize: 16, fontWeight: '600' },
   cta: { backgroundColor: Brand.purple, borderRadius: Radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
 
-  cat: { borderRadius: Radius.xl, padding: Space.lg },
-  catTop: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
-  catIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  catTitle: { fontSize: 20, fontFamily: Fonts.display, letterSpacing: -0.2 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: Space.md },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6, paddingHorizontal: 10, borderRadius: Radius.pill, maxWidth: '100%' },
-  chipTxt: { fontSize: 12, fontWeight: '600' },
-  barTrack: { height: 26, borderRadius: 13, overflow: 'hidden', justifyContent: 'center' },
-  barFill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 13 },
-  barLabelWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
-  barLabel: { color: '#fff', fontWeight: '800', fontSize: 12.5, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  cat: { borderRadius: Radius.xl, borderWidth: StyleSheet.hairlineWidth, padding: Space.xl, gap: 6 },
+  catHead: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
+  catEyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
+  catPct: { fontSize: 13, fontWeight: '700' },
+  catTitle: { fontSize: 26, fontFamily: Fonts.display, letterSpacing: -0.3, marginTop: 2 },
+  catMeta: { fontSize: 13, fontWeight: '500', marginBottom: Space.sm },
+  catBarTrack: { height: 7, borderRadius: 4, overflow: 'hidden' },
+  catBarFill: { height: 7, borderRadius: 4 },
 });
