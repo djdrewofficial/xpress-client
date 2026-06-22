@@ -14,6 +14,7 @@ export type SectionRow = {
   song_limit: number | null;
   sort_order: number;
   on_timeline: boolean | null; // per-event override; null = auto (on when section_type==='timeline')
+  on_music: boolean | null; // per-event override; null = auto (vibe playlists: songs on + no single-song limit)
   time_enabled: boolean; // section supports a time
   time_label: string | null; // the time shown on the timeline, e.g. "5:00 PM"
   locked: boolean;
@@ -26,6 +27,11 @@ export type SectionRow = {
     per-event override, else defaults from its type — info sections stay off). */
 export const onTimeline = (s: Pick<SectionRow, 'on_timeline' | 'section_type'>): boolean =>
   s.on_timeline ?? s.section_type === 'timeline';
+
+/** Whether a section shows on the Music tab (vibe curation). Honours the staff
+    override, else defaults to open playlists (songs on, no single-song limit). */
+export const onMusic = (s: Pick<SectionRow, 'on_music' | 'songs_enabled' | 'song_limit'>): boolean =>
+  s.on_music ?? (s.songs_enabled && s.song_limit == null);
 
 export type Group = {
   id: string;

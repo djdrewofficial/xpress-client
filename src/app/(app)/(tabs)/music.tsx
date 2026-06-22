@@ -9,7 +9,7 @@ import { Backdrop } from '@/components/Backdrop';
 import { BrandHeader } from '@/components/Logo';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
-import { getMyEvents, loadOverview, type SectionRow } from '@/lib/planning';
+import { getMyEvents, loadOverview, onMusic, type SectionRow } from '@/lib/planning';
 
 export default function MusicScreen() {
   const c = useC();
@@ -25,7 +25,7 @@ export default function MusicScreen() {
     setEventId(ev?.id ?? null);
     if (ev) {
       const ov = await loadOverview(ev.id);
-      setSections(ov.sections.filter((s) => s.songs_enabled));
+      setSections(ov.sections.filter(onMusic));
     } else setSections([]);
   }, [profile]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -47,7 +47,13 @@ export default function MusicScreen() {
             {totalSongs > 0 && <Text style={styles.aiCount}>{totalSongs} song{totalSongs === 1 ? '' : 's'} picked so far</Text>}
           </LinearGradient>
 
-          <Text style={[styles.lab, { color: c.textTertiary }]}>EVERY MOMENT OF YOUR NIGHT</Text>
+          <View style={[styles.note, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={{ color: c.textSecondary, fontSize: 13.5, lineHeight: 20 }}>
+              There&apos;s no pressure to fill these playlists all the way up. Even a general sense of the vibe — or just a few songs — gives us plenty to work with. What matters most is sharing what you and your guests love, especially your cultural influences and the music that means something to you.
+            </Text>
+          </View>
+
+          <Text style={[styles.lab, { color: c.textTertiary }]}>VIBE CURATION</Text>
           {!sections ? (
             <ActivityIndicator color={Brand.purple} style={{ marginTop: Space.xl }} />
           ) : sections.length === 0 ? (
@@ -85,6 +91,7 @@ const styles = StyleSheet.create({
   aiTitle: { color: '#fff', fontSize: 22, fontWeight: '800' },
   aiSub: { color: 'rgba(255,255,255,0.88)', fontSize: 13, lineHeight: 19, marginTop: 4 },
   aiCount: { color: '#fff', fontSize: 12, fontWeight: '700', marginTop: Space.sm },
+  note: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: Space.md },
   lab: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginTop: Space.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: Space.md, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: Space.md },
   rowIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
