@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { useFonts, DMSerifDisplay_400Regular } from '@expo-google-fonts/dm-serif-display';
 import {
   Montserrat_400Regular,
@@ -47,10 +48,12 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        <StatusBar style="auto" />
-        <RootNavigator />
-      </AuthProvider>
+      <KeyboardProvider>
+        <AuthProvider>
+          <StatusBar style="auto" />
+          <RootNavigator />
+        </AuthProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

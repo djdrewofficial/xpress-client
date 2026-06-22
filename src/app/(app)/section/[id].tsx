@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -91,7 +92,12 @@ export default function SectionScreen() {
             </View>
           )}
         </View>
-        <ScrollView contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl * 2, gap: Space.lg }}>
+        <KeyboardAwareScrollView
+          contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl * 2, gap: Space.lg }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          bottomOffset={Space.xl}
+        >
           <View style={{ gap: Space.md }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.sm }}>
               {meta?.icon ? <Text style={{ fontSize: 26 }}>{meta.icon}</Text> : null}
@@ -168,7 +174,7 @@ export default function SectionScreen() {
           )}
 
           <Encourager />
-        </ScrollView>
+        </KeyboardAwareScrollView>
 
         {meta && (
           <SongPicker

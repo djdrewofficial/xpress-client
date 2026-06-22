@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { GradientButton, useC } from '@/components/ui';
@@ -27,7 +28,7 @@ export default function LoginScreen() {
   return (
     <LinearGradient colors={[Brand.purple, '#2c1d57']} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoidingView style={styles.form} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={styles.form} behavior="padding">
           <View style={{ alignItems: 'center', marginBottom: Space.md }}>
             <Logo variant="full" height={54} tone="#ffffff" />
           </View>

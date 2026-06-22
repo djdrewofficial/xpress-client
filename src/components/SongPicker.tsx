@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Image } from 'expo-image';
 import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 
@@ -221,7 +222,7 @@ export function SongPicker({
             </View>
           )}
 
-          <ScrollView contentContainerStyle={{ padding: Space.lg, gap: Space.sm, paddingBottom: Space.xxl * 2 }} keyboardShouldPersistTaps="handled">
+          <KeyboardAwareScrollView contentContainerStyle={{ padding: Space.lg, gap: Space.sm, paddingBottom: Space.xxl * 2 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" bottomOffset={Space.xl}>
             {mode === 'foryou' ? (
               fy.status === 'loading' ? <MixtapeLoader eventName={eventName} />
               : fy.status === 'needs-profile' ? <Empty text="Head to “Tell us about you” under Let's Get Started and share your story + favorite genres — then we'll fill this with songs picked just for you." />
@@ -284,7 +285,7 @@ export function SongPicker({
                 </Pressable>
               ))
             )}
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </SafeAreaView>
       </View>
     </Modal>

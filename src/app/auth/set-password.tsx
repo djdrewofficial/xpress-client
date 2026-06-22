@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Linking, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 
@@ -64,7 +65,7 @@ export default function SetPasswordScreen() {
   return (
     <LinearGradient colors={[Brand.purple, '#2c1d57']} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoidingView style={styles.wrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={styles.wrap} behavior="padding">
           <Text style={styles.brand}>Set your password</Text>
           <Text style={styles.tagline}>Welcome to Xpress Entertainment</Text>
 

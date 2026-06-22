@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Linking, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useC } from '@/components/ui';
@@ -251,6 +252,7 @@ function Composer({ c, onClose, onPosted }: { c: ReturnType<typeof useC>; onClos
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
       <View style={{ flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' }}>
         <View style={{ backgroundColor: c.bg, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, maxHeight: '92%' }}>
           <View style={styles.sheetHead}>
@@ -260,7 +262,7 @@ function Composer({ c, onClose, onPosted }: { c: ReturnType<typeof useC>; onClos
               {busy ? <ActivityIndicator color={Brand.purple} /> : <Text style={{ color: canPost ? Brand.purple : c.textTertiary, fontWeight: '800', fontSize: 15 }}>Post</Text>}
             </Pressable>
           </View>
-          <ScrollView contentContainerStyle={{ padding: Space.lg, gap: Space.md }} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={{ padding: Space.lg, gap: Space.md }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
             <TextInput
               style={[styles.input, { backgroundColor: c.cardAlt, color: c.text, borderColor: c.border, minHeight: 90, textAlignVertical: 'top' }]}
               placeholder="Share something with the community…"
@@ -300,6 +302,7 @@ function Composer({ c, onClose, onPosted }: { c: ReturnType<typeof useC>; onClos
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -331,6 +334,7 @@ function CommentsModal({ postId, c, meId, onClose }: { postId: string; c: Return
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
       <View style={{ flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' }}>
         <View style={{ backgroundColor: c.bg, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, height: '75%' }}>
           <View style={styles.sheetHead}>
@@ -345,6 +349,8 @@ function CommentsModal({ postId, c, meId, onClose }: { postId: string; c: Return
               data={comments}
               keyExtractor={(x) => x.id}
               contentContainerStyle={{ padding: Space.lg, gap: Space.md }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
               ListEmptyComponent={<Text style={{ color: c.textTertiary, textAlign: 'center', marginTop: Space.lg }}>No comments yet.</Text>}
               renderItem={({ item }) => (
                 <View style={{ flexDirection: 'row', gap: Space.sm }}>
@@ -365,6 +371,7 @@ function CommentsModal({ postId, c, meId, onClose }: { postId: string; c: Return
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
