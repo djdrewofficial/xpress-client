@@ -150,6 +150,15 @@ export default function AccountScreen() {
                 </View>
               </View>
 
+              {/* Invite your people (moved here from the old People tab) */}
+              <View style={[styles.card, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR PEOPLE</Text>
+                <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginTop: 4 }}>Invite a partner or planner</Text>
+                <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 2 }}>
+                  Want help planning? We can give your partner or wedding planner access too — ask our team and we&apos;ll set it up.
+                </Text>
+              </View>
+
               <Pressable onPress={signOut} style={[styles.signOut, { borderColor: c.border }]}>
                 <Text style={{ color: c.textSecondary, fontWeight: '600' }}>Sign out</Text>
               </Pressable>
