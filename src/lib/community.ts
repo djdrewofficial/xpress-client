@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
 
 /* Community board data layer. Posts/reactions/comments/votes read+write directly
@@ -123,15 +124,41 @@ export async function pickCommunityImage(): Promise<ImagePicker.ImagePickerAsset
   return res.assets[0];
 }
 
+/* Downscale + recompress before upload. Full-resolution phone photos are several
+   MB — too big for the upload endpoint and slow/memory-heavy on device. Cap the
+   long edge at 1600px and re-encode as JPEG. Falls back to the original on error. */
+async function compressForUpload(asset: ImagePicker.ImagePickerAsset): Promise<{ uri: string; name: string; type: string }> {
+  try {
+    const ctx = ImageManipulator.manipulate(asset.uri);
+    if ((asset.width ?? 0) > 1600) ctx.resize({ width: 1600 });
+    const ref = await ctx.renderAsync();
+    const out = await ref.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+    return { uri: out.uri, name: 'photo.jpg', type: 'image/jpeg' };
+  } catch {
+    const name = asset.fileName || `photo.${(asset.mimeType ?? 'image/jpeg').split('/')[1] || 'jpg'}`;
+    return { uri: asset.uri, name, type: asset.mimeType ?? 'image/jpeg' };
+  }
+}
+
 async function uploadPhoto(asset: ImagePicker.ImagePickerAsset): Promise<string> {
   const base = apiBase();
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!base || !token) throw new Error('Not configured');
-  const name = asset.fileName || `photo.${(asset.mimeType ?? 'image/jpeg').split('/')[1] || 'jpg'}`;
+  const file = await compressForUpload(asset);
   const form = new FormData();
-  form.append('photo', { uri: asset.uri, name, type: asset.mimeType ?? 'image/jpeg' } as unknown as Blob);
-  const res = await fetch(`${base}/api/mobile/community-upload`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form });
+  form.append('photo', { uri: file.uri, name: file.name, type: file.type } as unknown as Blob);
+  // Hard timeout so a cold/slow endpoint can't leave the post spinner stuck forever.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 45000);
+  let res: Response;
+  try {
+    res = await fetch(`${base}/api/mobile/community-upload`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form, signal: controller.signal });
+  } catch {
+    throw new Error(controller.signal.aborted ? 'Photo upload timed out — please check your connection and try again.' : 'Photo upload failed — please try again.');
+  } finally {
+    clearTimeout(timer);
+  }
   const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
   if (!res.ok) throw new Error(json.error || 'Upload failed');
   return json.url ?? '';

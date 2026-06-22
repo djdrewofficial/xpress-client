@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KeyboardAwareScrollView, KeyboardProvider } from 'react-native-keyboard-controller';
 import { Image } from 'expo-image';
 import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 
@@ -194,6 +194,7 @@ export function SongPicker({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <KeyboardProvider>
       <View style={{ flex: 1, backgroundColor: c.bg }}>
         <SafeAreaView edges={['top']} style={{ flex: 1 }}>
           <View style={[styles.header, { borderColor: c.border }]}>
@@ -288,6 +289,7 @@ export function SongPicker({
           </KeyboardAwareScrollView>
         </SafeAreaView>
       </View>
+      </KeyboardProvider>
     </Modal>
   );
 }

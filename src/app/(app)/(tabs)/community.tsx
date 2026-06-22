@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Linking, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView, KeyboardProvider } from 'react-native-keyboard-controller';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useC } from '@/components/ui';
@@ -252,6 +252,7 @@ function Composer({ c, onClose, onPosted }: { c: ReturnType<typeof useC>; onClos
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardProvider>
       <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
       <View style={{ flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' }}>
         <View style={{ backgroundColor: c.bg, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, maxHeight: '92%' }}>
@@ -303,6 +304,7 @@ function Composer({ c, onClose, onPosted }: { c: ReturnType<typeof useC>; onClos
         </View>
       </View>
       </KeyboardAvoidingView>
+      </KeyboardProvider>
     </Modal>
   );
 }
@@ -334,6 +336,7 @@ function CommentsModal({ postId, c, meId, onClose }: { postId: string; c: Return
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardProvider>
       <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
       <View style={{ flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' }}>
         <View style={{ backgroundColor: c.bg, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, height: '75%' }}>
@@ -372,6 +375,7 @@ function CommentsModal({ postId, c, meId, onClose }: { postId: string; c: Return
         </View>
       </View>
       </KeyboardAvoidingView>
+      </KeyboardProvider>
     </Modal>
   );
 }
