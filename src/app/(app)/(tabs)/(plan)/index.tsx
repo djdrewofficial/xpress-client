@@ -3,10 +3,11 @@ import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleS
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { Ring, useC } from '@/components/ui';
+import { Ring, useC, useScheme } from '@/components/ui';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { Logo } from '@/components/Logo';
 import { pickCoverImage, uploadCoverPhoto } from '@/lib/coverPhoto';
@@ -188,6 +189,9 @@ export default function PlanScreen() {
 
 function CategoryCard({ group, index, onPress }: { group: Group; index: number; onPress: () => void }) {
   const c = useC();
+  const dark = useScheme() === 'dark';
+  const glassFill = dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.5)';
+  const glassBorder = dark ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.7)';
   const pct = group.totalQuestions > 0
     ? Math.round((group.answeredQuestions / group.totalQuestions) * 100)
     : group.songCount > 0 ? 100 : 0;
@@ -199,8 +203,10 @@ function CategoryCard({ group, index, onPress }: { group: Group; index: number; 
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.985 : 1 }] }]}>
-      <View style={[styles.cat, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
-        <View style={styles.catHead}>
+      <View style={[styles.catShadow, Shadow.card]}>
+        <BlurView intensity={dark ? 36 : 60} tint={dark ? 'dark' : 'light'} style={[styles.cat, { borderColor: glassBorder }]}>
+          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: glassFill }]} />
+          <View style={styles.catHead}>
           <Text style={[styles.catEyebrow, { color: done ? Brand.red : Brand.purpleLight }]}>
             {done ? '✓ COMPLETE' : `STEP ${index + 1}`}
           </Text>
@@ -225,7 +231,8 @@ function CategoryCard({ group, index, onPress }: { group: Group; index: number; 
               style={[styles.catBarFill, { width: `${Math.max(3, pct)}%` }]}
             />
           )}
-        </View>
+          </View>
+        </BlurView>
       </View>
     </Pressable>
   );
@@ -261,7 +268,8 @@ const styles = StyleSheet.create({
   contTitle: { fontSize: 16, fontWeight: '600' },
   cta: { backgroundColor: Brand.purple, borderRadius: Radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
 
-  cat: { borderRadius: Radius.xl, borderWidth: StyleSheet.hairlineWidth, padding: Space.xl, gap: 6 },
+  catShadow: { borderRadius: Radius.xl },
+  cat: { borderRadius: Radius.xl, borderWidth: StyleSheet.hairlineWidth, padding: Space.xl, gap: 6, overflow: 'hidden' },
   catHead: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   catEyebrow: { fontSize: 13, fontWeight: '800', letterSpacing: 1.4 },
   catPct: { fontSize: 13, fontWeight: '700' },
