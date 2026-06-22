@@ -13,10 +13,16 @@ export type SectionRow = {
   ai_picks_enabled: boolean;
   song_limit: number | null;
   sort_order: number;
+  on_timeline: boolean | null; // per-event override; null = auto (on when section_type==='timeline')
   questionCount: number;
   answeredCount: number;
   songCount: number;
 };
+
+/** Whether a section shows on the couple's client Timeline view (honours the
+    per-event override, else defaults from its type — info sections stay off). */
+export const onTimeline = (s: Pick<SectionRow, 'on_timeline' | 'section_type'>): boolean =>
+  s.on_timeline ?? s.section_type === 'timeline';
 
 export type Group = {
   id: string;
@@ -190,6 +196,10 @@ export const reorderSections = (eventId: string, orderedIds: string[]): Promise<
 /** Delete a section — staff permanent, host soft (restorable). */
 export const deleteSection = (eventId: string, sectionId: string): Promise<boolean> =>
   sectionAction({ action: 'delete', eventId, sectionId });
+
+/** Show/hide a section on the couple's client Timeline view (per-event only). */
+export const setSectionOnTimeline = (eventId: string, sectionId: string, on: boolean): Promise<boolean> =>
+  sectionAction({ action: 'set_timeline', eventId, sectionId, on });
 
 /** Restore a host-deleted section. Staff + hosts. */
 export const restoreSection = (eventId: string, sectionId: string): Promise<boolean> =>
