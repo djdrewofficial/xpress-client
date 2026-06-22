@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
 import { BrandHeader } from '@/components/Logo';
+import { InvitePersonSheet } from '@/components/InvitePersonSheet';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { getMyEvents } from '@/lib/planning';
@@ -18,6 +19,8 @@ export default function AccountScreen() {
   const { profile, session, signOut } = useAuth();
   const [data, setData] = useState<AccountData | null>(null);
   const [eventName, setEventName] = useState('');
+  const [eventId, setEventId] = useState<string | null>(null);
+  const [showInvite, setShowInvite] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -26,6 +29,7 @@ export default function AccountScreen() {
     const events = await getMyEvents({ clientId: profile.clientId, eventGuestId: profile.eventGuestId });
     const ev = events[0] ?? null;
     setEventName(ev?.name ?? '');
+    setEventId(ev?.id ?? null);
     const isGuest = profile.accountType === 'event_guest';
     setData(ev ? await loadAccount(ev.id, isGuest) : null);
     setLoading(false);
@@ -150,14 +154,21 @@ export default function AccountScreen() {
                 </View>
               </View>
 
-              {/* Invite your people (moved here from the old People tab) */}
-              <View style={[styles.card, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
-                <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR PEOPLE</Text>
-                <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginTop: 4 }}>Invite a partner or planner</Text>
-                <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 2 }}>
-                  Want help planning? We can give your partner or wedding planner access too — ask our team and we&apos;ll set it up.
-                </Text>
-              </View>
+              {/* Invite your people — couples only (guests can't invite others) */}
+              {profile?.accountType === 'client' && eventId && (
+                <View style={[styles.card, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                  <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR PEOPLE</Text>
+                  <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginTop: 4 }}>Invite a partner or planner</Text>
+                  <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 2, marginBottom: Space.md }}>
+                    Want help planning? Give your partner or wedding planner their own login to plan alongside you.
+                  </Text>
+                  <Pressable onPress={() => setShowInvite(true)} style={{ width: '100%' }}>
+                    <LinearGradient colors={[Brand.purple, Brand.purpleLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bigBtn}>
+                      <Text style={styles.bigBtnTxt}>＋ Invite someone</Text>
+                    </LinearGradient>
+                  </Pressable>
+                </View>
+              )}
 
               <Pressable onPress={signOut} style={[styles.signOut, { borderColor: c.border }]}>
                 <Text style={{ color: c.textSecondary, fontWeight: '600' }}>Sign out</Text>
@@ -167,6 +178,13 @@ export default function AccountScreen() {
           )}
         </ScrollView>
       </SafeAreaView>
+      {eventId && (
+        <InvitePersonSheet
+          visible={showInvite}
+          eventId={eventId}
+          onClose={() => setShowInvite(false)}
+        />
+      )}
     </View>
   );
 }
