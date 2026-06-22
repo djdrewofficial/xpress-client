@@ -7,7 +7,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Bar, useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
-import { DanceHeader } from '@/components/DanceHeader';
 import { Encourager } from '@/components/Encourager';
 import { SongPicker } from '@/components/SongPicker';
 import { SectionSongs } from '@/components/SectionSongs';
@@ -77,8 +76,6 @@ export default function SectionScreen() {
   const answeredCount = visible.filter((q) => (answers[q.id] ?? '').trim() !== '').length;
   const pct = visible.length > 0 ? Math.round((answeredCount / visible.length) * 100) : 0;
   const isDoNotPlay = /do ?not play|don'?t play|dont play/i.test(meta?.title ?? '');
-  // Only the open dance-floor sections get the disco header — not the slow/first/parent dances.
-  const isDance = /^dancing$|open dancing/i.test((meta?.title ?? '').trim());
 
   return (
     <View style={{ flex: 1 }}>
@@ -101,7 +98,6 @@ export default function SectionScreen() {
           keyboardDismissMode="interactive"
           bottomOffset={Space.xl}
         >
-          {isDance && <DanceHeader />}
           <View style={{ gap: Space.md }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.sm }}>
               {meta?.icon ? <Text style={{ fontSize: 26 }}>{meta.icon}</Text> : null}
