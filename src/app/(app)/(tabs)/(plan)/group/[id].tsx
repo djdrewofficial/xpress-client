@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Bar, useC } from '@/components/ui';
+import { Backdrop } from '@/components/Backdrop';
 import { Encourager } from '@/components/Encourager';
 import { useAuth } from '@/lib/auth';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
@@ -94,7 +95,8 @@ export default function GroupScreen() {
   const total = sections?.length ?? 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
+    <View style={{ flex: 1 }}>
+      <Backdrop />
       {/* ── Header ── */}
       <LinearGradient colors={[Brand.purple, '#6a4fb8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
         <SafeAreaView edges={['top']}>

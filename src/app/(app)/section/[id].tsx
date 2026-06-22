@@ -5,6 +5,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Bar, useC } from '@/components/ui';
+import { Backdrop } from '@/components/Backdrop';
 import { Encourager } from '@/components/Encourager';
 import { SongPicker } from '@/components/SongPicker';
 import { SectionSongs } from '@/components/SectionSongs';
@@ -76,7 +77,8 @@ export default function SectionScreen() {
   const isDoNotPlay = /do ?not play|don'?t play|dont play/i.test(meta?.title ?? '');
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
+    <View style={{ flex: 1 }}>
+      <Backdrop />
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>

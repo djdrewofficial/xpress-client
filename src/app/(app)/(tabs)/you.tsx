@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useC } from '@/components/ui';
+import { Backdrop } from '@/components/Backdrop';
 import { BrandHeader } from '@/components/Logo';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
@@ -38,7 +39,8 @@ export default function AccountScreen() {
   const officePhone = OFFICE_PHONE.replace(/[^\d+]/g, '');
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
+    <View style={{ flex: 1 }}>
+      <Backdrop />
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <BrandHeader />
         <ScrollView

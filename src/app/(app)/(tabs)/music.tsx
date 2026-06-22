@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { Bar, useC } from '@/components/ui';
+import { Backdrop } from '@/components/Backdrop';
 import { BrandHeader } from '@/components/Logo';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
@@ -32,7 +33,8 @@ export default function MusicScreen() {
   const totalSongs = (sections ?? []).reduce((n, s) => n + s.songCount, 0);
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
+    <View style={{ flex: 1 }}>
+      <Backdrop />
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <BrandHeader />
         <ScrollView contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl * 3, gap: Space.md }}>

@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { Ring, useC, useScheme } from '@/components/ui';
+import { Backdrop } from '@/components/Backdrop';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { Logo } from '@/components/Logo';
 import { pickCoverImage, uploadCoverPhoto } from '@/lib/coverPhoto';
@@ -78,7 +79,8 @@ export default function PlanScreen() {
   const nextUp = overview?.sections.find((s) => s.questionCount > 0 && s.answeredCount < s.questionCount);
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
+    <View style={{ flex: 1 }}>
+      <Backdrop />
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <ScrollView
           contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl * 3, gap: Space.lg }}
