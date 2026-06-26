@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { KeyboardAwareScrollView, KeyboardProvider } from 'react-native-keyboard-controller';
 import { Image } from 'expo-image';
 import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 
@@ -194,7 +193,6 @@ export function SongPicker({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <KeyboardProvider>
       <View style={{ flex: 1, backgroundColor: c.bg }}>
         <SafeAreaView edges={['top']} style={{ flex: 1 }}>
           <View style={[styles.header, { borderColor: c.border }]}>
@@ -223,7 +221,7 @@ export function SongPicker({
             </View>
           )}
 
-          <KeyboardAwareScrollView contentContainerStyle={{ padding: Space.lg, gap: Space.sm, paddingBottom: Space.xxl * 2 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" bottomOffset={Space.xl}>
+          <ScrollView contentContainerStyle={{ padding: Space.lg, gap: Space.sm, paddingBottom: Space.xxl * 2 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets>
             {mode === 'foryou' ? (
               fy.status === 'loading' ? <MixtapeLoader eventName={eventName} />
               : fy.status === 'needs-profile' ? <Empty text="Head to “Tell us about you” under Let's Get Started and share your story + favorite genres — then we'll fill this with songs picked just for you." />
@@ -286,10 +284,9 @@ export function SongPicker({
                 </Pressable>
               ))
             )}
-          </KeyboardAwareScrollView>
+          </ScrollView>
         </SafeAreaView>
       </View>
-      </KeyboardProvider>
     </Modal>
   );
 }
