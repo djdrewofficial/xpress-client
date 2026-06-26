@@ -214,7 +214,7 @@ export function SongPicker({
               {tab === 'search' && (
                 <View style={[styles.searchBox, { backgroundColor: c.cardAlt, borderColor: c.border }]}>
                   <Text style={{ color: c.textTertiary, fontSize: 16 }}>🔍</Text>
-                  <TextInput style={{ flex: 1, color: c.text, fontSize: 16 }} value={query} onChangeText={setQuery} placeholder="Search songs or artists…" placeholderTextColor={c.textTertiary} autoFocus returnKeyType="search" />
+                  <TextInput style={{ flex: 1, color: c.text, fontSize: 16 }} value={query} onChangeText={setQuery} placeholder="Search songs — or paste a YouTube link…" placeholderTextColor={c.textTertiary} autoFocus returnKeyType="search" />
                   {query.length > 0 && <Pressable onPress={() => setQuery('')} hitSlop={8}><Text style={{ color: c.textTertiary }}>✕</Text></Pressable>}
                 </View>
               )}
