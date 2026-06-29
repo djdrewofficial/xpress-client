@@ -44,12 +44,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setProfile(null);
       return;
     }
+    // Guard against a stale resolve: if the session changes before this finishes,
+    // don't let an earlier user's profile overwrite the newer one.
+    let cancelled = false;
     (async () => {
       const { data: account } = await supabase
         .from('accounts')
         .select('account_type, client_id, event_guest_id')
         .eq('auth_user_id', uid)
         .maybeSingle();
+      if (cancelled) return;
 
       let firstName = '';
       if (account?.client_id) {
@@ -59,6 +63,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         const { data: g } = await supabase.from('event_guests').select('first_name').eq('id', account.event_guest_id).maybeSingle();
         firstName = g?.first_name ?? '';
       }
+      if (cancelled) return;
       setProfile({
         accountType: (account?.account_type as Profile['accountType']) ?? null,
         clientId: account?.client_id ?? null,
@@ -66,11 +71,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
         firstName,
       });
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [session?.user.id]);
 
   return (
     <AuthContext.Provider
-      value={{ session, loading, profile, signOut: () => supabase.auth.signOut().then(() => {}) }}>
+      value={{ session, loading, profile, signOut: () => { setProfile(null); return supabase.auth.signOut().then(() => {}); } }}>
       {children}
     </AuthContext.Provider>
   );
