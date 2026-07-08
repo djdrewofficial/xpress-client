@@ -10,11 +10,18 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.xpressentertainment.client"
+      "bundleIdentifier": "com.xpressentertainment.client",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.xpressentertainment.client",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "output": "static"
@@ -40,7 +47,14 @@
     ],
     "experiments": {
       "typedRoutes": false,
-      "reactCompiler": true
-    }
+      "reactCompiler": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "6adaa737-a3a0-4d16-ad16-361a15fcab94"
+      }
+    },
+    "owner": "drewsegura"
   }
 }

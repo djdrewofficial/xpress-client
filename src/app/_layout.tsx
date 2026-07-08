@@ -1,4 +1,5 @@
-import { Stack } from 'expo-router';
+import { Stack, type ErrorBoundaryProps } from 'expo-router';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -18,6 +19,25 @@ import { patchTextFonts } from '@/lib/fontPatch';
 // via an explicit fontFamily.
 patchTextFonts();
 
+// Surfaces any startup/render error instead of a silent white screen.
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <View style={{ flex: 1, backgroundColor: '#160f2b', padding: 24, paddingTop: 72 }}>
+      <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 10 }}>Something went wrong</Text>
+      <ScrollView style={{ flex: 1, marginBottom: 12 }}>
+        <Text selectable style={{ color: '#f6b8b8', fontSize: 13, lineHeight: 19 }}>
+          {String(error?.message ?? error)}
+          {'\n\n'}
+          {String(error?.stack ?? '')}
+        </Text>
+      </ScrollView>
+      <Pressable onPress={retry} style={{ backgroundColor: '#4b328e', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
+        <Text style={{ color: '#fff', fontWeight: '700' }}>Try again</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function RootNavigator() {
   const { session, loading } = useAuth();
   if (loading) return null;
@@ -36,7 +56,7 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     DMSerifDisplay_400Regular,
     Montserrat_400Regular,
     Montserrat_500Medium,
@@ -44,7 +64,8 @@ export default function RootLayout() {
     Montserrat_700Bold,
     Montserrat_800ExtraBold,
   });
-  if (!fontsLoaded) return null;
+  // Don't block forever if a font fails to load in a release build — render anyway.
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
