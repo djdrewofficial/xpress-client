@@ -3,6 +3,7 @@
     "name": "Xpress Entertainment",
     "slug": "xpress-client",
     "version": "1.0.0",
+    "icon": "./src/assets/icon.png",
     "orientation": "portrait",
     "scheme": "xpressclient",
     "userInterfaceStyle": "automatic",
