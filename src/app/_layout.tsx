@@ -1,3 +1,4 @@
+import { Component, type ReactNode } from 'react';
 import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -15,27 +16,52 @@ import {
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { patchTextFonts } from '@/lib/fontPatch';
 
-// Route every <Text> through Montserrat (weight-aware); DM Serif headlines opt in
-// via an explicit fontFamily.
-patchTextFonts();
+// Route every <Text> through Montserrat. Guarded so a failure here can never
+// take down module evaluation (which would white-screen with no error).
+let patchError: unknown = null;
+try {
+  patchTextFonts();
+} catch (e) {
+  patchError = e;
+}
 
-// Surfaces any startup/render error instead of a silent white screen.
-export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+function ErrorScreen({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+  const e = error as { message?: string; stack?: string } | undefined;
   return (
     <View style={{ flex: 1, backgroundColor: '#160f2b', padding: 24, paddingTop: 72 }}>
-      <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 10 }}>Something went wrong</Text>
+      <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 10 }}>Startup error</Text>
       <ScrollView style={{ flex: 1, marginBottom: 12 }}>
         <Text selectable style={{ color: '#f6b8b8', fontSize: 13, lineHeight: 19 }}>
-          {String(error?.message ?? error)}
+          {String(e?.message ?? error)}
           {'\n\n'}
-          {String(error?.stack ?? '')}
+          {String(e?.stack ?? '')}
         </Text>
       </ScrollView>
-      <Pressable onPress={retry} style={{ backgroundColor: '#4b328e', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
-        <Text style={{ color: '#fff', fontWeight: '700' }}>Try again</Text>
-      </Pressable>
+      {onRetry ? (
+        <Pressable onPress={onRetry} style={{ backgroundColor: '#4b328e', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Try again</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
+}
+
+// expo-router's per-route boundary (catches errors inside screens).
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return <ErrorScreen error={error} onRetry={retry} />;
+}
+
+// Top-level class boundary — catches render errors in the ROOT PROVIDERS
+// (GestureHandler / Keyboard / Auth), which sit above expo-router's boundary.
+class RootBoundary extends Component<{ children: ReactNode }, { error: unknown }> {
+  state: { error: unknown } = { error: null };
+  static getDerivedStateFromError(error: unknown) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) return <ErrorScreen error={this.state.error} onRetry={() => this.setState({ error: null })} />;
+    return this.props.children;
+  }
 }
 
 function RootNavigator() {
@@ -68,13 +94,19 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <KeyboardProvider>
-        <AuthProvider>
-          <StatusBar style="auto" />
-          <RootNavigator />
-        </AuthProvider>
-      </KeyboardProvider>
-    </GestureHandlerRootView>
+    <RootBoundary>
+      {patchError ? (
+        <ErrorScreen error={patchError} />
+      ) : (
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <KeyboardProvider>
+            <AuthProvider>
+              <StatusBar style="auto" />
+              <RootNavigator />
+            </AuthProvider>
+          </KeyboardProvider>
+        </GestureHandlerRootView>
+      )}
+    </RootBoundary>
   );
 }
