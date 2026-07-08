@@ -1,4 +1,4 @@
-import { Component, type ReactNode } from 'react';
+import { Component, useEffect, useState, type ReactNode } from 'react';
 import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -46,6 +46,17 @@ function ErrorScreen({ error, onRetry }: { error: unknown; onRetry?: () => void 
   );
 }
 
+// Visible loading state (never a blank/null render) so a stuck stage is
+// diagnosable: a labeled purple screen means we reached JS but a stage hung;
+// a blank white screen means module evaluation itself threw before React.
+function Splash({ label }: { label: string }) {
+  return (
+    <View style={{ flex: 1, backgroundColor: '#4b328e', alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: '#ffffff', fontSize: 15, opacity: 0.9 }}>{label}</Text>
+    </View>
+  );
+}
+
 // expo-router's per-route boundary (catches errors inside screens).
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   return <ErrorScreen error={error} onRetry={retry} />;
@@ -66,7 +77,7 @@ class RootBoundary extends Component<{ children: ReactNode }, { error: unknown }
 
 function RootNavigator() {
   const { session, loading } = useAuth();
-  if (loading) return null;
+  if (loading) return <Splash label="Connecting…" />;
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
       <Stack.Protected guard={!!session}>
@@ -90,8 +101,14 @@ export default function RootLayout() {
     Montserrat_700Bold,
     Montserrat_800ExtraBold,
   });
-  // Don't block forever if a font fails to load in a release build — render anyway.
-  if (!fontsLoaded && !fontError) return null;
+  // Never let a slow/stuck font load white-screen the app: proceed after a short
+  // wait even if useFonts neither resolves nor errors (release-build failure mode).
+  const [fontTimedOut, setFontTimedOut] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setFontTimedOut(true), 2500);
+    return () => clearTimeout(t);
+  }, []);
+  if (!fontsLoaded && !fontError && !fontTimedOut) return <Splash label="Loading…" />;
 
   return (
     <RootBoundary>
