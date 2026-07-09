@@ -1,6 +1,6 @@
 import { Component, useEffect, useState, type ReactNode } from 'react';
 import { Stack, type ErrorBoundaryProps } from 'expo-router';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { LogBox, Pressable, ScrollView, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -16,6 +16,13 @@ import {
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { BrandSplash } from '@/components/BrandSplash';
 import { patchTextFonts } from '@/lib/fontPatch';
+
+// The Timeline's nested drag lists (react-native-reorderable-list's
+// NestedReorderableList with scrollable=false inside ScrollViewContainer) are the
+// library's intended pattern; RN's generic "VirtualizedLists nested in a
+// ScrollView" warning is a false positive here (no windowing to break), so quiet
+// just that one message. Dev-only — LogBox never renders in production anyway.
+LogBox.ignoreLogs(['VirtualizedLists should never be nested inside plain ScrollViews']);
 
 // Route every <Text> through Montserrat. Guarded so a failure here can never
 // take down module evaluation (which would white-screen with no error).
