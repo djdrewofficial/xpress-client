@@ -77,6 +77,24 @@ export async function spotifyPlaylists(): Promise<SpotifyPlaylist[]> {
   }
 }
 
+export type PlaylistImport = { name: string | null; tracks: SpotifyTrack[] };
+export type PlaylistImportError = 'bad_link' | 'not_found' | 'restricted' | 'unconfigured' | 'failed';
+
+/** Read a PUBLIC Spotify playlist by pasted link via XOS's app credentials — no
+    user login, so it isn't gated by Spotify's extended-quota approval. */
+export async function importPublicPlaylist(url: string): Promise<PlaylistImport | { error: PlaylistImportError }> {
+  const base = apiBase();
+  if (!base) return { error: 'unconfigured' };
+  try {
+    const res = await fetch(`${base}/api/music/playlist?url=${encodeURIComponent(url)}`, { headers: await authHeader() });
+    const j = (await res.json().catch(() => ({}))) as { name?: string | null; tracks?: SpotifyTrack[]; error?: string };
+    if (!res.ok) return { error: (j.error as PlaylistImportError) ?? 'failed' };
+    return { name: j.name ?? null, tracks: j.tracks ?? [] };
+  } catch {
+    return { error: 'failed' };
+  }
+}
+
 export async function spotifyPlaylistTracks(id: string): Promise<SpotifyTrack[]> {
   const base = apiBase();
   if (!base) return [];
