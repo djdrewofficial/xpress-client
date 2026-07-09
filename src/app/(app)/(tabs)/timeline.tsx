@@ -32,6 +32,7 @@ export default function TimelineScreen() {
   const [loading, setLoading] = useState(true);
   const [timeEditing, setTimeEditing] = useState<SectionRow | null>(null);
   const [pt, setPt] = useState<PlannerTimelineFile>(null);
+  const [ptLoading, setPtLoading] = useState(false);
   const [ptBusy, setPtBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -39,17 +40,23 @@ export default function TimelineScreen() {
     const events = await getMyEvents({ clientId: profile.clientId, eventGuestId: profile.eventGuestId });
     const ev = events[0] ?? null;
     setEventId(ev?.id ?? null);
-    if (ev) {
-      const [ov, plannerFile] = await Promise.all([loadOverview(ev.id), getPlannerTimeline(ev.id)]);
-      // Only sections staff have kept on the timeline (info sections are hidden by staff).
-      const g: TLGroup[] = ov.groups
-        .map((grp) => ({ id: grp.id, title: grp.title, icon: grp.icon, on: grp.sections.filter(onTimeline) }))
-        .filter((grp) => grp.on.length > 0);
-      setGroups(g);
-      setArchived(ov.removed);
-      setPt(plannerFile);
-    }
+    if (!ev) { setLoading(false); return; }
+
+    // Render as soon as the overview (fast, direct-to-Supabase) is in.
+    const ov = await loadOverview(ev.id);
+    // Only sections staff have kept on the timeline (info sections are hidden by staff).
+    const g: TLGroup[] = ov.groups
+      .map((grp) => ({ id: grp.id, title: grp.title, icon: grp.icon, on: grp.sections.filter(onTimeline) }))
+      .filter((grp) => grp.on.length > 0);
+    setGroups(g);
+    setArchived(ov.removed);
     setLoading(false);
+
+    // The planner file only fills the "Official Planner Timeline" card and comes
+    // from a slower XOS endpoint (serverless cold starts). Fetch it in the
+    // background so it never gates the whole page.
+    setPtLoading(true);
+    getPlannerTimeline(ev.id).then(setPt).catch(() => {}).finally(() => setPtLoading(false));
   }, [profile]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -129,7 +136,9 @@ export default function TimelineScreen() {
             {/* Official timeline from the planner — optional */}
             <View style={[styles.planner, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
               <Text style={[styles.offLab, { color: c.textTertiary }]}>OFFICIAL PLANNER TIMELINE</Text>
-              {pt ? (
+              {ptLoading && !pt ? (
+                <ActivityIndicator color={Brand.purple} style={{ marginVertical: Space.md, alignSelf: 'flex-start' }} />
+              ) : pt ? (
                 <>
                   <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', marginTop: 4 }} numberOfLines={1}>✓ {pt.name}</Text>
                   <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 2, marginBottom: Space.md }}>Shared with your Xpress team. You can replace it anytime.</Text>
