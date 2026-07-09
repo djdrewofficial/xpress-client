@@ -16,6 +16,7 @@ import { useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
 import { BrandHeader } from '@/components/Logo';
 import { TimePickerSheet } from '@/components/TimePickerSheet';
+import { AddSectionSheet } from '@/components/AddSectionSheet';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { getMyEvents, loadOverview, reorderSections, deleteSection, restoreSection, setSectionTime, onTimeline, type SectionRow, type RemovedSection } from '@/lib/planning';
@@ -34,6 +35,9 @@ export default function TimelineScreen() {
   const [pt, setPt] = useState<PlannerTimelineFile>(null);
   const [ptLoading, setPtLoading] = useState(false);
   const [ptBusy, setPtBusy] = useState(false);
+  const [addingGroup, setAddingGroup] = useState<{ id: string; title: string } | null>(null);
+
+  const canManage = profile?.accountType === 'staff' || profile?.accountType === 'client';
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -165,6 +169,11 @@ export default function TimelineScreen() {
                   <Text style={[styles.catTitle, { color: Brand.purpleLight }]}>{g.title.toUpperCase()}</Text>
                   <View style={{ flex: 1 }} />
                   <Text style={{ color: c.textTertiary, fontSize: 12, fontWeight: '600' }}>{g.on.length}</Text>
+                  {canManage ? (
+                    <Pressable onPress={() => setAddingGroup({ id: g.id, title: g.title })} hitSlop={8} style={[styles.addChip, { borderColor: Brand.purple }]}>
+                      <Text style={{ color: Brand.purpleLight, fontSize: 12, fontWeight: '800' }}>＋ Add</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
                 <NestedReorderableList
                   data={g.on}
@@ -202,6 +211,14 @@ export default function TimelineScreen() {
         title={timeEditing ? `${timeEditing.title} time` : 'Set time'}
         onClose={() => setTimeEditing(null)}
         onSave={(time) => { if (timeEditing) saveTime(timeEditing, time); }}
+      />
+      <AddSectionSheet
+        visible={!!addingGroup}
+        eventId={eventId ?? ''}
+        groupId={addingGroup?.id ?? ''}
+        groupTitle={addingGroup?.title}
+        onClose={() => setAddingGroup(null)}
+        onAdded={load}
       />
     </View>
   );
@@ -266,6 +283,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 30, fontFamily: Fonts.display },
   catHead: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, marginBottom: Space.sm },
   catTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 1.2 },
+  addChip: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 3, paddingHorizontal: 10, marginLeft: 8 },
   offLab: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: Space.md, borderRadius: Radius.lg, borderWidth: 1, padding: Space.md },
   archiveAction: { flex: 1, backgroundColor: '#e0584f', borderRadius: Radius.lg, justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: Space.lg },

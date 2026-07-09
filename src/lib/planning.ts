@@ -218,6 +218,52 @@ export const setSectionTime = (eventId: string, sectionId: string, time: string 
 export const restoreSection = (eventId: string, sectionId: string): Promise<boolean> =>
   sectionAction({ action: 'restore', eventId, sectionId });
 
+// ── Adding sections (couple) ─────────────────────────────────────────────────
+
+export type AddableSection = { templateSectionId: string; title: string; icon: string | null };
+
+/** Common sections staff flagged that the couple can add (Bouquet Toss, etc.),
+    from the event's template, minus ones already on the event. */
+export async function getAddableSections(eventId: string): Promise<AddableSection[]> {
+  const base = apiBase();
+  if (!base) return [];
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) return [];
+  try {
+    const res = await fetch(`${base}/api/mobile/planning/addable-sections?eventId=${encodeURIComponent(eventId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { sections?: AddableSection[] };
+    return json.sections ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export type NewSong = {
+  title: string;
+  artist?: string | null;
+  album?: string | null;
+  artwork_url?: string | null;
+  preview_url?: string | null;
+  external_url?: string | null;
+  provider?: 'spotify' | 'apple' | 'youtube' | 'manual';
+  provider_id?: string | null;
+};
+
+/** Add a common section from the template into a group. */
+export const addSectionFromTemplate = (eventId: string, groupId: string, templateSectionId: string): Promise<boolean> =>
+  sectionAction({ action: 'add', eventId, groupId, templateSectionId });
+
+/** Add a fully custom section (name + notes + up to 3 songs) into a group. */
+export const addCustomSection = (
+  eventId: string,
+  groupId: string,
+  custom: { title: string; notes?: string; songs?: NewSong[] },
+): Promise<boolean> => sectionAction({ action: 'add', eventId, groupId, custom });
+
 export async function loadSection(eventId: string, sectionId: string): Promise<{ questions: QuestionRow[]; songs: SongRow[] }> {
   const [{ data: questions }, { data: answers }, { data: songs }] = await Promise.all([
     supabase.from('planning_questions').select('*').eq('section_id', sectionId).order('sort_order'),

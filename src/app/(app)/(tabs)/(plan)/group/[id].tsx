@@ -7,6 +7,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Bar, useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
 import { Encourager } from '@/components/Encourager';
+import { AddSectionSheet } from '@/components/AddSectionSheet';
 import { useAuth } from '@/lib/auth';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import {
@@ -29,6 +30,7 @@ export default function GroupScreen() {
   const [removed, setRemoved] = useState<RemovedSection[]>([]);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   const isStaff = profile?.accountType === 'staff';
   const canManage = isStaff || profile?.accountType === 'client';
@@ -209,6 +211,12 @@ export default function GroupScreen() {
           <Text style={{ color: c.textTertiary, fontSize: 13, paddingVertical: Space.md }}>No sections here.</Text>
         )}
 
+        {canManage && !editing && sections && (
+          <Pressable onPress={() => setAdding(true)} style={[styles.addSectionBtn, { borderColor: Brand.purple }]}>
+            <Text style={{ color: Brand.purpleLight, fontWeight: '800', fontSize: 15 }}>＋ Add a section</Text>
+          </Pressable>
+        )}
+
         {/* Removed sections — restore (staff/host) */}
         {canManage && editing && removed.length > 0 && (
           <View style={{ marginTop: Space.lg, gap: Space.sm }}>
@@ -228,6 +236,15 @@ export default function GroupScreen() {
         {/* Branded encouragement fills the empty space */}
         {sections && !editing && <Encourager />}
       </ScrollView>
+
+      <AddSectionSheet
+        visible={adding}
+        eventId={eventId}
+        groupId={id}
+        groupTitle={group?.title}
+        onClose={() => setAdding(false)}
+        onAdded={load}
+      />
     </View>
   );
 }
@@ -251,5 +268,6 @@ const styles = StyleSheet.create({
   arrow: { width: 40, height: 24, alignItems: 'center', justifyContent: 'center' },
   trash: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   removedRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md, borderRadius: Radius.lg, borderWidth: 1, borderStyle: 'dashed', paddingVertical: Space.sm, paddingHorizontal: Space.md },
+  addSectionBtn: { borderWidth: 1.5, borderRadius: Radius.lg, borderStyle: 'dashed', paddingVertical: 14, alignItems: 'center' },
   restoreBtn: { paddingHorizontal: 12, paddingVertical: 6 },
 });
