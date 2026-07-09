@@ -29,11 +29,12 @@ function fromTrack(t: Track): PickItem {
     payload: { title: t.title, artist: t.artist, album: t.album ?? null, artwork_url: t.artworkUrl ?? null, preview_url: t.previewUrl ?? null, external_url: t.externalUrl ?? null, provider: t.provider, provider_id: t.providerId },
   };
 }
-function fromSpotify(t: SpotifyTrack): PickItem {
+function fromPlaylistTrack(t: SpotifyTrack): PickItem {
+  const provider = t.provider ?? 'spotify';
   return {
-    key: `spotify:${t.providerId}`,
+    key: `${provider}:${t.providerId}`,
     title: t.title, artist: t.artist, artworkUrl: t.artworkUrl, previewUrl: t.previewUrl,
-    payload: { title: t.title, artist: t.artist, album: t.album, artwork_url: t.artworkUrl, preview_url: t.previewUrl, external_url: t.externalUrl, provider: 'spotify', provider_id: t.providerId },
+    payload: { title: t.title, artist: t.artist, album: t.album, artwork_url: t.artworkUrl, preview_url: t.previewUrl, external_url: t.externalUrl, provider, provider_id: t.providerId },
   };
 }
 function fromRec(s: RecommendedSong): PickItem {
@@ -64,7 +65,7 @@ export function SongPicker({
 
   const [fy, setFy] = useState<{ status: 'loading' | 'needs-profile' | 'unconfigured' | 'error' | 'ok'; items: PickItem[]; basis: string[] }>({ status: 'loading', items: [], basis: [] });
   const [fyMore, setFyMore] = useState(false);
-  const [tab, setTab] = useState<'search' | 'spotify'>('search');
+  const [tab, setTab] = useState<'search' | 'playlist'>('search');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Track[]>([]);
   const [searching, setSearching] = useState(false);
@@ -141,9 +142,9 @@ export function SongPicker({
     setPlBusy(false);
     if ('error' in res) {
       setPlError(
-        res.error === 'bad_link' ? "That doesn't look like a Spotify playlist link."
-          : res.error === 'not_found' ? "Couldn't find that playlist — double-check the link."
-            : res.error === 'restricted' ? "That playlist is private. In Spotify, open it → ⋯ → Make Public, then paste the link again."
+        res.error === 'bad_link' ? "That doesn't look like a Spotify or Apple Music playlist link."
+          : res.error === 'not_found' ? "Couldn't find that playlist — double-check the link and that it's public."
+            : res.error === 'restricted' ? "That playlist is private. Open it in Spotify or Apple Music, make it public/shared, then paste the link again."
               : 'Couldn’t read that playlist. Please try again.',
       );
       return;
@@ -173,7 +174,7 @@ export function SongPicker({
     if (!plResult) return;
     setImportingAll(true);
     for (const t of plResult.tracks) {
-      const item = fromSpotify(t);
+      const item = fromPlaylistTrack(t);
       if (existingTitles.has(item.title.toLowerCase()) || added[item.key] === 'done') continue;
       await handleAdd(item);
     }
@@ -200,7 +201,7 @@ export function SongPicker({
             <View style={{ paddingHorizontal: Space.lg, paddingTop: Space.md, gap: Space.md }}>
               <View style={[styles.segment, { backgroundColor: c.cardAlt }]}>
                 <SegBtn label="Search" active={tab === 'search'} onPress={() => setTab('search')} c={c} />
-                <SegBtn label="From Spotify" active={tab === 'spotify'} onPress={() => setTab('spotify')} c={c} />
+                <SegBtn label="From a playlist" active={tab === 'playlist'} onPress={() => setTab('playlist')} c={c} />
               </View>
               {tab === 'search' && (
                 <View style={[styles.searchBox, { backgroundColor: c.cardAlt, borderColor: c.border }]}>
@@ -235,17 +236,17 @@ export function SongPicker({
               : results.length === 0 ? <Empty text="No results. Try a different search." />
               : results.map(fromTrack).map((item) => <SongRowView key={item.key} item={item} c={c} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => togglePlay(item)} onAdd={() => handleAdd(item)} />)
             ) : (
-              // ── From Spotify: paste a PUBLIC playlist link (no login needed) ──
+              // ── From a playlist: paste a PUBLIC Spotify or Apple Music link (no login needed) ──
               <View style={{ gap: Space.md }}>
                 <Text style={{ color: c.textSecondary, fontSize: 13, lineHeight: 19 }}>
-                  Paste a public Spotify playlist link and we&apos;ll pull in the songs. In Spotify: open the playlist → ⋯ → Share → Copy link (make sure it&apos;s set to Public).
+                  Paste a public Spotify or Apple Music playlist link and we&apos;ll pull in the songs. Open the playlist → Share → Copy link (make sure it&apos;s set to Public).
                 </Text>
                 <View style={[styles.searchBox, { backgroundColor: c.cardAlt, borderColor: c.border }]}>
                   <TextInput
                     style={{ flex: 1, color: c.text, fontSize: 15 }}
                     value={plUrl}
                     onChangeText={setPlUrl}
-                    placeholder="https://open.spotify.com/playlist/…"
+                    placeholder="Paste a Spotify or Apple Music link…"
                     placeholderTextColor={c.textTertiary}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -254,7 +255,7 @@ export function SongPicker({
                   />
                   {plUrl.length > 0 && <Pressable onPress={() => setPlUrl('')} hitSlop={8}><Text style={{ color: c.textTertiary }}>✕</Text></Pressable>}
                 </View>
-                <Pressable disabled={plBusy || !plUrl.trim()} onPress={runImport} style={[styles.spotifyBtn, (plBusy || !plUrl.trim()) && { opacity: 0.6 }]}>
+                <Pressable disabled={plBusy || !plUrl.trim()} onPress={runImport} style={[styles.importBtn, (plBusy || !plUrl.trim()) && { opacity: 0.6 }]}>
                   {plBusy ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Import playlist</Text>}
                 </Pressable>
 
@@ -268,7 +269,7 @@ export function SongPicker({
                         {importingAll ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>+ Add all ({plResult.tracks.length})</Text>}
                       </Pressable>
                     </View>
-                    {plResult.tracks.map(fromSpotify).map((item) => <SongRowView key={item.key} item={item} c={c} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => togglePlay(item)} onAdd={() => handleAdd(item)} />)}
+                    {plResult.tracks.map(fromPlaylistTrack).map((item) => <SongRowView key={item.key} item={item} c={c} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => togglePlay(item)} onAdd={() => handleAdd(item)} />)}
                   </>
                 ) : null}
               </View>
@@ -336,5 +337,5 @@ const styles = StyleSheet.create({
   addBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   addAll: { borderRadius: Radius.pill, paddingVertical: 8, paddingHorizontal: 14 },
   loadMore: { borderWidth: 1, borderRadius: Radius.md, paddingVertical: 13, alignItems: 'center', marginTop: Space.sm },
-  spotifyBtn: { backgroundColor: '#1DB954', borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 28, minWidth: 200, alignItems: 'center' },
+  importBtn: { backgroundColor: Brand.purple, borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 28, minWidth: 200, alignItems: 'center' },
 });

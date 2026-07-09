@@ -9,7 +9,9 @@ import { supabase } from '@/lib/supabase';
 const RETURN_URL = 'xpressclient://spotify-callback';
 
 export type SpotifyPlaylist = { id: string; name: string; image: string | null; trackCount: number; owner: string | null };
+// A track from a pasted playlist — Spotify OR Apple Music (carries its own provider).
 export type SpotifyTrack = {
+  provider?: 'spotify' | 'apple' | 'youtube';
   providerId: string;
   isrc: string | null;
   title: string;
@@ -80,8 +82,9 @@ export async function spotifyPlaylists(): Promise<SpotifyPlaylist[]> {
 export type PlaylistImport = { name: string | null; tracks: SpotifyTrack[] };
 export type PlaylistImportError = 'bad_link' | 'not_found' | 'restricted' | 'unconfigured' | 'failed';
 
-/** Read a PUBLIC Spotify playlist by pasted link via XOS's app credentials — no
-    user login, so it isn't gated by Spotify's extended-quota approval. */
+/** Read a PUBLIC playlist by pasted link — Spotify OR Apple Music, auto-detected
+    server-side. Uses XOS's app credentials (no user login), so it isn't gated by
+    Spotify's extended-quota approval or an Apple Music subscription. */
 export async function importPublicPlaylist(url: string): Promise<PlaylistImport | { error: PlaylistImportError }> {
   const base = apiBase();
   if (!base) return { error: 'unconfigured' };
