@@ -11,6 +11,7 @@ import { searchTracks, resolvePreview, type Track } from '@/lib/musicSearch';
 import { getRecommendations, type RecommendedSong } from '@/lib/recommendations';
 import { importPublicPlaylist, type SpotifyTrack } from '@/lib/spotify';
 import { MixtapeLoader } from '@/components/MixtapeLoader';
+import { ProviderLogo, ProviderLogoRow, type SongProvider } from '@/components/ProviderLogo';
 
 type PickItem = {
   key: string;
@@ -19,13 +20,14 @@ type PickItem = {
   artworkUrl: string | null;
   previewUrl: string | null;
   reason?: string | null;
+  provider?: SongProvider | null;
   payload: Parameters<typeof addSong>[2];
 };
 
 function fromTrack(t: Track): PickItem {
   return {
     key: `${t.provider}:${t.providerId}`,
-    title: t.title, artist: t.artist, artworkUrl: t.artworkUrl ?? null, previewUrl: t.previewUrl ?? null,
+    title: t.title, artist: t.artist, artworkUrl: t.artworkUrl ?? null, previewUrl: t.previewUrl ?? null, provider: t.provider,
     payload: { title: t.title, artist: t.artist, album: t.album ?? null, artwork_url: t.artworkUrl ?? null, preview_url: t.previewUrl ?? null, external_url: t.externalUrl ?? null, provider: t.provider, provider_id: t.providerId },
   };
 }
@@ -33,7 +35,7 @@ function fromPlaylistTrack(t: SpotifyTrack): PickItem {
   const provider = t.provider ?? 'spotify';
   return {
     key: `${provider}:${t.providerId}`,
-    title: t.title, artist: t.artist, artworkUrl: t.artworkUrl, previewUrl: t.previewUrl,
+    title: t.title, artist: t.artist, artworkUrl: t.artworkUrl, previewUrl: t.previewUrl, provider,
     payload: { title: t.title, artist: t.artist, album: t.album, artwork_url: t.artworkUrl, preview_url: t.previewUrl, external_url: t.externalUrl, provider, provider_id: t.providerId },
   };
 }
@@ -201,7 +203,7 @@ export function SongPicker({
             <View style={{ paddingHorizontal: Space.lg, paddingTop: Space.md, gap: Space.md }}>
               <View style={[styles.segment, { backgroundColor: c.cardAlt }]}>
                 <SegBtn label="Search" active={tab === 'search'} onPress={() => setTab('search')} c={c} />
-                <SegBtn label="From a playlist" active={tab === 'playlist'} onPress={() => setTab('playlist')} c={c} />
+                <SegBtn label="From a playlist" active={tab === 'playlist'} onPress={() => setTab('playlist')} c={c} logos />
               </View>
               {tab === 'search' && (
                 <View style={[styles.searchBox, { backgroundColor: c.cardAlt, borderColor: c.border }]}>
@@ -238,6 +240,7 @@ export function SongPicker({
             ) : (
               // ── From a playlist: paste a PUBLIC Spotify or Apple Music link (no login needed) ──
               <View style={{ gap: Space.md }}>
+                <ProviderLogoRow size={26} gap={12} />
                 <Text style={{ color: c.textSecondary, fontSize: 13, lineHeight: 19 }}>
                   Paste a public Spotify or Apple Music playlist link and we&apos;ll pull in the songs. Open the playlist → Share → Copy link (make sure it&apos;s set to Public).
                 </Text>
@@ -281,10 +284,11 @@ export function SongPicker({
   );
 }
 
-function SegBtn({ label, active, onPress, c }: { label: string; active: boolean; onPress: () => void; c: ReturnType<typeof useC> }) {
+function SegBtn({ label, active, onPress, c, logos }: { label: string; active: boolean; onPress: () => void; c: ReturnType<typeof useC>; logos?: boolean }) {
   return (
-    <Pressable onPress={onPress} style={[styles.segBtn, active && { backgroundColor: c.card }]}>
+    <Pressable onPress={onPress} style={[styles.segBtn, { flexDirection: 'row', alignItems: 'center', gap: 6 }, active && { backgroundColor: c.card }]}>
       <Text style={{ color: active ? c.text : c.textSecondary, fontWeight: '700', fontSize: 13 }}>{label}</Text>
+      {logos ? <><ProviderLogo provider="spotify" size={13} /><ProviderLogo provider="apple" size={13} /></> : null}
     </Pressable>
   );
 }
@@ -298,7 +302,10 @@ function SongRowView({ item, c, playing, state, onPlay, onAdd }: { item: PickIte
       </Pressable>
       <View style={{ flex: 1 }}>
         <Text style={{ color: c.text, fontWeight: '600', fontSize: 14 }} numberOfLines={1}>{item.title}</Text>
-        <Text style={{ color: c.textSecondary, fontSize: 13 }} numberOfLines={1}>{item.artist}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          {item.provider && item.provider !== 'manual' ? <ProviderLogo provider={item.provider} size={13} /> : null}
+          <Text style={{ color: c.textSecondary, fontSize: 13, flexShrink: 1 }} numberOfLines={1}>{item.artist}</Text>
+        </View>
         {item.reason ? <Text style={{ color: c.textTertiary, fontSize: 11, marginTop: 2 }} numberOfLines={1}>{item.reason}</Text> : null}
       </View>
       <Pressable disabled={state != null} onPress={onAdd} hitSlop={8}>
