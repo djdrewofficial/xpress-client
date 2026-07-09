@@ -14,6 +14,7 @@ import {
 } from '@expo-google-fonts/montserrat';
 
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { BrandSplash } from '@/components/BrandSplash';
 import { patchTextFonts } from '@/lib/fontPatch';
 
 // Route every <Text> through Montserrat. Guarded so a failure here can never
@@ -46,15 +47,11 @@ function ErrorScreen({ error, onRetry }: { error: unknown; onRetry?: () => void 
   );
 }
 
-// Visible loading state (never a blank/null render) so a stuck stage is
-// diagnosable: a labeled purple screen means we reached JS but a stage hung;
-// a blank white screen means module evaluation itself threw before React.
+// Animated brand splash (the [X] strokes meeting). Keeps the `label` for
+// stuck-stage diagnosis: a labeled purple screen means we reached JS but a
+// stage hung; a blank white screen means module evaluation threw before React.
 function Splash({ label }: { label: string }) {
-  return (
-    <View style={{ flex: 1, backgroundColor: '#4b328e', alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: '#ffffff', fontSize: 15, opacity: 0.9 }}>{label}</Text>
-    </View>
-  );
+  return <BrandSplash label={label} />;
 }
 
 // expo-router's per-route boundary (catches errors inside screens).
@@ -88,6 +85,8 @@ function RootNavigator() {
       </Stack.Protected>
       {/* Always reachable — invite/reset deep links land here (xpressclient://auth/set-password). */}
       <Stack.Screen name="auth/set-password" />
+      {/* In-app password reset (email → code → new password), from the login screen. */}
+      <Stack.Screen name="auth/forgot-password" />
     </Stack>
   );
 }
@@ -108,7 +107,14 @@ export default function RootLayout() {
     const t = setTimeout(() => setFontTimedOut(true), 2500);
     return () => clearTimeout(t);
   }, []);
-  if (!fontsLoaded && !fontError && !fontTimedOut) return <Splash label="Loading…" />;
+  // Hold the splash long enough for the [X] reveal to play in full, even when
+  // fonts + auth resolve almost instantly on a warm start.
+  const [minSplash, setMinSplash] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setMinSplash(false), 2000);
+    return () => clearTimeout(t);
+  }, []);
+  if ((!fontsLoaded && !fontError && !fontTimedOut) || minSplash) return <Splash label="Loading…" />;
 
   return (
     <RootBoundary>

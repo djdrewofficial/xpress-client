@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   fields: { width: '100%', gap: Space.md, marginTop: Space.lg },
   fieldLab: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
   inputWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: Radius.md, paddingHorizontal: Space.md, height: 50 },
-  input: { flex: 1, fontSize: 16, height: '100%' },
+  input: { letterSpacing: 0, flex: 1, fontSize: 16, height: '100%' },
   primary: { width: '100%', borderRadius: Radius.pill, paddingVertical: 15, alignItems: 'center', marginTop: Space.lg },
   primaryTxt: { color: '#fff', fontWeight: '800', fontSize: 16 },
   skip: { marginTop: Space.md, padding: 8 },

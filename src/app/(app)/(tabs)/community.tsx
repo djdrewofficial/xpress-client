@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
   pollOpt: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: Radius.md, paddingVertical: 10, paddingHorizontal: 12, overflow: 'hidden' },
   pollFill: { position: 'absolute', left: 0, top: 0, bottom: 0 },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Space.lg, paddingVertical: Space.md, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(128,128,128,0.2)' },
-  input: { borderWidth: 1, borderRadius: Radius.md, paddingHorizontal: Space.md, paddingVertical: 11, fontSize: 15 },
+  input: { letterSpacing: 0, borderWidth: 1, borderRadius: Radius.md, paddingHorizontal: Space.md, paddingVertical: 11, fontSize: 15 },
   tool: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 9, paddingHorizontal: 14 },
   commentBar: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, padding: Space.md, borderTopWidth: StyleSheet.hairlineWidth },
   sendBtn: { backgroundColor: Brand.purple, borderRadius: Radius.pill, paddingHorizontal: 18, paddingVertical: 11 },

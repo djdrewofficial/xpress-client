@@ -111,6 +111,6 @@ const styles = StyleSheet.create({
   brand: { color: '#fff', fontSize: 26, fontFamily: Fonts.display, textAlign: 'center' },
   tagline: { color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center', marginBottom: Space.lg },
   card: { backgroundColor: '#fff', borderRadius: Radius.xl, padding: Space.xl, gap: Space.md },
-  input: { borderRadius: Radius.md, paddingHorizontal: Space.lg, paddingVertical: 14, fontSize: 16 },
+  input: { letterSpacing: 0, borderRadius: Radius.md, paddingHorizontal: Space.lg, paddingVertical: 14, fontSize: 16 },
   error: { color: '#dc2626', textAlign: 'center', fontSize: 14 },
 });

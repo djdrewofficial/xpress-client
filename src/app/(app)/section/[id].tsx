@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
   qNum: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   actionBtn: { flex: 1, borderRadius: Radius.pill, paddingVertical: 13, alignItems: 'center', justifyContent: 'center' },
   actionTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  input: { borderWidth: 1, borderRadius: Radius.md, paddingHorizontal: Space.md, paddingVertical: 12, fontSize: 16 },
+  input: { letterSpacing: 0, borderWidth: 1, borderRadius: Radius.md, paddingHorizontal: Space.md, paddingVertical: 12, fontSize: 16 },
   chip: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 18 },
   imgOpt: { width: 96, borderWidth: 2, borderRadius: Radius.md, overflow: 'hidden' },
   showAll: { borderWidth: 2, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center', backgroundColor: Brand.purple + '12', marginTop: 2 },
