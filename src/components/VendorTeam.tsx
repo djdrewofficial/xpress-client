@@ -175,6 +175,6 @@ const styles = StyleSheet.create({
   chip: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 7, paddingHorizontal: 16 },
   catChip: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 7, paddingHorizontal: 12 },
   fieldLab: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
-  input: { borderWidth: 1, borderRadius: Radius.md, paddingHorizontal: Space.md, paddingVertical: 11, fontSize: 15 },
+  input: { letterSpacing: 0, borderWidth: 1, borderRadius: Radius.md, paddingHorizontal: Space.md, paddingVertical: 11, fontSize: 15 },
   smallBtn: { borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 18 },
 });

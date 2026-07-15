@@ -120,6 +120,6 @@ const styles = StyleSheet.create({
   noteBox: { borderRadius: Radius.sm, padding: Space.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 6, paddingHorizontal: 10 },
-  input: { borderWidth: 1, borderRadius: Radius.md, padding: Space.md, fontSize: 14, minHeight: 64, textAlignVertical: 'top' },
+  input: { letterSpacing: 0, borderWidth: 1, borderRadius: Radius.md, padding: Space.md, fontSize: 14, minHeight: 64, textAlignVertical: 'top' },
   smallBtn: { borderRadius: Radius.pill, paddingVertical: 8, paddingHorizontal: 14 },
 });

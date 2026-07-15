@@ -16,6 +16,7 @@ import { useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
 import { BrandHeader } from '@/components/Logo';
 import { TimePickerSheet } from '@/components/TimePickerSheet';
+import { AddSectionSheet } from '@/components/AddSectionSheet';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { getMyEvents, loadOverview, reorderSections, deleteSection, restoreSection, setSectionTime, onTimeline, type SectionRow, type RemovedSection } from '@/lib/planning';
@@ -32,24 +33,34 @@ export default function TimelineScreen() {
   const [loading, setLoading] = useState(true);
   const [timeEditing, setTimeEditing] = useState<SectionRow | null>(null);
   const [pt, setPt] = useState<PlannerTimelineFile>(null);
+  const [ptLoading, setPtLoading] = useState(false);
   const [ptBusy, setPtBusy] = useState(false);
+  const [addingGroup, setAddingGroup] = useState<{ id: string; title: string } | null>(null);
+
+  const canManage = profile?.accountType === 'staff' || profile?.accountType === 'client';
 
   const load = useCallback(async () => {
     if (!profile) return;
     const events = await getMyEvents({ clientId: profile.clientId, eventGuestId: profile.eventGuestId });
     const ev = events[0] ?? null;
     setEventId(ev?.id ?? null);
-    if (ev) {
-      const [ov, plannerFile] = await Promise.all([loadOverview(ev.id), getPlannerTimeline(ev.id)]);
-      // Only sections staff have kept on the timeline (info sections are hidden by staff).
-      const g: TLGroup[] = ov.groups
-        .map((grp) => ({ id: grp.id, title: grp.title, icon: grp.icon, on: grp.sections.filter(onTimeline) }))
-        .filter((grp) => grp.on.length > 0);
-      setGroups(g);
-      setArchived(ov.removed);
-      setPt(plannerFile);
-    }
+    if (!ev) { setLoading(false); return; }
+
+    // Render as soon as the overview (fast, direct-to-Supabase) is in.
+    const ov = await loadOverview(ev.id);
+    // Only sections staff have kept on the timeline (info sections are hidden by staff).
+    const g: TLGroup[] = ov.groups
+      .map((grp) => ({ id: grp.id, title: grp.title, icon: grp.icon, on: grp.sections.filter(onTimeline) }))
+      .filter((grp) => grp.on.length > 0);
+    setGroups(g);
+    setArchived(ov.removed);
     setLoading(false);
+
+    // The planner file only fills the "Official Planner Timeline" card and comes
+    // from a slower XOS endpoint (serverless cold starts). Fetch it in the
+    // background so it never gates the whole page.
+    setPtLoading(true);
+    getPlannerTimeline(ev.id).then(setPt).catch(() => {}).finally(() => setPtLoading(false));
   }, [profile]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -129,7 +140,9 @@ export default function TimelineScreen() {
             {/* Official timeline from the planner — optional */}
             <View style={[styles.planner, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
               <Text style={[styles.offLab, { color: c.textTertiary }]}>OFFICIAL PLANNER TIMELINE</Text>
-              {pt ? (
+              {ptLoading && !pt ? (
+                <ActivityIndicator color={Brand.purple} style={{ marginVertical: Space.md, alignSelf: 'flex-start' }} />
+              ) : pt ? (
                 <>
                   <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', marginTop: 4 }} numberOfLines={1}>✓ {pt.name}</Text>
                   <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 2, marginBottom: Space.md }}>Shared with your Xpress team. You can replace it anytime.</Text>
@@ -156,6 +169,11 @@ export default function TimelineScreen() {
                   <Text style={[styles.catTitle, { color: Brand.purpleLight }]}>{g.title.toUpperCase()}</Text>
                   <View style={{ flex: 1 }} />
                   <Text style={{ color: c.textTertiary, fontSize: 12, fontWeight: '600' }}>{g.on.length}</Text>
+                  {canManage ? (
+                    <Pressable onPress={() => setAddingGroup({ id: g.id, title: g.title })} hitSlop={8} style={[styles.addChip, { borderColor: Brand.purple }]}>
+                      <Text style={{ color: Brand.purpleLight, fontSize: 12, fontWeight: '800' }}>＋ Add</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
                 <NestedReorderableList
                   data={g.on}
@@ -193,6 +211,14 @@ export default function TimelineScreen() {
         title={timeEditing ? `${timeEditing.title} time` : 'Set time'}
         onClose={() => setTimeEditing(null)}
         onSave={(time) => { if (timeEditing) saveTime(timeEditing, time); }}
+      />
+      <AddSectionSheet
+        visible={!!addingGroup}
+        eventId={eventId ?? ''}
+        groupId={addingGroup?.id ?? ''}
+        groupTitle={addingGroup?.title}
+        onClose={() => setAddingGroup(null)}
+        onAdded={load}
       />
     </View>
   );
@@ -257,6 +283,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 30, fontFamily: Fonts.display },
   catHead: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, marginBottom: Space.sm },
   catTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 1.2 },
+  addChip: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 3, paddingHorizontal: 10, marginLeft: 8 },
   offLab: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: Space.md, borderRadius: Radius.lg, borderWidth: 1, padding: Space.md },
   archiveAction: { flex: 1, backgroundColor: '#e0584f', borderRadius: Radius.lg, justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: Space.lg },
