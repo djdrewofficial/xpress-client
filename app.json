@@ -25,6 +25,10 @@
     },
     "android": {
       "package": "com.xpressentertainment.client",
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/icon.png",
+        "backgroundColor": "#4b328e"
+      },
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.RECORD_AUDIO",
