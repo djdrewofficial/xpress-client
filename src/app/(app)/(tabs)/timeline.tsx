@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import {
   ScrollViewContainer,
@@ -14,12 +13,13 @@ import { useFocusEffect } from 'expo-router';
 
 import { useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
-import { BrandHeader } from '@/components/Logo';
+import { AppHeader } from '@/components/AppHeader';
 import { TimePickerSheet } from '@/components/TimePickerSheet';
 import { AddSectionSheet } from '@/components/AddSectionSheet';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
-import { getMyEvents, loadOverview, reorderSections, deleteSection, restoreSection, setSectionTime, onTimeline, type SectionRow, type RemovedSection } from '@/lib/planning';
+import { useEvent } from '@/lib/events';
+import { loadOverview, reorderSections, deleteSection, restoreSection, setSectionTime, onTimeline, type SectionRow, type RemovedSection } from '@/lib/planning';
 import { getPlannerTimeline, pickAndUploadPlannerTimeline, type PlannerTimelineFile } from '@/lib/eventFiles';
 
 type TLGroup = { id: string; title: string; icon: string | null; on: SectionRow[] };
@@ -27,7 +27,7 @@ type TLGroup = { id: string; title: string; icon: string | null; on: SectionRow[
 export default function TimelineScreen() {
   const c = useC();
   const { profile } = useAuth();
-  const [eventId, setEventId] = useState<string | null>(null);
+  const { eventId, loading: eventLoading } = useEvent();
   const [groups, setGroups] = useState<TLGroup[]>([]);
   const [archived, setArchived] = useState<RemovedSection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,14 +40,10 @@ export default function TimelineScreen() {
   const canManage = profile?.accountType === 'staff' || profile?.accountType === 'client';
 
   const load = useCallback(async () => {
-    if (!profile) return;
-    const events = await getMyEvents({ clientId: profile.clientId, eventGuestId: profile.eventGuestId });
-    const ev = events[0] ?? null;
-    setEventId(ev?.id ?? null);
-    if (!ev) { setLoading(false); return; }
+    if (!eventId) { setGroups([]); setArchived([]); setLoading(false); return; }
 
     // Render as soon as the overview (fast, direct-to-Supabase) is in.
-    const ov = await loadOverview(ev.id);
+    const ov = await loadOverview(eventId);
     // Only sections staff have kept on the timeline (info sections are hidden by staff).
     const g: TLGroup[] = ov.groups
       .map((grp) => ({ id: grp.id, title: grp.title, icon: grp.icon, on: grp.sections.filter(onTimeline) }))
@@ -60,8 +56,8 @@ export default function TimelineScreen() {
     // from a slower XOS endpoint (serverless cold starts). Fetch it in the
     // background so it never gates the whole page.
     setPtLoading(true);
-    getPlannerTimeline(ev.id).then(setPt).catch(() => {}).finally(() => setPtLoading(false));
-  }, [profile]);
+    getPlannerTimeline(eventId).then(setPt).catch(() => {}).finally(() => setPtLoading(false));
+  }, [eventId]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const saveTime = useCallback((section: SectionRow, time: string | null) => {
@@ -112,15 +108,15 @@ export default function TimelineScreen() {
     load(); // re-fetch so it lands back in its correct category + order slot
   }, [eventId, load]);
 
-  if (loading) return <View style={[styles.center, { backgroundColor: c.bg }]}><ActivityIndicator color={Brand.purple} /></View>;
+  if (loading || eventLoading) return <View style={[styles.center, { backgroundColor: c.bg }]}><ActivityIndicator color={Brand.purple} /></View>;
 
   const hasAny = groups.length > 0 || archived.length > 0;
 
   return (
     <View style={{ flex: 1 }}>
       <Backdrop />
-      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <BrandHeader />
+      <AppHeader />
+      <View style={{ flex: 1 }}>
         {!hasAny ? (
           <View style={{ padding: Space.lg }}>
             <Text style={[styles.title, { color: c.text }]}>Timeline</Text>
@@ -204,7 +200,7 @@ export default function TimelineScreen() {
             )}
           </ScrollViewContainer>
         )}
-      </SafeAreaView>
+      </View>
       <TimePickerSheet
         visible={timeEditing !== null}
         initial={timeEditing?.time_label ?? null}

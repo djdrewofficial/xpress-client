@@ -1,33 +1,29 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { Bar, useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
-import { BrandHeader } from '@/components/Logo';
+import { AppHeader } from '@/components/AppHeader';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
-import { useAuth } from '@/lib/auth';
-import { getMyEvents, loadOverview, onMusic, type SectionRow } from '@/lib/planning';
+import { useEvent } from '@/lib/events';
+import { loadOverview, onMusic, type SectionRow } from '@/lib/planning';
 
 export default function MusicScreen() {
   const c = useC();
   const router = useRouter();
-  const { profile } = useAuth();
-  const [eventId, setEventId] = useState<string | null>(null);
+  const { eventId, loading: eventLoading } = useEvent();
   const [sections, setSections] = useState<SectionRow[] | null>(null);
 
   const load = useCallback(async () => {
-    if (!profile) return;
-    const events = await getMyEvents({ clientId: profile.clientId, eventGuestId: profile.eventGuestId });
-    const ev = events[0] ?? null;
-    setEventId(ev?.id ?? null);
-    if (ev) {
-      const ov = await loadOverview(ev.id);
-      setSections(ov.sections.filter(onMusic));
-    } else setSections([]);
-  }, [profile]);
+    if (!eventId) {
+      setSections([]);
+      return;
+    }
+    const ov = await loadOverview(eventId);
+    setSections(ov.sections.filter(onMusic));
+  }, [eventId]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const totalSongs = (sections ?? []).reduce((n, s) => n + s.songCount, 0);
@@ -35,8 +31,8 @@ export default function MusicScreen() {
   return (
     <View style={{ flex: 1 }}>
       <Backdrop />
-      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <BrandHeader />
+      <AppHeader />
+      <View style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl * 3, gap: Space.md }}>
           <Text style={[styles.title, { color: c.text }]}>Music</Text>
 
@@ -54,7 +50,7 @@ export default function MusicScreen() {
           </View>
 
           <Text style={[styles.lab, { color: c.textTertiary }]}>VIBE CURATION</Text>
-          {!sections ? (
+          {eventLoading || !sections ? (
             <ActivityIndicator color={Brand.purple} style={{ marginTop: Space.xl }} />
           ) : sections.length === 0 ? (
             <Text style={{ color: c.textSecondary }}>No song moments yet — your DJ will add these to your plan.</Text>
@@ -79,7 +75,7 @@ export default function MusicScreen() {
             })
           )}
         </ScrollView>
-      </SafeAreaView>
+      </View>
     </View>
   );
 }

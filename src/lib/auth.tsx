@@ -3,12 +3,27 @@ import { createContext, useContext, useEffect, useState, type PropsWithChildren 
 
 import { supabase } from '@/lib/supabase';
 
+export type PermissionTier = 'master_admin' | 'salesperson' | 'employee';
+
 type Profile = {
   accountType: 'client' | 'event_guest' | 'staff' | null;
   clientId: string | null;
   eventGuestId: string | null;
+  employeeId: string | null;
+  /** Staff role. Drives what a staff member may see on mobile (all events vs. assigned; financials). */
+  permissionTier: PermissionTier | null;
   firstName: string;
 };
+
+/** Admins and salespeople see every event; plain employees see only assigned ones. */
+export function staffSeesAllEvents(p: Profile | null): boolean {
+  return p?.accountType === 'staff' && (p.permissionTier === 'master_admin' || p.permissionTier === 'salesperson');
+}
+
+/** Plain employees NEVER see financials/contracts on mobile; admins/sales may. */
+export function staffSeesFinancials(p: Profile | null): boolean {
+  return p?.accountType === 'staff' && p.permissionTier !== 'employee';
+}
 
 type AuthState = {
   session: Session | null;
@@ -66,24 +81,31 @@ export function AuthProvider({ children }: PropsWithChildren) {
     (async () => {
       const { data: account } = await supabase
         .from('accounts')
-        .select('account_type, client_id, event_guest_id')
+        .select('account_type, client_id, event_guest_id, employee_id')
         .eq('auth_user_id', uid)
         .maybeSingle();
       if (cancelled) return;
 
       let firstName = '';
+      let permissionTier: PermissionTier | null = null;
       if (account?.client_id) {
         const { data: c } = await supabase.from('clients').select('first_name').eq('id', account.client_id).maybeSingle();
         firstName = c?.first_name ?? '';
       } else if (account?.event_guest_id) {
         const { data: g } = await supabase.from('event_guests').select('first_name').eq('id', account.event_guest_id).maybeSingle();
         firstName = g?.first_name ?? '';
+      } else if (account?.employee_id) {
+        const { data: e } = await supabase.from('employees').select('first_name, permission_tier').eq('id', account.employee_id).maybeSingle();
+        firstName = e?.first_name ?? '';
+        permissionTier = (e?.permission_tier as PermissionTier | undefined) ?? null;
       }
       if (cancelled) return;
       setProfile({
         accountType: (account?.account_type as Profile['accountType']) ?? null,
         clientId: account?.client_id ?? null,
         eventGuestId: account?.event_guest_id ?? null,
+        employeeId: account?.employee_id ?? null,
+        permissionTier,
         firstName,
       });
     })();

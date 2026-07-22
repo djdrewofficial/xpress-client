@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Linking, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAvoidingView, KeyboardProvider } from 'react-native-keyboard-controller';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
-import { BrandHeader } from '@/components/Logo';
+import { AppHeader } from '@/components/AppHeader';
 import { useAuth } from '@/lib/auth';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import {
@@ -71,8 +70,8 @@ export default function CommunityScreen() {
   return (
     <View style={{ flex: 1 }}>
       <Backdrop />
-      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <BrandHeader />
+      <AppHeader title="Community" switchable={false} />
+      <View style={{ flex: 1 }}>
         <View style={styles.head}>
           <Text style={[styles.title, { color: c.text }]}>Community</Text>
           <Pressable onPress={openComposer} style={styles.newBtn}>
@@ -108,7 +107,7 @@ export default function CommunityScreen() {
             )}
           />
         )}
-      </SafeAreaView>
+      </View>
 
       {composer && <Composer c={c} onClose={() => setComposer(false)} onPosted={() => { setComposer(false); load(); }} />}
       {commentsFor && <CommentsModal postId={commentsFor} c={c} meId={meId} onClose={() => { setCommentsFor(null); load(); }} />}

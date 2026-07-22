@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
-import { BrandHeader } from '@/components/Logo';
+import { AppHeader } from '@/components/AppHeader';
 import { InvitePersonSheet } from '@/components/InvitePersonSheet';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
-import { useAuth } from '@/lib/auth';
-import { getMyEvents } from '@/lib/planning';
+import { useAuth, staffSeesFinancials } from '@/lib/auth';
+import { useEvent } from '@/lib/events';
 import { loadAccount, money, OFFICE_PHONE, OFFICE_EMAIL_FALLBACK, type AccountData } from '@/lib/account';
 
 const fmtDate = (d: string | null) => (d ? new Date(d + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : null);
@@ -17,27 +16,25 @@ const fmtDate = (d: string | null) => (d ? new Date(d + 'T00:00:00').toLocaleDat
 export default function AccountScreen() {
   const c = useC();
   const { profile, session, signOut } = useAuth();
+  const { event, loading: eventLoading } = useEvent();
+  const eventId = event?.id ?? null;
   const [data, setData] = useState<AccountData | null>(null);
-  const [eventName, setEventName] = useState('');
-  const [eventId, setEventId] = useState<string | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     if (!profile) return;
-    const events = await getMyEvents({ clientId: profile.clientId, eventGuestId: profile.eventGuestId });
-    const ev = events[0] ?? null;
-    setEventName(ev?.name ?? '');
-    setEventId(ev?.id ?? null);
     const isGuest = profile.accountType === 'event_guest';
-    setData(ev ? await loadAccount(ev.id, isGuest) : null);
+    // Plain staff employees never see financials/contracts on mobile.
+    const canSeeFinancials = profile.accountType === 'staff' ? staffSeesFinancials(profile) : true;
+    setData(event ? await loadAccount(event.id, isGuest, canSeeFinancials) : null);
     setLoading(false);
-  }, [profile]);
+  }, [profile, event]);
   useEffect(() => { load(); }, [load]);
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
-  if (loading) return <View style={[styles.center, { backgroundColor: c.bg }]}><ActivityIndicator color={Brand.purple} /></View>;
+  if (loading || eventLoading) return <View style={[styles.center, { backgroundColor: c.bg }]}><ActivityIndicator color={Brand.purple} /></View>;
 
   const officeEmail = data?.officeEmail ?? OFFICE_EMAIL_FALLBACK;
   const officePhone = OFFICE_PHONE.replace(/[^\d+]/g, '');
@@ -45,8 +42,8 @@ export default function AccountScreen() {
   return (
     <View style={{ flex: 1 }}>
       <Backdrop />
-      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <BrandHeader />
+      <AppHeader />
+      <View style={{ flex: 1 }}>
         <ScrollView
           contentContainerStyle={{ padding: Space.lg, gap: Space.lg, paddingBottom: Space.xxl * 3 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Brand.purple} />}>
@@ -177,7 +174,7 @@ export default function AccountScreen() {
             </>
           )}
         </ScrollView>
-      </SafeAreaView>
+      </View>
       {eventId && (
         <InvitePersonSheet
           visible={showInvite}

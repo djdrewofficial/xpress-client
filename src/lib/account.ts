@@ -34,18 +34,19 @@ export type AccountData = {
 
 const num = (v: unknown): number => (typeof v === 'number' ? v : v ? Number(v) : 0) || 0;
 
-export async function loadAccount(eventId: string, isGuest: boolean): Promise<AccountData> {
+export async function loadAccount(eventId: string, isGuest: boolean, canSeeFinancials = true): Promise<AccountData> {
   const { data: ev } = await supabase.from('events').select('*').eq('id', eventId).maybeSingle();
 
-  // Visibility: guests NEVER see financials; otherwise per-event override
-  // (true/false) wins, else the event type's default.
+  // Visibility: guests NEVER see financials, and neither do plain staff employees
+  // (canSeeFinancials=false). Otherwise a per-event override (true/false) wins,
+  // else the event type's default.
   let typeHide = false;
   if (ev?.event_type_id) {
     const { data: et } = await supabase.from('event_types').select('hide_financials').eq('id', ev.event_type_id).maybeSingle();
     typeHide = !!et?.hide_financials;
   }
   const hidden = ev?.hide_financials ?? typeHide;
-  const financialsVisible = !isGuest && !hidden;
+  const financialsVisible = !isGuest && !hidden && canSeeFinancials;
 
   const [{ data: eAddons }, { data: company }] = await Promise.all([
     supabase.from('event_addons').select('addon_id, quantity, price_override, price_locked').eq('event_id', eventId),

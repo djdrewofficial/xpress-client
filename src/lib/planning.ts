@@ -104,6 +104,60 @@ export async function getMyEvents(account: { clientId: string | null; eventGuest
   return [];
 }
 
+export type StaffEvent = {
+  id: string;
+  name: string;
+  event_date: string | null;
+  start_time: string | null;
+  cover_photo_url: string | null;
+  clientName: string | null;
+  status: { name: string; color: string | null; textColor: string | null } | null;
+};
+
+type StaffEventRow = {
+  id: string;
+  name: string;
+  event_date: string | null;
+  start_time: string | null;
+  cover_photo_url: string | null;
+  client: { first_name: string | null; last_name: string | null } | null;
+  status: { name: string; color: string | null; text_color: string | null } | null;
+};
+
+/** Upcoming events a staff member can open. Admins/sales see all; plain employees
+    see only events they're assigned to (event_staff). No financials/contracts here. */
+export async function getStaffEvents(opts: { employeeId: string | null; seesAll: boolean }): Promise<StaffEvent[]> {
+  const cols =
+    'id, name, event_date, start_time, cover_photo_url, client:clients(first_name, last_name), status:event_statuses(name, color, text_color)';
+  const today = new Date().toISOString().slice(0, 10);
+  let query = supabase
+    .from('events')
+    .select(opts.seesAll ? cols : `${cols}, event_staff!inner(employee_id)`)
+    .is('archived_at', null)
+    .gte('event_date', today)
+    .order('event_date', { ascending: true });
+  if (!opts.seesAll) query = query.eq('event_staff.employee_id', opts.employeeId ?? '');
+
+  const { data } = await query;
+  const rows = (data ?? []) as unknown as StaffEventRow[];
+  const seen = new Set<string>();
+  const out: StaffEvent[] = [];
+  for (const r of rows) {
+    if (seen.has(r.id)) continue; // event_staff!inner can duplicate an event across roles
+    seen.add(r.id);
+    out.push({
+      id: r.id,
+      name: r.name,
+      event_date: r.event_date,
+      start_time: r.start_time,
+      cover_photo_url: r.cover_photo_url,
+      clientName: r.client ? [r.client.first_name, r.client.last_name].filter(Boolean).join(' ') || null : null,
+      status: r.status ? { name: r.status.name, color: r.status.color, textColor: r.status.text_color } : null,
+    });
+  }
+  return out;
+}
+
 /** Section list + progress for the home screen. */
 export async function loadOverview(eventId: string): Promise<Overview> {
   const [{ data: sections }, { data: questions }, { data: answers }, { data: songs }] = await Promise.all([

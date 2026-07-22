@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -6,6 +6,8 @@ import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 
 import { Brand } from '@/lib/theme';
 import { useC } from '@/components/ui';
+import { useAuth } from '@/lib/auth';
+import { useEvent } from '@/lib/events';
 
 // Plan is the home base — land there by default even though it sits in the center.
 export const unstable_settings = { initialRouteName: '(plan)' };
@@ -13,6 +15,14 @@ export const unstable_settings = { initialRouteName: '(plan)' };
 export default function TabsLayout() {
   const c = useC();
   const scheme = useColorScheme();
+  const { profile } = useAuth();
+  const { eventId, loading } = useEvent();
+
+  // Staff's home is the events list — the planner tabs only make sense once
+  // they've opened a specific event. (Couples always have their own event here.)
+  if (profile?.accountType === 'staff' && !loading && !eventId) {
+    return <Redirect href="/events" />;
+  }
   const icon = (glyph: string) =>
     function TabIcon({ focused }: { focused: boolean }) {
       return <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>{glyph}</Text>;

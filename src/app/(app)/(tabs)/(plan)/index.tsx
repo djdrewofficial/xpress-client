@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
@@ -10,11 +9,13 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Ring, useC, useScheme } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
 import { OnboardingTour } from '@/components/OnboardingTour';
+import { AppHeader } from '@/components/AppHeader';
 import { Logo } from '@/components/Logo';
 import { pickCoverImage, uploadCoverPhoto } from '@/lib/coverPhoto';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
-import { getMyEvents, loadOverview, type EventLite, type Group, type Overview } from '@/lib/planning';
+import { useEvent } from '@/lib/events';
+import { loadOverview, type Group, type Overview } from '@/lib/planning';
 
 const TOUR_KEY = 'onboarding_seen_v1';
 
@@ -22,7 +23,7 @@ export default function PlanScreen() {
   const c = useC();
   const router = useRouter();
   const { profile, signOut } = useAuth();
-  const [event, setEvent] = useState<EventLite | null>(null);
+  const { event, reload: reloadEvents, loading: eventLoading } = useEvent();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -42,13 +43,9 @@ export default function PlanScreen() {
   }, []);
 
   const load = useCallback(async () => {
-    if (!profile) return;
-    const events = await getMyEvents({ clientId: profile.clientId, eventGuestId: profile.eventGuestId });
-    const ev = events[0] ?? null;
-    setEvent(ev);
-    setOverview(ev ? await loadOverview(ev.id) : null);
+    setOverview(event ? await loadOverview(event.id) : null);
     setLoading(false);
-  }, [profile]);
+  }, [event]);
 
   // refetch progress every time the screen regains focus (e.g. after answering)
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -61,15 +58,15 @@ export default function PlanScreen() {
       if (!asset) return;
       setUploading(true);
       await uploadCoverPhoto(event.id, asset);
-      await load();
+      await reloadEvents(); // refresh the cover in the shared event (re-runs load via focus)
     } catch (e) {
       Alert.alert('Could not update photo', e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setUploading(false);
     }
-  }, [event, load]);
+  }, [event, reloadEvents]);
 
-  if (loading) return <View style={[styles.center, { backgroundColor: c.bg }]}><ActivityIndicator color={Brand.purple} /></View>;
+  if (loading || eventLoading) return <View style={[styles.center, { backgroundColor: c.bg }]}><ActivityIndicator color={Brand.purple} /></View>;
 
   const pct = overview && overview.totalQuestions > 0 ? Math.round((overview.answeredQuestions / overview.totalQuestions) * 100) : 0;
   const countdown = event?.event_date ? daysUntil(event.event_date) : null;
@@ -81,7 +78,8 @@ export default function PlanScreen() {
   return (
     <View style={{ flex: 1 }}>
       <Backdrop />
-      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+      <AppHeader />
+      <View style={{ flex: 1 }}>
         <ScrollView
           contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl * 3, gap: Space.lg }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Brand.purple} />}>
@@ -111,7 +109,7 @@ export default function PlanScreen() {
                 />
 
                 <View style={styles.heroTopRow}>
-                  <Logo variant="full" height={30} tone="#ffffff" />
+                  <View style={{ flex: 1 }} />
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.md }}>
                     <Pressable onPress={() => setShowTour(true)} hitSlop={8} style={styles.camBtn}>
                       <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>?</Text>
@@ -183,7 +181,7 @@ export default function PlanScreen() {
             </>
           )}
         </ScrollView>
-      </SafeAreaView>
+      </View>
       <OnboardingTour visible={showTour} onClose={closeTour} />
     </View>
   );

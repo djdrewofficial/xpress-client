@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 
 import { Bar, useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
+import { AppHeader } from '@/components/AppHeader';
 import { Encourager } from '@/components/Encourager';
 import { SongPicker } from '@/components/SongPicker';
 import { SectionSongs } from '@/components/SectionSongs';
@@ -19,7 +19,6 @@ import { supabase } from '@/lib/supabase';
 
 export default function SectionScreen() {
   const c = useC();
-  const router = useRouter();
   const { session } = useAuth();
   const { id, eventId } = useLocalSearchParams<{ id: string; eventId: string }>();
   const [meta, setMeta] = useState<{ title: string; icon: string | null; intro: string | null; songs_enabled: boolean; ai_picks_enabled: boolean; module: string | null } | null>(null);
@@ -80,18 +79,8 @@ export default function SectionScreen() {
   return (
     <View style={{ flex: 1 }}>
       <Backdrop />
-      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
-            <Text style={{ color: Brand.purpleLight, fontSize: 16, fontWeight: '600' }}>‹</Text>
-            <Text style={{ color: Brand.purpleLight, fontSize: 16 }}>Back</Text>
-          </Pressable>
-          {visible.length > 0 && (
-            <View style={[styles.countPill, { backgroundColor: c.cardAlt }]}>
-              <Text style={{ color: c.textSecondary, fontSize: 13, fontWeight: '700' }}>{answeredCount}/{visible.length}</Text>
-            </View>
-          )}
-        </View>
+      <AppHeader back />
+      <View style={{ flex: 1 }}>
         <KeyboardAwareScrollView
           contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl * 2, gap: Space.lg }}
           keyboardShouldPersistTaps="handled"
@@ -190,7 +179,7 @@ export default function SectionScreen() {
             onReload={load}
           />
         )}
-      </SafeAreaView>
+      </View>
     </View>
   );
 }
