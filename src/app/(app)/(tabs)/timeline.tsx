@@ -60,12 +60,15 @@ export default function TimelineScreen() {
   }, [eventId]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const saveTime = useCallback((section: SectionRow, time: string | null) => {
+  const saveTime = useCallback(async (section: SectionRow, time: string | null) => {
     if (!eventId) return;
     setTimeEditing(null);
-    setGroups((prev) => prev.map((g) => ({ ...g, on: g.on.map((s) => (s.id === section.id ? { ...s, time_label: time } : s)) })));
-    setSectionTime(eventId, section.id, time);
-  }, [eventId]);
+    setGroups((gs) => gs.map((g) => ({ ...g, on: g.on.map((s) => (s.id === section.id ? { ...s, time_label: time } : s)) })));
+    if (!(await setSectionTime(eventId, section.id, time))) {
+      Alert.alert("Couldn't update the time", 'Please try again.');
+      load(); // resync to the server's truth
+    }
+  }, [eventId, load]);
 
   const uploadPlanner = useCallback(async () => {
     if (!eventId) return;
@@ -80,26 +83,33 @@ export default function TimelineScreen() {
     }
   }, [eventId, load]);
 
-  const reorderInGroup = useCallback((groupId: string, { from, to }: ReorderableListReorderEvent) => {
+  const reorderInGroup = useCallback(async (groupId: string, { from, to }: ReorderableListReorderEvent) => {
     if (!eventId) return;
-    setGroups((prev) => prev.map((g) => {
-      if (g.id !== groupId) return g;
-      const on = reorderItems(g.on, from, to);
-      reorderSections(eventId, on.map((s) => s.id));
-      return { ...g, on };
-    }));
-  }, [eventId]);
+    // Compute the new order OUTSIDE the state updater (updaters must be pure —
+    // React may run them twice), then fire the write once.
+    const g = groups.find((x) => x.id === groupId);
+    if (!g) return;
+    const on = reorderItems(g.on, from, to);
+    setGroups((gs) => gs.map((x) => (x.id === groupId ? { ...x, on } : x)));
+    if (!(await reorderSections(eventId, on.map((s) => s.id)))) {
+      Alert.alert("Couldn't save the new order", 'Please try again.');
+      load();
+    }
+  }, [eventId, groups, load]);
 
   // Swipe to archive: removes the section from the couple's timeline AND their
   // plan (host soft-delete). Recoverable from the Archived list below.
-  const archive = useCallback((groupId: string, s: SectionRow) => {
+  const archive = useCallback(async (groupId: string, s: SectionRow) => {
     if (!eventId) return;
     setGroups((prev) => prev
       .map((g) => (g.id === groupId ? { ...g, on: g.on.filter((x) => x.id !== s.id) } : g))
       .filter((g) => g.on.length > 0));
     setArchived((prev) => [{ id: s.id, title: s.title, icon: s.icon }, ...prev]);
-    deleteSection(eventId, s.id);
-  }, [eventId]);
+    if (!(await deleteSection(eventId, s.id))) {
+      Alert.alert("Couldn't archive that section", 'Please try again.');
+      load(); // resync — restores it to the timeline and drops the bogus archived row
+    }
+  }, [eventId, load]);
 
   const restore = useCallback(async (r: RemovedSection) => {
     if (!eventId) return;
@@ -176,7 +186,7 @@ export default function TimelineScreen() {
                   keyExtractor={(s) => s.id}
                   onReorder={(e) => reorderInGroup(g.id, e)}
                   contentContainerStyle={{ gap: Space.sm }}
-                  renderItem={({ item }) => <Row section={item} onArchive={() => archive(g.id, item)} onEditTime={() => setTimeEditing(item)} c={c} />}
+                  renderItem={({ item }) => <Row section={item} canManage={canManage} onArchive={() => archive(g.id, item)} onEditTime={() => setTimeEditing(item)} c={c} />}
                 />
               </View>
             ))}
@@ -220,7 +230,7 @@ export default function TimelineScreen() {
   );
 }
 
-function Row({ section, onArchive, onEditTime, c }: { section: SectionRow; onArchive: () => void; onEditTime: () => void; c: ReturnType<typeof useC> }) {
+function Row({ section, canManage, onArchive, onEditTime, c }: { section: SectionRow; canManage: boolean; onArchive: () => void; onEditTime: () => void; c: ReturnType<typeof useC> }) {
   const drag = useReorderableDrag();
   const active = useIsActive();
   const swipe = useRef<SwipeableMethods>(null);
@@ -241,6 +251,35 @@ function Row({ section, onArchive, onEditTime, c }: { section: SectionRow; onArc
     );
   };
 
+  // Time can be edited only by managers (staff/host); guests see it read-only.
+  const timeEl = section.time_enabled && !section.locked && canManage ? (
+    <Pressable onPress={onEditTime} hitSlop={6} style={[styles.timePill, section.time_label ? { backgroundColor: Brand.purple } : { borderWidth: 1, borderColor: Brand.purple }]}>
+      <Text style={{ color: section.time_label ? '#fff' : Brand.purpleLight, fontWeight: '700', fontSize: 13 }}>
+        {section.time_label ?? '＋ Time'}
+      </Text>
+    </Pressable>
+  ) : section.time_label ? (
+    <Text style={{ color: c.textSecondary, fontWeight: '700', fontSize: 13 }}>{section.time_label}</Text>
+  ) : null;
+
+  const inner = (
+    <Pressable
+      onLongPress={canManage ? drag : undefined}
+      delayLongPress={180}
+      style={[styles.row, Shadow.card, { backgroundColor: c.card, borderColor: active ? Brand.purple : c.border, opacity: active ? 0.95 : 1 }]}>
+      {canManage ? <Text style={{ color: c.textTertiary, fontSize: 20, fontWeight: '700' }}>≡</Text> : null}
+      <Text style={{ fontSize: 22 }}>{section.icon ?? '🎵'}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }} numberOfLines={1}>{section.title}</Text>
+        {meta ? <Text style={{ color: c.textTertiary, fontSize: 12, marginTop: 1 }}>{meta}</Text> : null}
+      </View>
+      {timeEl}
+    </Pressable>
+  );
+
+  // Guests can't reorder or archive — no drag handle, no swipe-to-archive.
+  if (!canManage) return inner;
+
   return (
     <ReanimatedSwipeable
       ref={swipe}
@@ -250,26 +289,7 @@ function Row({ section, onArchive, onEditTime, c }: { section: SectionRow; onArc
         <View style={styles.archiveAction}><Text style={styles.archiveTxt}>🗑  Archive</Text></View>
       )}
       onSwipeableOpen={confirmArchive}>
-      <Pressable
-        onLongPress={drag}
-        delayLongPress={180}
-        style={[styles.row, Shadow.card, { backgroundColor: c.card, borderColor: active ? Brand.purple : c.border, opacity: active ? 0.95 : 1 }]}>
-        <Text style={{ color: c.textTertiary, fontSize: 20, fontWeight: '700' }}>≡</Text>
-        <Text style={{ fontSize: 22 }}>{section.icon ?? '🎵'}</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }} numberOfLines={1}>{section.title}</Text>
-          {meta ? <Text style={{ color: c.textTertiary, fontSize: 12, marginTop: 1 }}>{meta}</Text> : null}
-        </View>
-        {section.time_enabled && !section.locked ? (
-          <Pressable onPress={onEditTime} hitSlop={6} style={[styles.timePill, section.time_label ? { backgroundColor: Brand.purple } : { borderWidth: 1, borderColor: Brand.purple }]}>
-            <Text style={{ color: section.time_label ? '#fff' : Brand.purpleLight, fontWeight: '700', fontSize: 13 }}>
-              {section.time_label ?? '＋ Time'}
-            </Text>
-          </Pressable>
-        ) : section.time_label ? (
-          <Text style={{ color: c.textSecondary, fontWeight: '700', fontSize: 13 }}>{section.time_label}</Text>
-        ) : null}
-      </Pressable>
+      {inner}
     </ReanimatedSwipeable>
   );
 }

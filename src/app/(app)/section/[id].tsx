@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
@@ -59,8 +59,12 @@ export default function SectionScreen() {
   function setLocal(qid: string, v: string) {
     setAnswers((prev) => ({ ...prev, [qid]: v }));
   }
-  function persist(qid: string, v: string) {
-    if (session?.user.id) saveAnswer(eventId, qid, v, session.user.id);
+  async function persist(qid: string, v: string) {
+    if (!session?.user.id) return;
+    const ok = await saveAnswer(eventId, qid, v, session.user.id);
+    // Don't roll back the text (would wipe what they typed) — just warn; the
+    // field re-saves on the next blur/selection so they can retry.
+    if (!ok) Alert.alert("Couldn't save", "That answer didn't save — check your connection and try again.");
   }
   function pick(qid: string, v: string) {
     setLocal(qid, v);
