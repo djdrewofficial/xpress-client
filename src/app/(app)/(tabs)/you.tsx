@@ -209,8 +209,8 @@ export default function AccountScreen() {
               <View style={{ marginTop: Space.md, gap: Space.sm, alignItems: 'center' }}>
                 <Text style={{ color: c.textTertiary, fontSize: 11, lineHeight: 16, textAlign: 'center', paddingHorizontal: Space.md }}>
                   ✨ &ldquo;For You&rdquo; song suggestions are AI-generated. To create them, the event details and music
-                  preferences you enter are sent to our AI provider to build recommendations. This information is never
-                  used for advertising.
+                  preferences you enter are sent to OpenAI to build recommendations. This information is never used for
+                  advertising.
                 </Text>
                 <Pressable onPress={() => Linking.openURL(PRIVACY_URL)} hitSlop={8}>
                   <Text style={{ color: Brand.purpleLight, fontSize: 13, fontWeight: '700' }}>Privacy Policy</Text>
