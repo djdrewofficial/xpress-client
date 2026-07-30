@@ -35,31 +35,6 @@ export const Colors = {
 
 export type Scheme = keyof typeof Colors;
 
-/** Soft accent fills per module/category (bg + fg), brand-leaning. */
-export const Accents = {
-  music: { bg: '#E1F5EE', fg: '#0F6E56' },
-  timeline: { bg: '#EEEDFE', fg: '#3C3489' },
-  vendors: { bg: '#FAEEDA', fg: '#854F0B' },
-  questions: { bg: '#FBEAF0', fg: '#993556' },
-  moments: { bg: '#FAECE7', fg: '#993C1D' },
-} as const;
-
-/**
- * Per-category palettes for the expanded plan cards.
- * `tint` = soft light-mode fill, `tintDark` = deep low-saturation dark-mode fill,
- * `accent` = saturated ink for text/ring, `grad` = two-stop gradient for icon badge + ring.
- */
-export const CategoryThemes = [
-  { tint: '#EFEEFE', tintDark: '#1B1733', accent: '#5B4BD0', grad: ['#6D5BD0', '#8B6FD6'] }, // violet
-  { tint: '#E3F6EF', tintDark: '#0F2620', accent: '#0F8F70', grad: ['#13B488', '#0F8F70'] }, // teal
-  { tint: '#FBF0DA', tintDark: '#2A2110', accent: '#B5790F', grad: ['#E0A02A', '#C98417'] }, // amber
-  { tint: '#FBEAF1', tintDark: '#2A1019', accent: '#B23A66', grad: ['#E25A86', '#B23A66'] }, // rose
-  { tint: '#FBEBE3', tintDark: '#2A1610', accent: '#C0481F', grad: ['#E5683B', '#C0481F'] }, // coral
-  { tint: '#E7F0FB', tintDark: '#101F2C', accent: '#1E6FB8', grad: ['#3C92E0', '#1E6FB8'] }, // blue
-] as const;
-
-export type CategoryTheme = (typeof CategoryThemes)[number];
-
 /** Soft elevation that reads on both schemes. */
 export const Shadow = {
   card: {

@@ -1,14 +1,10 @@
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
+import { apiBase } from '@/lib/api';
 
 /* Couple-uploaded event header photo. Picks from the library, then POSTs it to
    the XOS mobile API (which verifies access and stores it via the admin client —
    clients can't write events.cover_photo_url directly under RLS). */
-
-function apiBase(): string | null {
-  const url = process.env.EXPO_PUBLIC_API_URL;
-  return url ? url.replace(/\/$/, '') : null;
-}
 
 async function authToken(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();

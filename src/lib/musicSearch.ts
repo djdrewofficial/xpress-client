@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { apiBase, authHeader } from '@/lib/api';
 
 /* Talks to the XOS music endpoints (search across Spotify/Apple/YouTube +
    iTunes preview resolution) using the signed-in user's Supabase token. */
@@ -14,16 +14,6 @@ export type Track = {
   externalUrl?: string | null;
 };
 
-function apiBase(): string | null {
-  const url = process.env.EXPO_PUBLIC_API_URL;
-  return url ? url.replace(/\/$/, '') : null;
-}
-
-async function authHeader(): Promise<Record<string, string>> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 /** Search the catalog. Returns [] if the API isn't configured or the user is signed out. */
 export async function searchTracks(query: string): Promise<Track[]> {

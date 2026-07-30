@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { apiBase, authHeader } from '@/lib/api';
 
 /* Photo Booth planner module data layer (mobile).
    - Backdrops are XOS-managed; read directly via Supabase (RLS exposes active ones).
@@ -21,24 +22,6 @@ export type BoothDesign = {
 };
 
 export type BoothSelection = { backdrop_id: string | null; design: BoothDesign | null } | null;
-
-export type FilterOption = { value: string; label: string };
-export type BoothFilters = {
-  layout: FilterOption[];
-  image_type: FilterOption[];
-  no_of_images: FilterOption[];
-};
-
-function apiBase(): string | null {
-  const url = process.env.EXPO_PUBLIC_API_URL;
-  return url ? url.replace(/\/$/, '') : null;
-}
-
-async function authHeader(): Promise<Record<string, string>> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 // ── Backdrops + selection (direct Supabase) ──────────────────────────────────
 
@@ -136,38 +119,3 @@ export async function fetchBoothTemplates(
   }
 }
 
-/** TemplatesBooth /filters returns value→label maps (layout_size/image_type/
-    no_of_images/type/text_display) and an array for tags. Normalize either to
-    {value,label}[]. */
-function toOpts(v: unknown): FilterOption[] {
-  if (Array.isArray(v)) {
-    return v
-      .map((x) =>
-        x && typeof x === 'object'
-          ? {
-              value: String((x as Record<string, unknown>).value ?? (x as Record<string, unknown>).slug ?? ''),
-              label: String((x as Record<string, unknown>).label ?? (x as Record<string, unknown>).name ?? (x as Record<string, unknown>).value ?? ''),
-            }
-          : { value: String(x), label: String(x) },
-      )
-      .filter((o) => o.value);
-  }
-  if (v && typeof v === 'object') {
-    return Object.entries(v as Record<string, unknown>).map(([value, label]) => ({ value, label: String(label) }));
-  }
-  return [];
-}
-
-export async function fetchBoothFilters(): Promise<BoothFilters> {
-  const empty: BoothFilters = { layout: [], image_type: [], no_of_images: [] };
-  const base = apiBase();
-  if (!base) return empty;
-  try {
-    const res = await fetch(`${base}/api/mobile/booth-filters`, { headers: await authHeader() });
-    if (!res.ok) return empty;
-    const o = (await res.json()) as Record<string, unknown>;
-    return { layout: toOpts(o.layout_size ?? o.layout), image_type: toOpts(o.image_type), no_of_images: toOpts(o.no_of_images) };
-  } catch {
-    return empty;
-  }
-}
