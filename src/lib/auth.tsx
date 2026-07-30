@@ -20,9 +20,11 @@ export function staffSeesAllEvents(p: Profile | null): boolean {
   return p?.accountType === 'staff' && (p.permissionTier === 'master_admin' || p.permissionTier === 'salesperson');
 }
 
-/** Plain employees NEVER see financials/contracts on mobile; admins/sales may. */
+/** Plain employees NEVER see financials/contracts on mobile; admins/sales may.
+    Default-deny: a null/unknown tier is treated as NOT authorized (mirrors
+    staffSeesAllEvents) so a missing employees row can't leak financials. */
 export function staffSeesFinancials(p: Profile | null): boolean {
-  return p?.accountType === 'staff' && p.permissionTier !== 'employee';
+  return p?.accountType === 'staff' && (p.permissionTier === 'master_admin' || p.permissionTier === 'salesperson');
 }
 
 type AuthState = {

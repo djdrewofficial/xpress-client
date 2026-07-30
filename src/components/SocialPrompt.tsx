@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -35,8 +35,14 @@ export function SocialPrompt() {
 
   const resolve = async (skip: boolean) => {
     setBusy(true);
-    await saveSocialHandles(skip ? null : cleanHandle(ig) || null, skip ? null : cleanHandle(tt) || null);
-    setBusy(false);
+    try {
+      await saveSocialHandles(skip ? null : cleanHandle(ig) || null, skip ? null : cleanHandle(tt) || null);
+    } catch {
+      Alert.alert("Couldn't save", 'Please check your connection and try again.');
+      return; // leave the prompt open so they can retry / dismiss
+    } finally {
+      setBusy(false); // never leave the spinner (and the un-dismissable modal) stuck
+    }
     if (hasFollow) setStep(2);
     else setState(null);
   };

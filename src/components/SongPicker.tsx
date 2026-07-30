@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 
 import { useC } from '@/components/ui';
 import { Brand, Radius, Space } from '@/lib/theme';
@@ -62,6 +62,7 @@ export function SongPicker({
 }) {
   const c = useC();
   const player = useAudioPlayer(null);
+  const status = useAudioPlayerStatus(player);
   const [playingKey, setPlayingKey] = useState<string | null>(null);
   const [added, setAdded] = useState<Record<string, 'busy' | 'done'>>({});
 
@@ -81,6 +82,8 @@ export function SongPicker({
   const [importingAll, setImportingAll] = useState(false);
 
   useEffect(() => { setAudioModeAsync({ playsInSilentMode: true }).catch(() => {}); }, []);
+  // Reset the ▶/⏸ state when a preview plays to its end on its own.
+  useEffect(() => { if (status.didJustFinish) setPlayingKey(null); }, [status.didJustFinish]);
 
   // Load For You picks when the sheet opens — excluding songs already on the playlist.
   useEffect(() => {

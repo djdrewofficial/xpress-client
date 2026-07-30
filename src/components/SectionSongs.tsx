@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
-import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 
 import { useC } from '@/components/ui';
 import { Brand, Radius, Space } from '@/lib/theme';
@@ -24,14 +24,28 @@ export function SectionSongs({
 }) {
   const c = useC();
   const player = useAudioPlayer(null);
+  const status = useAudioPlayerStatus(player);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
 
   useEffect(() => { setAudioModeAsync({ playsInSilentMode: true }).catch(() => {}); }, []);
+  // Stop and release audio when this component unmounts.
   useEffect(() => () => { try { player.pause(); } catch {} }, [player]);
+  // Reset the ▶/⏸ state when a preview plays to its end on its own.
+  useEffect(() => { if (status.didJustFinish) setPlayingId(null); }, [status.didJustFinish]);
+  // If the playing song scrolls out of the visible slice (e.g. "Show fewer"),
+  // stop it — its row (and pause control) is gone.
+  useEffect(() => {
+    if (playingId && !songs.some((s) => s.id === playingId)) {
+      try { player.pause(); } catch {}
+      setPlayingId(null);
+    }
+  }, [songs, playingId, player]);
 
   const patch = useCallback((id: string, p: Partial<SongRow>) => setSongs((prev) => prev.map((s) => (s.id === id ? { ...s, ...p } : s))), [setSongs]);
+
+  const failed = () => Alert.alert("Couldn't save", 'Please check your connection and try again.');
 
   const togglePlay = useCallback(async (s: SongRow) => {
     if (playingId === s.id) { try { player.pause(); } catch {} setPlayingId(null); return; }
@@ -41,11 +55,28 @@ export function SectionSongs({
     try { player.replace({ uri: url }); player.seekTo(0); player.play(); setPlayingId(s.id); } catch { setPlayingId(null); }
   }, [playingId, player]);
 
-  const onMust = (s: SongRow) => { const v = !s.must_play; patch(s.id, { must_play: v, do_not_play: v ? false : s.do_not_play }); setMustPlay(s.id, v); };
-  const onDnp = (s: SongRow) => { const v = !s.do_not_play; patch(s.id, { do_not_play: v, must_play: v ? false : s.must_play }); setDoNotPlay(s.id, v); };
-  const onRemove = (s: SongRow) => { setSongs((prev) => prev.filter((x) => x.id !== s.id)); removeSong(s.id); };
+  // Optimistic writes that roll back (and warn) if the server rejects them.
+  const onMust = async (s: SongRow) => {
+    const v = !s.must_play;
+    patch(s.id, { must_play: v, do_not_play: v ? false : s.do_not_play });
+    if (!(await setMustPlay(s.id, v))) { patch(s.id, { must_play: s.must_play, do_not_play: s.do_not_play }); failed(); }
+  };
+  const onDnp = async (s: SongRow) => {
+    const v = !s.do_not_play;
+    patch(s.id, { do_not_play: v, must_play: v ? false : s.must_play });
+    if (!(await setDoNotPlay(s.id, v))) { patch(s.id, { must_play: s.must_play, do_not_play: s.do_not_play }); failed(); }
+  };
+  const onRemove = async (s: SongRow) => {
+    setSongs((prev) => prev.filter((x) => x.id !== s.id));
+    if (!(await removeSong(s.id))) { setSongs((prev) => (prev.some((x) => x.id === s.id) ? prev : [...prev, s])); failed(); }
+  };
   const openNote = (s: SongRow) => { setEditing(s.id); setDraft(s.note ?? ''); };
-  const saveNote = (s: SongRow) => { patch(s.id, { note: draft.trim() || null }); updateSongNote(s.id, draft); setEditing(null); };
+  const saveNote = async (s: SongRow) => {
+    const prevNote = s.note ?? null;
+    patch(s.id, { note: draft.trim() || null });
+    setEditing(null);
+    if (!(await updateSongNote(s.id, draft))) { patch(s.id, { note: prevNote }); failed(); }
+  };
 
   return (
     <View style={{ gap: Space.sm }}>

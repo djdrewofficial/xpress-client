@@ -349,30 +349,38 @@ export async function loadSection(eventId: string, sectionId: string): Promise<{
   };
 }
 
-/** Toggle "must play" (clears "do not play" when on). */
-export async function setMustPlay(songId: string, value: boolean): Promise<void> {
-  await supabase.from('planning_songs').update(value ? { must_play: true, do_not_play: false } : { must_play: false }).eq('id', songId);
+/** Toggle "must play" (clears "do not play" when on). Returns false if the write
+    failed (e.g. RLS/network) so callers can roll back the optimistic UI. */
+export async function setMustPlay(songId: string, value: boolean): Promise<boolean> {
+  const { error } = await supabase.from('planning_songs').update(value ? { must_play: true, do_not_play: false } : { must_play: false }).eq('id', songId);
+  return !error;
 }
 
-/** Toggle "do not play" (clears "must play" when on). */
-export async function setDoNotPlay(songId: string, value: boolean): Promise<void> {
-  await supabase.from('planning_songs').update(value ? { do_not_play: true, must_play: false } : { do_not_play: false }).eq('id', songId);
+/** Toggle "do not play" (clears "must play" when on). Returns false on failure. */
+export async function setDoNotPlay(songId: string, value: boolean): Promise<boolean> {
+  const { error } = await supabase.from('planning_songs').update(value ? { do_not_play: true, must_play: false } : { do_not_play: false }).eq('id', songId);
+  return !error;
 }
 
-/** Save (or clear) a dedication / instruction note on a song. */
-export async function updateSongNote(songId: string, note: string): Promise<void> {
-  await supabase.from('planning_songs').update({ note: note.trim() || null }).eq('id', songId);
+/** Save (or clear) a dedication / instruction note on a song. Returns false on failure. */
+export async function updateSongNote(songId: string, note: string): Promise<boolean> {
+  const { error } = await supabase.from('planning_songs').update({ note: note.trim() || null }).eq('id', songId);
+  return !error;
 }
 
-/** Remove a song from a section. */
-export async function removeSong(songId: string): Promise<void> {
-  await supabase.from('planning_songs').delete().eq('id', songId);
+/** Remove a song from a section. Returns false on failure. */
+export async function removeSong(songId: string): Promise<boolean> {
+  const { error } = await supabase.from('planning_songs').delete().eq('id', songId);
+  return !error;
 }
 
-export async function saveAnswer(eventId: string, questionId: string, answer: string, userId: string): Promise<void> {
-  await supabase
+/** Save a question answer. Returns false if the write failed so the caller can
+    warn the user instead of silently losing it. */
+export async function saveAnswer(eventId: string, questionId: string, answer: string, userId: string): Promise<boolean> {
+  const { error } = await supabase
     .from('planning_question_answers')
     .upsert({ question_id: questionId, event_id: eventId, answer, answered_by: userId, updated_at: new Date().toISOString() }, { onConflict: 'question_id' });
+  return !error;
 }
 
 /** Add a song to a section (used by For You + search + import). Returns the new row. */
