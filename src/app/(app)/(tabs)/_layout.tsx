@@ -49,7 +49,6 @@ export default function TabsLayout() {
       }}>
       {/* Order matters — Plan sits dead center as the raised hero button. */}
       <Tabs.Screen name="music" options={{ title: 'Music', tabBarIcon: icon('🎵') }} />
-      <Tabs.Screen name="community" options={{ title: 'Community', tabBarIcon: icon('💬') }} />
       <Tabs.Screen
         name="(plan)"
         options={{
