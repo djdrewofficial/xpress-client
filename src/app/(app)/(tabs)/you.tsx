@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useC } from '@/components/ui';
@@ -9,7 +9,9 @@ import { InvitePersonSheet } from '@/components/InvitePersonSheet';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth, staffSeesFinancials } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
-import { loadAccount, money, OFFICE_PHONE, OFFICE_EMAIL_FALLBACK, type AccountData } from '@/lib/account';
+import { loadAccount, deleteAccount, money, OFFICE_PHONE, OFFICE_EMAIL_FALLBACK, type AccountData } from '@/lib/account';
+
+const SUPPORT_EMAIL = 'Events@xpressdjs.com';
 
 const fmtDate = (d: string | null) => (d ? new Date(d + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : null);
 
@@ -22,6 +24,36 @@ export default function AccountScreen() {
   const [showInvite, setShowInvite] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const confirmDelete = useCallback(() => {
+    Alert.alert(
+      'Delete your account?',
+      `This permanently deletes your login and removes your access to this event. ` +
+        `To use the app again you'll need a new invite — email ${SUPPORT_EMAIL}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete account',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            const ok = await deleteAccount();
+            setDeleting(false);
+            if (!ok) {
+              Alert.alert('Something went wrong', `We couldn't delete your account. Please try again, or email ${SUPPORT_EMAIL}.`);
+              return;
+            }
+            Alert.alert(
+              'Account deleted',
+              `Your account has been deleted. To return, email ${SUPPORT_EMAIL} for a new invite.`,
+              [{ text: 'OK', onPress: () => signOut() }],
+            );
+          },
+        },
+      ],
+    );
+  }, [signOut]);
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -171,6 +203,15 @@ export default function AccountScreen() {
                 <Text style={{ color: c.textSecondary, fontWeight: '600' }}>Sign out</Text>
               </Pressable>
               <Text style={{ color: c.textTertiary, fontSize: 12, textAlign: 'center' }}>{profile?.firstName ? `${profile.firstName} · ` : ''}{session?.user.email}</Text>
+
+              {/* App Store 5.1.1(v): self-serve account deletion, all the way at the bottom. */}
+              <Pressable onPress={confirmDelete} disabled={deleting} hitSlop={8} style={styles.deleteBtn}>
+                {deleting ? (
+                  <ActivityIndicator color="#c0392b" />
+                ) : (
+                  <Text style={{ color: '#c0392b', fontWeight: '600', fontSize: 13 }}>Delete account</Text>
+                )}
+              </Pressable>
             </>
           )}
         </ScrollView>
@@ -215,4 +256,5 @@ const styles = StyleSheet.create({
   bigBtn: { borderRadius: Radius.md, paddingVertical: 13, alignItems: 'center' },
   bigBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
   signOut: { borderWidth: 1, borderRadius: Radius.md, paddingVertical: 13, alignItems: 'center' },
+  deleteBtn: { alignItems: 'center', paddingVertical: Space.md, marginTop: Space.xs },
 });

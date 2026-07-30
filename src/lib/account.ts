@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { apiBase, authHeader } from '@/lib/api';
 
 /* Read-only event package + payment summary + team contacts for the Account tab.
    Mirrors XOS's price logic: override -> locked -> live default; "Investment"
@@ -132,4 +133,18 @@ async function packageDefaultPrice(packageId: string): Promise<number> {
 
 export function money(n: number): string {
   return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+}
+
+/** Permanently delete the signed-in user's login (App Store 5.1.1(v)). Removes
+    the auth user + account link server-side; the caller should sign out after.
+    Returns false on failure. */
+export async function deleteAccount(): Promise<boolean> {
+  const base = apiBase();
+  if (!base) return false;
+  try {
+    const res = await fetch(`${base}/api/mobile/delete-account`, { method: 'POST', headers: await authHeader() });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
