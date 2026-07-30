@@ -1,13 +1,9 @@
 import { supabase } from '@/lib/supabase';
+import { apiBase } from '@/lib/api';
 
 /* Invite a partner or planner to the couple's event. Posts to the XOS mobile
    endpoint, which creates/refreshes the event_guests row and emails a branded
    set-password invite (the link deep-links back into this app). */
-
-function apiBase(): string | null {
-  const url = process.env.EXPO_PUBLIC_API_URL;
-  return url ? url.replace(/\/$/, '') : null;
-}
 
 export async function inviteGuest(input: {
   eventId: string;

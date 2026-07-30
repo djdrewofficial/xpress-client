@@ -1,13 +1,9 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { supabase } from '@/lib/supabase';
+import { apiBase } from '@/lib/api';
 
 /* Couple-uploaded "official timeline from the planner". Picks a PDF/image and
    uploads it to the event's private files via the XOS mobile endpoint. */
-
-function apiBase(): string | null {
-  const url = process.env.EXPO_PUBLIC_API_URL;
-  return url ? url.replace(/\/$/, '') : null;
-}
 
 async function token(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();

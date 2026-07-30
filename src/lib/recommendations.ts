@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { apiBase } from '@/lib/api';
 
 /**
  * AI song recommendations grounded in the couple's own words.
@@ -93,8 +94,8 @@ export async function getRecommendations(opts: {
   /** Titles already on the playlist (or already shown) — won't be suggested again. */
   exclude?: string[];
 }): Promise<RecResult> {
-  const apiUrl = process.env.EXPO_PUBLIC_API_URL;
-  if (!apiUrl) return { status: 'unconfigured' };
+  const base = apiBase();
+  if (!base) return { status: 'unconfigured' };
 
   const ctx = await loadCoupleContext(opts.eventId, opts.eventName);
   if (!hasContext(ctx)) return { status: 'needs-profile' };
@@ -104,7 +105,7 @@ export async function getRecommendations(opts: {
   if (!token) return { status: 'error', message: 'Not signed in' };
 
   try {
-    const res = await fetch(`${apiUrl.replace(/\/$/, '')}/api/music/recommend`, {
+    const res = await fetch(`${base}/api/music/recommend`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({

@@ -13,15 +13,6 @@ export function useScheme(): Scheme {
   return (useColorScheme() ?? 'light') as Scheme;
 }
 
-export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
-  const c = useC();
-  return (
-    <View style={[{ backgroundColor: c.card, borderColor: c.border, borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.lg, padding: Space.lg }, style]}>
-      {children}
-    </View>
-  );
-}
-
 /** Slim progress bar. */
 export function Bar({ pct, height = 8, track }: { pct: number; height?: number; track?: string }) {
   const c = useC();
@@ -77,20 +68,6 @@ export function Ring({
       </Svg>
       <Text style={{ color, fontWeight: '800', fontSize: size * 0.27 }}>{label ?? `${Math.round(clamped)}%`}</Text>
     </View>
-  );
-}
-
-/** Little gradient "AI" pill used to flag smart features. */
-export function Sparkle({ label = 'For You', style }: { label?: string; style?: ViewStyle }) {
-  return (
-    <LinearGradient
-      colors={[Brand.purple, Brand.purpleLight]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 10, borderRadius: Radius.pill, alignSelf: 'flex-start' }, style]}>
-      <Text style={{ fontSize: 11 }}>✨</Text>
-      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 11, letterSpacing: 0.3 }}>{label}</Text>
-    </LinearGradient>
   );
 }
 

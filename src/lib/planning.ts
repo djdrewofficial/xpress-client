@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { apiBase } from '@/lib/api';
 
 export type EventLite = { id: string; name: string; event_date: string | null; cover_photo_url: string | null };
 
@@ -228,11 +229,6 @@ export async function loadOverview(eventId: string): Promise<Overview> {
 
 // ── Section management (staff + hosts) — writes go through an XOS admin route
 //    because hosts can't write planning_sections under RLS. ────────────────────
-
-function apiBase(): string | null {
-  const url = process.env.EXPO_PUBLIC_API_URL;
-  return url ? url.replace(/\/$/, '') : null;
-}
 
 async function sectionAction(body: Record<string, unknown>): Promise<boolean> {
   const base = apiBase();
