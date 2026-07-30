@@ -20,7 +20,7 @@ import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
 import { loadOverview, reorderSections, deleteSection, restoreSection, setSectionTime, onTimeline, type SectionRow, type RemovedSection } from '@/lib/planning';
-import { getPlannerTimeline, pickAndUploadPlannerTimeline, type PlannerTimelineFile } from '@/lib/eventFiles';
+import { getPlannerTimeline, pickAndUploadPlannerTimeline, type PlannerTimelineFile, type PlannerSource } from '@/lib/eventFiles';
 
 type TLGroup = { id: string; title: string; icon: string | null; on: SectionRow[] };
 
@@ -70,11 +70,11 @@ export default function TimelineScreen() {
     }
   }, [eventId, load]);
 
-  const uploadPlanner = useCallback(async () => {
+  const runUpload = useCallback(async (src: PlannerSource) => {
     if (!eventId) return;
     setPtBusy(true);
     try {
-      const res = await pickAndUploadPlannerTimeline(eventId);
+      const res = await pickAndUploadPlannerTimeline(eventId, src);
       if (res) { await load(); Alert.alert('Uploaded ✓', `We saved "${res.name}" and shared it with your Xpress team.`); }
     } catch (e) {
       Alert.alert('Upload failed', e instanceof Error ? e.message : 'Please try again.');
@@ -82,6 +82,15 @@ export default function TimelineScreen() {
       setPtBusy(false);
     }
   }, [eventId, load]);
+
+  // Let the couple choose where their timeline comes from — their photos or Files.
+  const uploadPlanner = useCallback(() => {
+    Alert.alert('Add your timeline', 'Where is it saved?', [
+      { text: 'Photo Library', onPress: () => runUpload('gallery') },
+      { text: 'Files (PDF or image)', onPress: () => runUpload('files') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [runUpload]);
 
   const reorderInGroup = useCallback(async (groupId: string, { from, to }: ReorderableListReorderEvent) => {
     if (!eventId) return;

@@ -1,4 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
 import { apiBase } from '@/lib/api';
 
@@ -27,24 +28,41 @@ export async function getPlannerTimeline(eventId: string): Promise<PlannerTimeli
   }
 }
 
-/** Pick a PDF/image and upload it. Returns the saved name, or null if cancelled,
-    or throws with a message on failure. */
-export async function pickAndUploadPlannerTimeline(eventId: string): Promise<{ name: string } | null> {
-  const picked = await DocumentPicker.getDocumentAsync({
-    type: ['application/pdf', 'image/*'],
-    copyToCacheDirectory: true,
-    multiple: false,
-  });
-  if (picked.canceled || !picked.assets?.length) return null;
-  const asset = picked.assets[0];
+/** Where the couple's timeline comes from. */
+export type PlannerSource = 'files' | 'gallery';
 
+/** Pick a timeline — a PDF/image from Files, or a photo from the gallery — and
+    upload it. Returns the saved name, null if cancelled, or throws with a message
+    on failure. */
+export async function pickAndUploadPlannerTimeline(eventId: string, source: PlannerSource = 'files'): Promise<{ name: string } | null> {
+  let file: { uri: string; name: string; type: string } | null = null;
+
+  if (source === 'gallery') {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) throw new Error('Photo access is needed to pick from your library. You can enable it in Settings.');
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9 });
+    if (res.canceled || !res.assets?.length) return null;
+    const a = res.assets[0];
+    const ext = (a.mimeType ?? 'image/jpeg').split('/')[1] || 'jpg';
+    file = { uri: a.uri, name: a.fileName || `planner-timeline.${ext}`, type: a.mimeType || 'image/jpeg' };
+  } else {
+    const picked = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/*'], copyToCacheDirectory: true, multiple: false });
+    if (picked.canceled || !picked.assets?.length) return null;
+    const a = picked.assets[0];
+    file = { uri: a.uri, name: a.name || 'planner-timeline.pdf', type: a.mimeType || 'application/pdf' };
+  }
+
+  return uploadPlannerFile(eventId, file);
+}
+
+async function uploadPlannerFile(eventId: string, file: { uri: string; name: string; type: string }): Promise<{ name: string }> {
   const base = apiBase();
   const t = await token();
   if (!base || !t) throw new Error('Not signed in.');
 
   const form = new FormData();
   form.append('eventId', eventId);
-  form.append('file', { uri: asset.uri, name: asset.name || 'planner-timeline.pdf', type: asset.mimeType || 'application/pdf' } as unknown as Blob);
+  form.append('file', { uri: file.uri, name: file.name, type: file.type } as unknown as Blob);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60000);
@@ -57,7 +75,7 @@ export async function pickAndUploadPlannerTimeline(eventId: string): Promise<{ n
     });
     const json = (await res.json().catch(() => ({}))) as { ok?: boolean; name?: string; error?: string };
     if (!res.ok || !json.ok) throw new Error(json.error || 'Upload failed.');
-    return { name: json.name || asset.name || 'Timeline' };
+    return { name: json.name || file.name || 'Timeline' };
   } catch (e) {
     if (controller.signal.aborted) throw new Error('Upload timed out — please check your connection.');
     throw e instanceof Error ? e : new Error('Upload failed.');
