@@ -12,6 +12,7 @@ import { useEvent } from '@/lib/events';
 import { loadAccount, deleteAccount, money, OFFICE_PHONE, OFFICE_EMAIL_FALLBACK, type AccountData } from '@/lib/account';
 
 const SUPPORT_EMAIL = 'Events@xpressdjs.com';
+const PRIVACY_URL = 'https://xos.xpressdjs.com/app-privacy';
 
 const fmtDate = (d: string | null) => (d ? new Date(d + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : null);
 
@@ -203,6 +204,18 @@ export default function AccountScreen() {
                 <Text style={{ color: c.textSecondary, fontWeight: '600' }}>Sign out</Text>
               </Pressable>
               <Text style={{ color: c.textTertiary, fontSize: 12, textAlign: 'center' }}>{profile?.firstName ? `${profile.firstName} · ` : ''}{session?.user.email}</Text>
+
+              {/* Legal footer: AI disclosure (Guideline 5.1.2) + privacy policy link (5.1.1). */}
+              <View style={{ marginTop: Space.md, gap: Space.sm, alignItems: 'center' }}>
+                <Text style={{ color: c.textTertiary, fontSize: 11, lineHeight: 16, textAlign: 'center', paddingHorizontal: Space.md }}>
+                  ✨ &ldquo;For You&rdquo; song suggestions are AI-generated. To create them, the event details and music
+                  preferences you enter are sent to our AI provider to build recommendations. This information is never
+                  used for advertising.
+                </Text>
+                <Pressable onPress={() => Linking.openURL(PRIVACY_URL)} hitSlop={8}>
+                  <Text style={{ color: Brand.purpleLight, fontSize: 13, fontWeight: '700' }}>Privacy Policy</Text>
+                </Pressable>
+              </View>
 
               {/* App Store 5.1.1(v): self-serve account deletion, all the way at the bottom. */}
               <Pressable onPress={confirmDelete} disabled={deleting} hitSlop={8} style={styles.deleteBtn}>
