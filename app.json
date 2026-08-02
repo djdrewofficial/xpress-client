@@ -30,10 +30,7 @@
         "backgroundColor": "#4b328e"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
-      ]
+      "permissions": []
     },
     "web": {
       "output": "static"
@@ -48,11 +45,18 @@
           "imageWidth": 120
         }
       ],
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false
+        }
+      ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Xpress to use your photos to set your event header photo."
+          "photosPermission": "Allow Xpress to use your photos to set your event header photo.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ],
       "expo-font",
