@@ -9,7 +9,7 @@ import { useC } from './useC';
  * P2/Track row.
  * - default: index, title, artist. Optional Must play tag (accent tint pill).
  * - with note: DJ note block under the track (`note` string).
- * - do not play: `ban` icon, muted crossed-out title. Only used inside Open Dancing.
+ * - do not play: `ban` icon, muted crossed-out title.
  */
 export function TrackRow({
   index,

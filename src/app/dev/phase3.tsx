@@ -120,11 +120,6 @@ const FLOOR: MomentSong[] = [
   { id: 'f6', title: 'Sample Sixth Song', artist: 'Sample Artist', mustPlay: false, doNotPlay: false, note: null },
 ];
 
-const AVOID: MomentSong[] = [
-  { id: 'd1', title: 'Sample Overplayed Song', artist: 'Sample Artist', mustPlay: false, doNotPlay: true, note: null },
-  { id: 'd2', title: 'Sample Line Dance', artist: 'Sample Band', mustPlay: false, doNotPlay: true, note: null },
-];
-
 function SampleMoment({ initial, dancing }: { initial: MomentTab; dancing?: boolean }) {
   const { t } = useT();
   const [tab, setTab] = useState<MomentTab>(initial);
@@ -151,15 +146,12 @@ function SampleMoment({ initial, dancing }: { initial: MomentTab; dancing?: bool
       onPersist={() => {}}
       onPick={(id, value) => setAnswers((a) => ({ ...a, [id]: value }))}
       songs={songs}
-      doNotPlaySongs={dancing ? AVOID : []}
       isDanceFloor={!!dancing}
-      isAvoidList={false}
-      songCount={dancing ? 18 : 2}
+      songCount={songs.length}
       songsEnabled
       aiPicks={false}
       onAddMusic={() => {}}
       onForYou={() => {}}
-      onAddDoNotPlay={() => {}}
       onToggleMust={() => {}}
       onRemove={() => {}}
       onSaveNote={() => {}}

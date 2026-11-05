@@ -18,7 +18,9 @@ export type MusicMoment = {
   isOpenDancing: boolean;
   /** Playable songs, in playlist order. */
   tracks: RecordTrack[];
-  /** Do-not-play songs. Only the Open Dancing moment carries these. */
+  /**
+   * Kept empty. Do-not-play songs belong on their own moment, not inside Open Dancing.
+   */
   doNotPlay: RecordTrack[];
 };
 
@@ -29,7 +31,7 @@ export type MusicStats = {
   doNotPlay: number;
 };
 
-/** Open-dancing playlist (the only place Do not play is shown). */
+/** Open-dancing playlist. Do-not-play songs stay on their own moment. */
 export function isOpenDancingTitle(title: string): boolean {
   return /open\s*dancing/i.test(title) || /^dancing(\s+(music|playlist))?$/i.test(title);
 }
@@ -48,7 +50,6 @@ export function sideFor(groupTitle: string, sectionTitle: string): 'A' | 'B' {
 }
 
 function includeSection(groupTitle: string, section: SectionRow, hasSongs: boolean): boolean {
-  if (isDoNotPlaySectionTitle(section.title)) return false;
   if (!section.songs_enabled && !hasSongs) return false;
   if (/ceremon|reception|cocktail|dinner|party|dance|celebration|toast/i.test(groupTitle)) return true;
   if (onTimeline(section) || onMusic(section) || isOpenDancingTitle(section.title)) return true;
@@ -69,8 +70,7 @@ function toTrack(song: EventSong, doNotPlay: boolean): RecordTrack {
 
 /**
  * Fold the plan into a two-sided record.
- * Do-not-play songs (flagged, or living on a Do not play section) are pulled off
- * their moment and listed only under Open Dancing.
+ * The Do not play section is its own moment. Its songs are not copied onto Open Dancing.
  */
 export function buildMusicRecord(groups: Group[], songs: EventSong[]): MusicMoment[] {
   const bySection = new Map<string, EventSong[]>();
@@ -80,46 +80,27 @@ export function buildMusicRecord(groups: Group[], songs: EventSong[]): MusicMome
     bySection.set(song.section_id, list);
   }
 
-  const dnpSectionIds = new Set<string>();
-  for (const group of groups) {
-    for (const section of group.sections) {
-      if (isDoNotPlaySectionTitle(section.title)) dnpSectionIds.add(section.id);
-    }
-  }
-
-  const seen = new Set<string>();
-  const dnpTracks: RecordTrack[] = [];
-  for (const song of songs) {
-    if (!song.do_not_play && !dnpSectionIds.has(song.section_id)) continue;
-    if (seen.has(song.id)) continue;
-    seen.add(song.id);
-    dnpTracks.push(toTrack(song, true));
-  }
-
   type Draft = { id: string; side: 'A' | 'B'; title: string; isOpenDancing: boolean; tracks: RecordTrack[] };
   const drafts: Draft[] = [];
-  let openId: string | null = null;
 
   for (const group of groups) {
     for (const section of group.sections) {
-      if (dnpSectionIds.has(section.id)) continue;
       const sectionSongs = bySection.get(section.id) ?? [];
       if (!includeSection(group.title, section, sectionSongs.length > 0)) continue;
-      const isOpen = isOpenDancingTitle(section.title);
-      if (isOpen && !openId) openId = section.id;
+      const isDnp = isDoNotPlaySectionTitle(section.title);
       drafts.push({
         id: section.id,
         side: sideFor(group.title, section.title),
         title: section.title,
-        isOpenDancing: isOpen,
-        tracks: sectionSongs.filter((s) => !s.do_not_play).map((s) => toTrack(s, false)),
+        isOpenDancing: isOpenDancingTitle(section.title),
+        tracks: (isDnp ? sectionSongs : sectionSongs.filter((s) => !s.do_not_play)).map((s) => toTrack(s, isDnp)),
       });
     }
   }
 
   const ordered = [...drafts.filter((d) => d.side === 'A'), ...drafts.filter((d) => d.side === 'B')];
   const counts = { A: 0, B: 0 };
-  const moments: MusicMoment[] = ordered.map((draft) => {
+  return ordered.map((draft) => {
     counts[draft.side] += 1;
     return {
       id: draft.id,
@@ -128,34 +109,19 @@ export function buildMusicRecord(groups: Group[], songs: EventSong[]): MusicMome
       title: draft.title,
       isOpenDancing: draft.isOpenDancing,
       tracks: draft.tracks,
-      doNotPlay: draft.id === openId ? dnpTracks : [],
+      doNotPlay: [],
     };
   });
-
-  if (!openId && dnpTracks.length > 0) {
-    counts.B += 1;
-    moments.push({
-      id: 'do-not-play',
-      side: 'B',
-      index: counts.B,
-      title: 'Open Dancing',
-      isOpenDancing: true,
-      tracks: [],
-      doNotPlay: dnpTracks,
-    });
-  }
-
-  return moments;
 }
 
 export function musicStats(moments: MusicMoment[]): MusicStats {
   const tracks = moments.flatMap((m) => m.tracks);
-  const doNotPlay = moments.reduce((n, m) => n + m.doNotPlay.length, 0);
+  const listed = moments.reduce((n, m) => n + m.doNotPlay.length, 0);
   return {
-    songs: tracks.length + doNotPlay,
+    songs: tracks.length + listed,
     moments: moments.length,
     mustPlay: tracks.filter((t) => t.mustPlay).length,
-    doNotPlay,
+    doNotPlay: tracks.filter((t) => t.doNotPlay).length + listed,
   };
 }
 
@@ -165,10 +131,6 @@ export function momentSongCount(moment: MusicMoment): number {
 
 /** One-line subtitle under a moment title, matching the record layout. */
 export function momentSubtitle(moment: MusicMoment, locale: Locale = 'en'): string {
-  const must = moment.tracks.filter((t) => t.mustPlay).length;
-  if (moment.isOpenDancing && (must > 0 || moment.doNotPlay.length > 0)) {
-    return translate(locale, 'record.mustDnp', { must, dnp: moment.doNotPlay.length });
-  }
   const first = moment.tracks[0];
   if (!first) return translate(locale, 'record.noSongYet');
   const extra = moment.tracks.length - 1;
