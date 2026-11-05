@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -16,8 +16,10 @@ import {
 } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { questionVisible, type QuestionRow } from '@/lib/planning';
+import { getDoNotPlayNotes, saveDoNotPlayNotes } from '@/lib/doNotPlayNotes';
+import { getSectionNotes, normalizeNoteText, saveSectionNotes, type SectionNotesSave } from '@/lib/sectionNotes';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
-import { answerText, composeDjNote } from './model';
+import { answerText } from './model';
 
 export type MomentTab = 'questions' | 'songs' | 'notes';
 
@@ -35,8 +37,8 @@ export type MomentSong = {
 type Tab = MomentTab;
 
 /**
- * One moment: Questions, Music, and DJ notes.
- * DJ notes only reads answers and song notes that already exist.
+ * One moment: Questions, Songs when this section has music, and Notes.
+ * Notes are free text for the moment. Staff also get a private box.
  */
 export function MomentBody({
   backLabel,
@@ -56,8 +58,6 @@ export function MomentBody({
   doNotPlaySongs,
   isDanceFloor,
   isAvoidList,
-  danceTitle,
-  onOpenDance,
   songCount,
   songsEnabled,
   aiPicks,
@@ -71,6 +71,12 @@ export function MomentBody({
   playingId,
   special,
   intro,
+  sectionId,
+  isStaff,
+  notesReadOnly,
+  initialNotes,
+  initialStaffNotes,
+  eventId,
 }: {
   backLabel: string;
   onBack: () => void;
@@ -89,8 +95,6 @@ export function MomentBody({
   doNotPlaySongs: MomentSong[];
   isDanceFloor: boolean;
   isAvoidList: boolean;
-  danceTitle: string | null;
-  onOpenDance?: () => void;
   songCount: number;
   songsEnabled: boolean;
   aiPicks: boolean;
@@ -104,9 +108,19 @@ export function MomentBody({
   playingId: string | null;
   special?: ReactNode;
   intro?: string | null;
+  sectionId?: string;
+  isStaff?: boolean;
+  /** Guests can read notes but cannot write them. */
+  notesReadOnly?: boolean;
+  /** From the section row (`client_notes`). Undefined means the payload didn't include it. */
+  initialNotes?: string | null;
+  /** From the section row (`staff_notes`), staff only. */
+  initialStaffNotes?: string | null;
+  /** Event that owns Open Dancing's do-not-play note. */
+  eventId?: string;
 }) {
   const c = useC();
-  const { t, locale } = useT();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const [editingAll, setEditingAll] = useState(false);
   const [focusId, setFocusId] = useState<string | null>(null);
@@ -126,14 +140,12 @@ export function MomentBody({
         visible.find((q) => !(answers[q.id] ?? '').trim())?.id ??
         null);
 
-  const dj = composeDjNote(visible, answers, locale);
-  const songNotes = [...songs, ...doNotPlaySongs].filter((s) => (s.note ?? '').trim());
-
   // Avoid-list sections store the do-not-play rows. Everywhere else, flagged rows split out.
   const ownMust = isAvoidList ? [] : songs.filter((s) => !s.doNotPlay);
   const ownAvoid = isAvoidList ? songs : songs.filter((s) => s.doNotPlay);
   const avoid = dedupe([...ownAvoid, ...doNotPlaySongs]);
-  const showSplit = isDanceFloor || isAvoidList;
+  // Songs to avoid / Do not play is shown on the Open Dancing moment only.
+  const showSplit = isDanceFloor;
   const mustShown = showAllMust || ownMust.length <= 2 ? ownMust : ownMust.slice(0, 2);
 
   function saveAndContinue() {
@@ -141,13 +153,38 @@ export function MomentBody({
     setReeditId(null);
     const next = visible.find((q) => q.id !== activeId && !(answers[q.id] ?? '').trim());
     if (next) setFocusId(next.id);
-    else if (songsEnabled || songs.length > 0) onTab('songs');
+    else if (songsEnabled) onTab('songs');
   }
 
+  const showQuestions = visible.length > 0;
+  const showSongs = songsEnabled;
+  const tabOptions: { value: Tab; label: string }[] = [
+    ...(showQuestions
+      ? [{ value: 'questions' as const, label: t('moment.questionsCount', { answered: answeredCount, total: visible.length }) }]
+      : []),
+    ...(showSongs ? [{ value: 'songs' as const, label: t('moment.songsCount', { count: songCount }) }] : []),
+    { value: 'notes' as const, label: t('moment.notes') },
+  ];
+  const activeTab: Tab = tabOptions.some((o) => o.value === tab) ? tab : tabOptions[0].value;
+  const noteField = useAutosaveNote(special ? undefined : sectionId, 'notes', true, {
+    initial: initialNotes,
+    skipLoad: initialNotes !== undefined,
+    readOnly: !!notesReadOnly,
+  });
+  const staffField = useAutosaveNote(special ? undefined : sectionId, 'staffNotes', !!isStaff, {
+    initial: initialStaffNotes,
+    skipLoad: initialStaffNotes !== undefined,
+  });
+  const avoidField = useAutosaveNote(eventId, 'avoid', !!isDanceFloor && !special && !notesReadOnly);
+
+  useEffect(() => {
+    if (activeTab !== tab) onTab(activeTab);
+  }, [activeTab, tab, onTab]);
+
   const bottom =
-    special || tab === 'notes'
+    special || activeTab === 'notes'
       ? null
-      : tab === 'questions'
+      : activeTab === 'questions'
         ? visible.length > 0
           ? { label: t('moment.saveContinue'), arrow: true as const, onPress: saveAndContinue }
           : null
@@ -162,7 +199,7 @@ export function MomentBody({
           title={backLabel}
           onBack={onBack}
           trailing={
-            !special && tab === 'questions' && visible.length > 0
+            !special && activeTab === 'questions' && visible.length > 0
               ? { label: editingAll ? t('common.done') : t('common.edit'), onPress: () => { setEditingAll((e) => !e); setReeditId(null); } }
               : undefined
           }
@@ -190,17 +227,11 @@ export function MomentBody({
           special
         ) : (
           <>
-            <SegmentedControl
-              options={[
-                { value: 'questions' as const, label: visible.length ? t('moment.questionsCount', { answered: answeredCount, total: visible.length }) : t('moment.questions') },
-                { value: 'songs' as const, label: t('moment.songsCount', { count: songCount }) },
-                { value: 'notes' as const, label: t('moment.djNotes') },
-              ]}
-              value={tab}
-              onChange={onTab}
-            />
+            {tabOptions.length > 1 ? (
+              <SegmentedControl options={tabOptions} value={activeTab} onChange={onTab} />
+            ) : null}
 
-            {tab === 'questions' ? (
+            {activeTab === 'questions' && showQuestions ? (
               <QuestionPane
                 visible={visible}
                 answers={answers}
@@ -213,7 +244,7 @@ export function MomentBody({
               />
             ) : null}
 
-            {tab === 'songs' ? (
+            {activeTab === 'songs' && showSongs ? (
               <View style={{ gap: 14 }}>
                 {showSplit ? (
                   <DanceLists
@@ -231,6 +262,7 @@ export function MomentBody({
                     onStartNote={(s) => { setNoteFor(s); setNoteDraft(s.note ?? ''); setMenu(null); }}
                     onSaveNote={() => { if (noteFor) { onSaveNote(noteFor, noteDraft); setNoteFor(null); } }}
                     onCancelNote={() => setNoteFor(null)}
+                    avoidNote={notesReadOnly ? null : avoidField}
                   />
                 ) : (
                   <PlainSongs
@@ -244,42 +276,11 @@ export function MomentBody({
                     onCancelNote={() => setNoteFor(null)}
                   />
                 )}
-
-                {!showSplit && danceTitle && onOpenDance ? (
-                  <Pressable onPress={onOpenDance} style={[styles.linkRow, { backgroundColor: c.surface, borderColor: c.line }]}>
-                    <View style={[styles.smallBubble, { backgroundColor: c.redTint }]}>
-                      <Icon name="ban" size={16} color={c.danger} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[Type.subhead, { color: c.ink }]}>{t('moment.avoidTitle')}</Text>
-                      <Text style={[Type.footnote, { color: c.ink2 }]}>{t('moment.avoidLives', { title: danceTitle })}</Text>
-                    </View>
-                    <Icon name="chev-r" size={18} color={c.ink3} />
-                  </Pressable>
-                ) : null}
-
-                {!isDanceFloor && !isAvoidList && dj ? (
-                  <View style={[styles.noteCard, Shadow.card, { backgroundColor: c.surface }]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Icon name="dj-note" size={16} color={c.accent} />
-                      <Text style={[Type.label, { color: c.accent }]}>{t('moment.noteForDj')}</Text>
-                    </View>
-                    <View style={[styles.accentBar, { backgroundColor: c.red }]} />
-                    <Text style={[styles.noteProse, { color: c.ink }]}>{dj.text}</Text>
-                    <Text style={[Type.footnote, { color: c.ink3 }]}>
-                      {dj.edited ? t('moment.fromAnswersEdited', { edited: dj.edited }) : t('moment.fromAnswers')}
-                    </Text>
-                  </View>
-                ) : null}
-
-                {!songsEnabled && songs.length === 0 && !showSplit ? (
-                  <Text style={[Type.footnote, { color: c.ink3 }]}>{t('moment.noMusic')}</Text>
-                ) : null}
               </View>
             ) : null}
 
-            {tab === 'notes' ? (
-              <NotesPane djAnswers={visible} answers={answers} songNotes={songNotes} />
+            {activeTab === 'notes' ? (
+              <NotesPane notes={noteField} staff={isStaff ? staffField : null} readOnly={!!notesReadOnly} />
             ) : null}
           </>
         )}
@@ -287,7 +288,7 @@ export function MomentBody({
 
       {bottom ? (
         <View style={[styles.bottom, { backgroundColor: c.bg, paddingBottom: Math.max(insets.bottom, 16), borderTopColor: c.line }]}>
-          {aiPicks && tab === 'songs' ? (
+          {aiPicks && activeTab === 'songs' ? (
             <Pressable onPress={onForYou} hitSlop={6} style={{ alignSelf: 'center' }}>
               <Text style={[Type.subhead, { color: c.accent }]}>{t('moment.forYou')}</Text>
             </Pressable>
@@ -354,9 +355,7 @@ function QuestionPane({
 }) {
   const c = useC();
   const { t } = useT();
-  if (visible.length === 0) {
-    return <Text style={[Type.footnote, { color: c.ink3 }]}>{t('moment.noQuestions')}</Text>;
-  }
+  if (visible.length === 0) return null;
   const folded = editingAll ? [] : visible.filter((q) => (answers[q.id] ?? '').trim() && q.id !== activeId);
   const rest = editingAll ? [] : visible.filter((q) => !(answers[q.id] ?? '').trim() && q.id !== activeId);
   const expanded = editingAll ? visible : visible.filter((q) => q.id === activeId);
@@ -596,6 +595,7 @@ function DanceLists({
   onSong,
   onRemove,
   onAddDoNotPlay,
+  avoidNote,
   noteFor,
   noteDraft,
   onNoteDraft,
@@ -611,6 +611,7 @@ function DanceLists({
   onSong: (s: MomentSong) => void;
   onRemove: (s: MomentSong) => void;
   onAddDoNotPlay?: () => void;
+  avoidNote: NoteField | null;
 } & Omit<SongListProps, 'songs' | 'onSong'>) {
   const c = useC();
   const { t } = useT();
@@ -652,6 +653,19 @@ function DanceLists({
       <Text style={[Type.footnote, { color: c.ink2, marginTop: -8 }]}>
         {t('moment.avoidHelp')}
       </Text>
+      {avoidNote ? (
+        <View style={{ gap: 8 }}>
+          <Text style={[Type.callout, { color: c.ink2 }]}>{t('moment.avoidFree')}</Text>
+          <NoteBox
+            value={avoidNote.value}
+            onChange={avoidNote.setValue}
+            onBlur={avoidNote.flush}
+            minHeight={108}
+            editable={!avoidNote.readOnly}
+          />
+          <SaveLine state={avoidNote.state} />
+        </View>
+      ) : null}
       <View style={[styles.stack, { backgroundColor: c.surface, borderColor: c.line }]}>
         {avoid.map((s, i) => (
           <View key={s.id}>
@@ -719,51 +733,209 @@ function NoteEditor(props: Omit<SongListProps, 'songs' | 'onSong'> & { song: Mom
   );
 }
 
-function NotesPane({
-  djAnswers,
-  answers,
-  songNotes,
-}: {
-  djAnswers: QuestionRow[];
-  answers: Record<string, string>;
-  songNotes: MomentSong[];
-}) {
+type NoteSave = 'idle' | 'saving' | 'saved' | 'pending' | 'failed';
+type NoteField = { value: string; setValue: (v: string) => void; flush: () => void; state: NoteSave; readOnly: boolean };
+
+const NOTE_SAVE_MS = 700;
+
+function NotesPane({ notes, staff, readOnly }: { notes: NoteField; staff: NoteField | null; readOnly?: boolean }) {
   const c = useC();
   const { t } = useT();
-  const answered = djAnswers.filter((q) => answerText(q, answers[q.id] ?? ''));
-  if (answered.length === 0 && songNotes.length === 0) {
-    return (
-      <Text style={[Type.callout, { color: c.ink2 }]}>
-        {t('moment.notesEmpty')}
-      </Text>
-    );
-  }
+
   return (
-    <View style={{ gap: 18 }}>
-      {answered.length > 0 ? (
-        <View style={{ gap: 12 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>{t('moment.fromAnswers')}</Text>
-          {answered.map((q) => (
-            <View key={q.id} style={[styles.noteCard, { backgroundColor: c.surface }]}>
-              <Text style={[Type.footnote, { color: c.ink2 }]}>{q.prompt}</Text>
-              <Text style={[Type.callout, { color: c.ink, marginTop: 4 }]}>{answerText(q, answers[q.id] ?? '')}</Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
-      {songNotes.length > 0 ? (
-        <View style={{ gap: 12 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>{t('moment.songNotes')}</Text>
-          {songNotes.map((s) => (
-            <View key={s.id} style={[styles.noteCard, { backgroundColor: c.surface }]}>
-              <Text style={[Type.subhead, { color: c.ink }]}>{s.title}</Text>
-              <Text style={[Type.footnote, { color: c.ink2, marginTop: 4 }]}>{s.note}</Text>
-            </View>
-          ))}
+    <View style={{ gap: 10 }}>
+      <Text style={[Type.callout, { color: c.ink2 }]}>{t('moment.notesHelp')}</Text>
+      <NoteBox value={notes.value} onChange={notes.setValue} onBlur={notes.flush} editable={!readOnly && !notes.readOnly} />
+      {readOnly ? null : <SaveLine state={notes.state} />}
+      {staff ? (
+        <View style={[styles.staffBlock, { borderTopColor: c.line }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Icon name="lock" size={14} color={c.ink3} />
+            <Text style={[Type.subhead, { color: c.ink }]}>{t('moment.staffNotes')}</Text>
+          </View>
+          <Text style={[Type.footnote, { color: c.ink3 }]}>{t('moment.staffNotesPrivate')}</Text>
+          <NoteBox value={staff.value} onChange={staff.setValue} onBlur={staff.flush} />
+          <SaveLine state={staff.state} />
         </View>
       ) : null}
     </View>
   );
+}
+
+function NoteBox({
+  value,
+  onChange,
+  onBlur,
+  placeholder,
+  minHeight = 140,
+  editable = true,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onBlur: () => void;
+  placeholder?: string;
+  minHeight?: number;
+  editable?: boolean;
+}) {
+  const c = useC();
+  return (
+    <TextInput
+      style={StyleSheet.flatten([
+        styles.input,
+        { color: c.ink, borderColor: c.line, backgroundColor: editable ? c.surface : c.surface2, minHeight, textAlignVertical: 'top' },
+      ])}
+      value={value}
+      onChangeText={onChange}
+      onBlur={onBlur}
+      editable={editable}
+      multiline
+      maxLength={4000}
+      placeholder={placeholder}
+      placeholderTextColor={c.ink3}
+    />
+  );
+}
+
+function SaveLine({ state }: { state: NoteSave }) {
+  const c = useC();
+  const { t } = useT();
+  const label =
+    state === 'saving' ? t('common.saving')
+    : state === 'saved' ? t('moment.notesSaved')
+    : state === 'pending' ? t('moment.notesPending')
+    : state === 'failed' ? t('common.couldntSave')
+    : null;
+  if (!label) return null;
+  return <Text style={[Type.footnote, { color: c.ink3 }]}>{label}</Text>;
+}
+
+/**
+ * Local text that debounces to the section notes endpoint.
+ * A 404 keeps whatever was typed and reports that saving waits on the update.
+ */
+function useAutosaveNote(
+  sectionId: string | undefined,
+  field: 'notes' | 'staffNotes' | 'avoid',
+  enabled = true,
+  seed?: { initial?: string | null; skipLoad?: boolean; readOnly?: boolean },
+) {
+  const [value, setValue] = useState('');
+  const [state, setState] = useState<NoteSave>('idle');
+  const valueRef = useRef('');
+  const savedRef = useRef<string | null>(null);
+  const dirtyRef = useRef(false);
+  const missingRef = useRef(false);
+  const genRef = useRef(0);
+  const immediateRef = useRef(false);
+  const [flushTick, setFlushTick] = useState(0);
+
+  useEffect(() => {
+    const gen = ++genRef.current;
+    dirtyRef.current = false;
+    missingRef.current = false;
+    savedRef.current = null;
+    valueRef.current = '';
+    const seeded = seed?.skipLoad ? (seed.initial ?? '') : '';
+    setValue(seeded);
+    valueRef.current = seeded;
+    savedRef.current = seed?.skipLoad ? seeded : null;
+    setState('idle');
+    if (!sectionId || !enabled || seed?.skipLoad) return;
+    let cancel = false;
+    const applyLoaded = (res: { ok: true; text: string } | { ok: false; unavailable: boolean }) => {
+      if (cancel || genRef.current !== gen) return;
+      if (!res.ok) {
+        if (res.unavailable) {
+          missingRef.current = true;
+          setState('pending');
+        }
+        return;
+      }
+      if (dirtyRef.current) return;
+      savedRef.current = res.text;
+      valueRef.current = res.text;
+      setValue(res.text);
+    };
+    if (field === 'avoid') {
+      void getDoNotPlayNotes(sectionId).then((res) => {
+        applyLoaded(res.ok ? { ok: true, text: res.text ?? '' } : res);
+      });
+    } else {
+      void getSectionNotes(sectionId).then((res) => {
+        if (!res.ok) {
+          applyLoaded(res);
+          return;
+        }
+        const next = (field === 'staffNotes' ? res.notes.staffNotes : res.notes.notes) ?? '';
+        applyLoaded({ ok: true, text: next });
+      });
+    }
+    return () => {
+      cancel = true;
+    };
+  }, [sectionId, field, enabled, seed?.skipLoad, seed?.initial]);
+
+  useEffect(() => {
+    if (!sectionId || !enabled || seed?.readOnly || !dirtyRef.current) return;
+    if (savedRef.current !== null && value === savedRef.current) return;
+    const immediate = immediateRef.current;
+    immediateRef.current = false;
+    if (!missingRef.current) setState('idle');
+    const gen = genRef.current;
+    const timer = setTimeout(() => {
+      const snapshot = valueRef.current;
+      if (savedRef.current !== null && snapshot === savedRef.current) return;
+      const stored = normalizeNoteText(snapshot);
+      if (!missingRef.current) setState('saving');
+      const request = field === 'avoid'
+        ? saveDoNotPlayNotes(sectionId, stored)
+        : saveSectionNotes(sectionId, field === 'staffNotes' ? { staffNotes: stored } : { notes: stored });
+      void request.then((result) => {
+        if (genRef.current !== gen) return;
+        applySave(result, snapshot);
+      });
+    }, immediate ? 0 : NOTE_SAVE_MS);
+    return () => clearTimeout(timer);
+  }, [value, sectionId, field, enabled, seed?.readOnly, flushTick]);
+
+  function applySave(result: SectionNotesSave, snapshot: string) {
+    if (valueRef.current !== snapshot) return;
+    if (result === 'saved') {
+      missingRef.current = false;
+      const stored = normalizeNoteText(snapshot) ?? '';
+      savedRef.current = stored;
+      valueRef.current = stored;
+      setValue(stored);
+      setState('saved');
+      return;
+    }
+    if (result === 'forbidden') {
+      setState('failed');
+      return;
+    }
+    if (result === 'unavailable') {
+      missingRef.current = true;
+      setState('pending');
+      return;
+    }
+    setState('failed');
+  }
+
+  function update(next: string) {
+    if (seed?.readOnly) return;
+    dirtyRef.current = true;
+    valueRef.current = next.slice(0, 4000);
+    setValue(valueRef.current);
+  }
+
+  function flush() {
+    if (!dirtyRef.current) return;
+    if (savedRef.current !== null && valueRef.current === savedRef.current) return;
+    immediateRef.current = true;
+    setFlushTick((n) => n + 1);
+  }
+
+  return { value, setValue: update, flush, state, readOnly: !!seed?.readOnly };
 }
 
 function artistLine(s: MomentSong): string | null {
@@ -787,11 +959,7 @@ const styles = StyleSheet.create({
   chip: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 16 },
   imgOpt: { width: 96, borderWidth: 2, borderRadius: Radius.md, overflow: 'hidden' },
   stack: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: 14 },
-  smallBubble: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  noteCard: { borderRadius: Radius.lg, padding: 16, gap: 8 },
-  accentBar: { width: 28, height: 3, borderRadius: 2 },
-  noteProse: { fontFamily: Fonts.display, fontSize: 22, lineHeight: 28 },
+  staffBlock: { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 8, paddingTop: 16, gap: 8 },
   bottom: { paddingHorizontal: 20, paddingTop: 10, gap: 8, borderTopWidth: StyleSheet.hairlineWidth },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   addNote: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 48, paddingBottom: 12 },

@@ -56,6 +56,8 @@ export type SectionRow = {
   questionCount: number;
   answeredCount: number;
   songCount: number;
+  /** A song on this moment already has a note. */
+  hasNotes: boolean;
 };
 
 /** Whether a section shows on the couple's client Timeline view (honours the
@@ -73,6 +75,7 @@ export type Group = {
   title: string;
   icon: string | null;
   sections: SectionRow[];
+  intro: string | null;
   totalQuestions: number;
   answeredQuestions: number;
   songCount: number;
@@ -177,6 +180,8 @@ export type StaffEvent = {
   venue_id: string | null;
   package_id: string | null;
   clientName: string | null;
+  /** Assigned people, e.g. "DJ Drew · MC Alex". Null when the roster isn't available. */
+  staffLine: string | null;
   status: { name: string; color: string | null; textColor: string | null } | null;
 };
 
@@ -233,10 +238,64 @@ export async function getStaffEvents(opts: {
       venue_id: r.venue_id,
       package_id: r.package_id,
       clientName: r.client ? [r.client.first_name, r.client.last_name].filter(Boolean).join(' ') || null : null,
+      staffLine: null,
       status: r.status ? { name: r.status.name, color: r.status.color, textColor: r.status.text_color } : null,
     });
   }
+  const staff = await loadEventStaff(out.map((event) => event.id));
+  for (const event of out) event.staffLine = staff.get(event.id) ?? null;
   return out;
+}
+
+/** Names and roles from event_staff. Empty map if that read isn't allowed. */
+async function loadEventStaff(eventIds: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, { role: string | null; name: string }[]>();
+  if (!eventIds.length) return new Map();
+  try {
+    for (let i = 0; i < eventIds.length; i += 80) {
+      const part = eventIds.slice(i, i + 80);
+      const { data, error } = await supabase
+        .from('event_staff')
+        .select('event_id, role, employee:employees(first_name, last_name)')
+        .in('event_id', part);
+      if (error || !data) continue;
+      for (const row of data as unknown as {
+        event_id: string;
+        role: string | null;
+        employee: { first_name: string | null; last_name: string | null } | { first_name: string | null; last_name: string | null }[] | null;
+      }[]) {
+        const employee = Array.isArray(row.employee) ? row.employee[0] : row.employee;
+        const name = [employee?.first_name, employee?.last_name].filter(Boolean).join(' ').trim();
+        const role = row.role?.trim() || null;
+        if (!name && !role) continue;
+        const list = map.get(row.event_id) ?? [];
+        list.push({ role, name });
+        map.set(row.event_id, list);
+      }
+    }
+  } catch {
+    return new Map();
+  }
+  const lines = new Map<string, string>();
+  for (const [eventId, people] of map) {
+    const line = formatStaffLine(people);
+    if (line) lines.set(eventId, line);
+  }
+  return lines;
+}
+
+function formatStaffLine(people: { role: string | null; name: string }[]): string | null {
+  const rank = (role: string | null) => {
+    const key = (role ?? '').toLowerCase();
+    if (key === 'dj') return 0;
+    if (key === 'mc') return 1;
+    return 2;
+  };
+  const parts = [...people]
+    .sort((a, b) => rank(a.role) - rank(b.role) || (a.role ?? '').localeCompare(b.role ?? ''))
+    .map((person) => (person.role && person.name ? `${person.role} ${person.name}` : person.name || person.role || ''))
+    .filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
 }
 
 /** Section list + progress for the home screen. */
@@ -245,7 +304,7 @@ export async function loadOverview(eventId: string): Promise<Overview> {
     supabase.from('planning_sections').select('*').eq('event_id', eventId).order('sort_order'),
     supabase.from('planning_questions').select('id, section_id').eq('event_id', eventId),
     supabase.from('planning_question_answers').select('question_id, answer').eq('event_id', eventId),
-    supabase.from('planning_songs').select('id, section_id').eq('event_id', eventId),
+    supabase.from('planning_songs').select('id, section_id, note').eq('event_id', eventId),
   ]);
 
   const answered = new Set((answers ?? []).filter((a) => (a.answer ?? '').trim() !== '').map((a) => a.question_id));
@@ -256,7 +315,11 @@ export async function loadOverview(eventId: string): Promise<Overview> {
     qBySection.set(q.section_id, list);
   }
   const songBySection = new Map<string, number>();
-  for (const s of songs ?? []) songBySection.set(s.section_id, (songBySection.get(s.section_id) ?? 0) + 1);
+  const notesBySection = new Set<string>();
+  for (const s of songs ?? []) {
+    songBySection.set(s.section_id, (songBySection.get(s.section_id) ?? 0) + 1);
+    if ((s.note ?? '').trim()) notesBySection.add(s.section_id);
+  }
 
   let totalQuestions = 0;
   let answeredQuestions = 0;
@@ -267,7 +330,7 @@ export async function loadOverview(eventId: string): Promise<Overview> {
 
   const ensureGroup = (): Group => {
     if (!current) {
-      current = { id: 'start', title: 'Your plan', icon: '✨', sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0, aiPicks: false };
+      current = { id: 'start', title: 'Your plan', icon: '✨', intro: null, sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0, aiPicks: false };
       groups.push(current);
     }
     return current;
@@ -280,7 +343,7 @@ export async function loadOverview(eventId: string): Promise<Overview> {
       continue;
     }
     if (s.section_type === 'headline') {
-      current = { id: s.id, title: s.title, icon: s.icon, sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0, aiPicks: false };
+      current = { id: s.id, title: s.title, icon: s.icon, intro: s.intro ?? null, sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0, aiPicks: false };
       groups.push(current);
       continue;
     }
@@ -292,6 +355,7 @@ export async function loadOverview(eventId: string): Promise<Overview> {
       questionCount: qs.length,
       answeredCount: ans,
       songCount,
+      hasNotes: notesBySection.has(s.id),
     };
     flat.push(row);
     totalQuestions += qs.length;

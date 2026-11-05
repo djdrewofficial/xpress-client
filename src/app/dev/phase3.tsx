@@ -154,8 +154,6 @@ function SampleMoment({ initial, dancing }: { initial: MomentTab; dancing?: bool
       doNotPlaySongs={dancing ? AVOID : []}
       isDanceFloor={!!dancing}
       isAvoidList={false}
-      danceTitle={dancing ? null : 'Open Dancing'}
-      onOpenDance={() => {}}
       songCount={dancing ? 18 : 2}
       songsEnabled
       aiPicks={false}
@@ -235,15 +233,20 @@ function SampleGroup() {
   return (
     <GroupBody
       title="Reception"
-      subtitle="9 moments · 2 of 8"
+      chapterNumber={4}
+      description="Dinner, dances, and the party."
+      momentsDone={1}
+      momentsTotal={3}
+      questionsAnswered={2}
+      questionsTotal={8}
       onBack={() => {}}
       canManage
       editing={false}
       onToggleEdit={() => {}}
       moments={[
-        { id: '1', title: 'Grand Entrance', icon: 'mic', time: '5:30 PM', meta: '2 songs', badge: '2/5' },
-        { id: '2', title: 'First Dance', icon: 'first-dance', time: '5:45 PM', meta: '1 song', badge: '1/4' },
-        { id: '3', title: 'Cake Cutting', icon: 'cake', time: null, meta: 'No songs', badge: '0/3' },
+        { id: '1', title: 'Grand Entrance', icon: 'mic', meta: '2 of 5 answered · 2 songs', done: false },
+        { id: '2', title: 'First Dance', icon: 'first-dance', meta: '1 of 4 answered · 1 song', done: false },
+        { id: '3', title: 'Cake Cutting', icon: 'cake', meta: '3 of 3 answered', done: true },
       ]}
       onOpen={() => {}}
       onMove={() => {}}

@@ -7,7 +7,7 @@ import { PhotoBoothSection } from '@/components/PhotoBoothSection';
 import { SongPicker } from '@/components/music/AddMusicSheet';
 import { VendorTeam } from '@/components/VendorTeam';
 import { MomentBody, type MomentSong, type MomentTab } from '@/components/plan/MomentBody';
-import { findDanceFloor, isDanceFloorSection, isDoNotPlaySection, momentEyebrow, momentNumber } from '@/components/plan/model';
+import { isDanceFloorSection, isDoNotPlaySection, momentEyebrow, momentNumber } from '@/components/plan/model';
 import { useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useT } from '@/lib/i18n';
@@ -22,7 +22,6 @@ import {
   setSectionTime,
   updateSongNote,
   type QuestionRow,
-  type SectionRow,
   type SongRow,
 } from '@/lib/planning';
 import { supabase } from '@/lib/supabase';
@@ -38,7 +37,19 @@ type Meta = {
   time_label: string | null;
   time_enabled: boolean;
   locked: boolean;
+  /** Undefined when the section row has no client_notes column yet. */
+  clientNotes?: string | null;
+  /** Undefined when the row has no staff_notes column, or the caller is not staff. */
+  staffNotes?: string | null;
 };
+
+function payloadNote(row: Record<string, unknown> | null, key: string): string | null | undefined {
+  if (!row || !(key in row)) return undefined;
+  const value = row[key];
+  if (typeof value === 'string') return value;
+  if (value == null) return null;
+  return undefined;
+}
 
 export default function SectionScreen() {
   const c = useC();
@@ -54,11 +65,17 @@ export default function SectionScreen() {
   const [songs, setSongs] = useState<SongRow[]>([]);
   const [externalAvoid, setExternalAvoid] = useState<SongRow[]>([]);
   const [avoidSectionId, setAvoidSectionId] = useState<string | null>(null);
-  const [dance, setDance] = useState<SectionRow | null>(null);
   const [momentNo, setMomentNo] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<MomentTab>('questions');
+  const sectionKey = Array.isArray(id) ? id[0] : id;
+  const [tabSection, setTabSection] = useState(sectionKey);
+  if (tabSection !== sectionKey) {
+    setTabSection(sectionKey);
+    setTab('questions');
+    setLoading(true);
+  }
   const [picker, setPicker] = useState<null | { mode: 'foryou' | 'search'; target: 'section' | 'avoid' }>(null);
   const [pickingTime, setPickingTime] = useState(false);
 
@@ -78,6 +95,7 @@ export default function SectionScreen() {
       loadSection(eventId, id),
       loadOverview(eventId),
     ]);
+    const sectionRow = (m ?? null) as Record<string, unknown> | null;
     const nextMeta: Meta = {
       title: m?.title ?? 'Moment',
       icon: m?.icon ?? null,
@@ -88,6 +106,8 @@ export default function SectionScreen() {
       time_label: m?.time_label ?? null,
       time_enabled: m?.time_enabled ?? false,
       locked: m?.locked ?? false,
+      clientNotes: payloadNote(sectionRow, 'client_notes'),
+      staffNotes: payloadNote(sectionRow, 'staff_notes'),
     };
     setMeta(nextMeta);
     setEventName(ev?.name ?? '');
@@ -97,7 +117,6 @@ export default function SectionScreen() {
     for (const q of sec.questions) a[q.id] = q.answer ?? '';
     setAnswers(a);
     setMomentNo(momentNumber(ov.sections, id));
-    setDance(findDanceFloor(ov.sections));
     const avoid = ov.sections.find((s) => isDoNotPlaySection(s) && s.id !== id) ?? null;
     setAvoidSectionId(avoid?.id ?? (isDoNotPlaySection(nextMeta) ? id : null));
     if (isDanceFloorSection(nextMeta) && avoid) {
@@ -213,8 +232,6 @@ export default function SectionScreen() {
         doNotPlaySongs={danceFloor ? avoidSongs : []}
         isDanceFloor={danceFloor}
         isAvoidList={avoidList}
-        danceTitle={!danceFloor && !avoidList && dance ? dance.title : null}
-        onOpenDance={dance && dance.id !== id ? () => router.push({ pathname: '/section/[id]', params: { id: dance.id, eventId, from: backLabel } }) : undefined}
         songCount={songTotal}
         songsEnabled={meta.songs_enabled}
         aiPicks={meta.ai_picks_enabled}
@@ -227,6 +244,12 @@ export default function SectionScreen() {
         onPlay={onPlay}
         playingId={playingId}
         special={special}
+        sectionId={Array.isArray(id) ? id[0] : id}
+        eventId={Array.isArray(eventId) ? eventId[0] : eventId}
+        isStaff={profile?.accountType === 'staff'}
+        notesReadOnly={profile?.accountType === 'event_guest'}
+        initialNotes={meta.clientNotes}
+        initialStaffNotes={profile?.accountType === 'staff' ? meta.staffNotes : undefined}
       />
       <SongPicker
         visible={picker !== null}

@@ -3,8 +3,7 @@ import { Alert, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AddSectionSheet } from '@/components/AddSectionSheet';
-import { GroupBody, groupSubtitle } from '@/components/plan/GroupBody';
-import { chapterStatus } from '@/components/plan/model';
+import { GroupBody } from '@/components/plan/GroupBody';
 import { useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useT } from '@/lib/i18n';
@@ -20,11 +19,12 @@ import {
 
 export default function GroupScreen() {
   const c = useC();
-  const { t, locale } = useT();
+  const { t } = useT();
   const router = useRouter();
   const { profile } = useAuth();
   const { id, eventId, title } = useLocalSearchParams<{ id: string; eventId: string; title: string }>();
   const [group, setGroup] = useState<Group | null>(null);
+  const [chapterNumber, setChapterNumber] = useState<number | null>(null);
   const [sections, setSections] = useState<SectionRow[] | null>(null);
   const [removed, setRemoved] = useState<RemovedSection[]>([]);
   const [editing, setEditing] = useState(false);
@@ -37,7 +37,9 @@ export default function GroupScreen() {
   const load = useCallback(async () => {
     if (!eventId) return;
     const ov = await loadOverview(eventId);
-    const g = ov.groups.find((x) => x.id === id) ?? null;
+    const index = ov.groups.findIndex((x) => x.id === id);
+    const g = index >= 0 ? ov.groups[index] : null;
+    setChapterNumber(index >= 0 ? index + 1 : null);
     setGroup(g);
     setSections(g?.sections ?? []);
     setRemoved(ov.removed);
@@ -92,14 +94,19 @@ export default function GroupScreen() {
     load();
   };
 
-  const status = group ? chapterStatus(group, locale) : null;
   const heading = group?.title ?? title ?? t('group.momentsTitle');
+  const momentsDone = (sections ?? []).filter(momentDone).length;
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <GroupBody
         title={heading}
-        subtitle={groupSubtitle(sections?.length ?? 0, status?.label ?? null, locale)}
+        chapterNumber={chapterNumber}
+        description={group?.intro?.trim() || null}
+        momentsDone={momentsDone}
+        momentsTotal={sections?.length ?? 0}
+        questionsAnswered={group?.answeredQuestions ?? 0}
+        questionsTotal={group?.totalQuestions ?? 0}
         onBack={() => router.back()}
         canManage={canManage}
         editing={editing}
@@ -110,11 +117,8 @@ export default function GroupScreen() {
           id: s.id,
           title: s.title,
           icon: s.icon,
-          time: s.time_label,
-          meta: s.songCount > 0 ? `${s.songCount} ${s.songCount === 1 ? 'song' : 'songs'}` : 'No songs',
-          badge: s.questionCount > 0
-            ? s.answeredCount >= s.questionCount ? 'done' : `${s.answeredCount}/${s.questionCount}`
-            : undefined,
+          meta: momentMeta(s, t),
+          done: momentDone(s),
         }))}
         onOpen={(sectionId) => router.push({ pathname: '/section/[id]', params: { id: sectionId, eventId, from: heading } })}
         onMove={move}
@@ -133,4 +137,20 @@ export default function GroupScreen() {
       />
     </View>
   );
+}
+
+function momentDone(section: SectionRow): boolean {
+  if (section.questionCount > 0) return section.answeredCount >= section.questionCount;
+  if (section.songs_enabled) return section.songCount > 0;
+  return false;
+}
+
+function momentMeta(section: SectionRow, t: ReturnType<typeof useT>['t']): string {
+  const bits: string[] = [];
+  if (section.questionCount > 0) bits.push(t('group.answeredOf', { answered: section.answeredCount, total: section.questionCount }));
+  if (section.songs_enabled && section.songCount > 0) {
+    bits.push(section.songCount === 1 ? t('group.oneSong') : t('group.nSongs', { count: section.songCount }));
+  }
+  if (section.hasNotes) bits.push(t('group.notesAdded'));
+  return bits.join(' · ');
 }

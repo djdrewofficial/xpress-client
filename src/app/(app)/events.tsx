@@ -173,13 +173,14 @@ function toItem(event: StaffEvent, venues: Map<string, string>, progress: Map<st
     id: event.id,
     eventDate: event.event_date,
     startTime: event.start_time,
-    title: event.clientName || event.name || untitled,
+    title: event.name?.trim() || event.clientName || untitled,
+    staffLine: event.staffLine,
     venueName: event.venue_id ? venues.get(event.venue_id) ?? null : null,
     statusName: event.status?.name ?? null,
     statusColor: event.status?.color ?? null,
     statusTextColor: event.status?.textColor ?? null,
     progress: progress.get(event.id) ?? null,
-    haystack: [event.name, event.clientName, event.status?.name, event.event_date].filter(Boolean).join(' '),
+    haystack: [event.name, event.clientName, event.staffLine, event.status?.name, event.event_date].filter(Boolean).join(' '),
   };
 }
 

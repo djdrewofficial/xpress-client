@@ -128,9 +128,9 @@ function EventRow({ row, onPress }: { row: StaffRowModel; onPress: () => void })
         <Text style={[styles.month, { color: c.red }]}>{row.month}</Text>
         <Text style={[styles.day, { color: c.ink }]}>{row.day}</Text>
       </View>
-      <View style={{ flex: 1, gap: 2 }}>
+      <View style={{ flex: 1, gap: 4 }}>
         <View style={styles.titleLine}>
-          <Text style={[styles.title, { color: c.ink, flex: 1 }]} numberOfLines={1}>
+          <Text style={[styles.title, { color: c.ink, flex: 1 }]} numberOfLines={2}>
             {row.title}
           </Text>
           <View style={[styles.pill, { backgroundColor: tone.bg }]}>
@@ -139,8 +139,13 @@ function EventRow({ row, onPress }: { row: StaffRowModel; onPress: () => void })
             </Text>
           </View>
         </View>
+        {row.staffLine ? (
+          <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={2}>
+            {row.staffLine}
+          </Text>
+        ) : null}
         {row.subtitle ? (
-          <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={1}>
+          <Text style={[Type.footnote, { color: c.ink3 }]} numberOfLines={1}>
             {row.subtitle}
           </Text>
         ) : null}
@@ -187,12 +192,12 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 16, letterSpacing: 0, padding: 0, fontFamily: Fonts.body },
   card: { borderRadius: Radius.lg, overflow: 'hidden' },
   div: { height: StyleSheet.hairlineWidth, marginLeft: 72 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 11 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 16, minHeight: 88 },
   titleLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   date: { width: 44, alignItems: 'center' },
   month: { fontFamily: Fonts.bold, fontSize: 11, letterSpacing: 0.6 },
   day: { fontFamily: Fonts.display, fontSize: 26, lineHeight: 28 },
-  title: { fontFamily: Fonts.semibold, fontSize: 16, lineHeight: 20 },
+  title: { fontFamily: Fonts.semibold, fontSize: 17, lineHeight: 22 },
   pill: { maxWidth: 124, borderRadius: Radius.pill, paddingHorizontal: 8, paddingVertical: 4 },
   pillTxt: { fontFamily: Fonts.semibold, fontSize: 12 },
   empty: { alignItems: 'center', gap: 8, paddingTop: 36, paddingHorizontal: 16 },
