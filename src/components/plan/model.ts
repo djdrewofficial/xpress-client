@@ -66,37 +66,9 @@ export function chapterStatus(group: Pick<Group, 'totalQuestions' | 'answeredQue
   return { label: translate(locale, 'home.of', { answered: group.answeredQuestions, total: group.totalQuestions }), done: false };
 }
 
-export function editedAgo(iso?: string | null, locale: Locale = 'en'): string | null {
-  if (!iso) return null;
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return null;
-  const days = Math.floor((Date.now() - t) / 86400000);
-  if (days <= 0) return translate(locale, 'moment.editedToday');
-  if (days === 1) return translate(locale, 'moment.editedYesterday');
-  return translate(locale, 'moment.editedDays', { count: days });
-}
-
 export function answerText(q: QuestionRow, raw: string): string {
   const v = raw.trim();
   if (!v) return '';
   if (q.answer_type === 'multiselect') return v.split('|').filter(Boolean).join(', ');
   return v;
-}
-
-/** Prose rollup of answers already saved. Not a new field — just the answers, joined. */
-export function composeDjNote(
-  questions: QuestionRow[],
-  answers: Record<string, string>,
-  locale: Locale = 'en',
-): { text: string; edited: string | null } | null {
-  const bits: string[] = [];
-  let latest: string | null = null;
-  for (const q of questions) {
-    const text = answerText(q, answers[q.id] ?? '');
-    if (!text) continue;
-    bits.push(text);
-    if (q.updated_at && (!latest || q.updated_at > latest)) latest = q.updated_at;
-  }
-  if (!bits.length) return null;
-  return { text: bits.join('. '), edited: editedAgo(latest, locale) };
 }

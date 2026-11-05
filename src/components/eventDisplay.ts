@@ -30,6 +30,7 @@ export type StaffListItem = {
   eventDate: string | null;
   startTime: string | null;
   title: string;
+  staffLine: string | null;
   venueName: string | null;
   statusName: string | null;
   statusColor: string | null;
@@ -43,6 +44,7 @@ export type StaffRowModel = {
   month: string;
   day: string;
   title: string;
+  staffLine: string | null;
   subtitle: string | null;
   status: string;
   tone: 'ready' | 'progress' | 'idle' | 'crm';
@@ -256,6 +258,7 @@ function toRow(item: StaffListItem, parts: { month: string; day: string } | null
     month: parts?.month ?? translate(locale, 'staff.tbd'),
     day: parts?.day ?? '–',
     title: item.title,
+    staffLine: item.staffLine,
     subtitle,
     status: status.label,
     tone: status.tone,
