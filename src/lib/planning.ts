@@ -111,6 +111,30 @@ export type SongRow = {
   note: string | null;
 };
 
+export type EventSong = SongRow & { section_id: string };
+
+function toSongRow(s: {
+  id: string;
+  title: string;
+  artist?: string | null;
+  artwork_url?: string | null;
+  preview_url?: string | null;
+  must_play?: boolean | null;
+  do_not_play?: boolean | null;
+  note?: string | null;
+}): SongRow {
+  return {
+    id: s.id,
+    title: s.title,
+    artist: s.artist ?? null,
+    artwork_url: s.artwork_url ?? null,
+    preview_url: s.preview_url ?? null,
+    must_play: !!s.must_play,
+    do_not_play: !!s.do_not_play,
+    note: s.note ?? null,
+  };
+}
+
 /** Events this client/guest can plan. */
 export async function getMyEvents(account: { clientId: string | null; eventGuestId: string | null }): Promise<EventLite[]> {
   if (account.clientId) {
@@ -372,17 +396,18 @@ export async function loadSection(eventId: string, sectionId: string): Promise<{
       condition_question_id: q.condition_question_id ?? null,
       condition_values: Array.isArray(q.condition_values) ? q.condition_values : [],
     })),
-    songs: (songs ?? []).map((s) => ({
-      id: s.id,
-      title: s.title,
-      artist: s.artist ?? null,
-      artwork_url: s.artwork_url ?? null,
-      preview_url: s.preview_url ?? null,
-      must_play: !!s.must_play,
-      do_not_play: !!s.do_not_play,
-      note: s.note ?? null,
-    })),
+    songs: (songs ?? []).map((s) => toSongRow(s)),
   };
+}
+
+/** Every song on the event, in playlist order. Powers the Music record. */
+export async function loadEventSongs(eventId: string): Promise<EventSong[]> {
+  const { data } = await supabase
+    .from('planning_songs')
+    .select('id, section_id, title, artist, artwork_url, preview_url, must_play, do_not_play, note, sort_order')
+    .eq('event_id', eventId)
+    .order('sort_order');
+  return (data ?? []).map((s) => ({ ...toSongRow(s), section_id: s.section_id }));
 }
 
 /** Toggle "must play" (clears "do not play" when on). Returns false if the write
@@ -458,16 +483,7 @@ export async function addSong(
     .single();
   if (error) throw error;
   if (!data) return null;
-  return {
-    id: data.id,
-    title: data.title,
-    artist: data.artist ?? null,
-    artwork_url: data.artwork_url ?? null,
-    preview_url: data.preview_url ?? null,
-    must_play: !!data.must_play,
-    do_not_play: !!data.do_not_play,
-    note: data.note ?? null,
-  };
+  return toSongRow(data);
 }
 
 export function questionVisible(q: QuestionRow, answers: Record<string, string>): boolean {

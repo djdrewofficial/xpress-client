@@ -1,97 +1,87 @@
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useCallback, useMemo, useState } from 'react';
+import { Alert, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { Bar, EmojiIcon, Icon, useC } from '@/components/ui';
-import { Backdrop } from '@/components/Backdrop';
-import { AppHeader } from '@/components/AppHeader';
-import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
+import { MusicRecord } from '@/components/music/MusicRecord';
+import { useAddMusic } from '@/components/music/AddMusicSheet';
+import { buildMusicRecord, defaultMoment, type MusicMoment } from '@/components/music/model';
+import { EventSwitcher } from '@/components/EventSwitcher';
+import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
-import { loadOverview, onMusic, type SectionRow } from '@/lib/planning';
+import { loadEventSongs, loadOverview } from '@/lib/planning';
 
 export default function MusicScreen() {
-  const c = useC();
   const router = useRouter();
-  const { eventId, loading: eventLoading } = useEvent();
-  const [sections, setSections] = useState<SectionRow[] | null>(null);
+  const { profile } = useAuth();
+  const { event, eventId, events, loading: eventLoading } = useEvent();
+  const [moments, setMoments] = useState<MusicMoment[] | null>(null);
+  const [switcher, setSwitcher] = useState(false);
 
   const load = useCallback(async () => {
     if (!eventId) {
-      setSections([]);
+      setMoments([]);
       return;
     }
-    const ov = await loadOverview(eventId);
-    setSections(ov.sections.filter(onMusic));
+    try {
+      const [overview, songs] = await Promise.all([loadOverview(eventId), loadEventSongs(eventId)]);
+      setMoments(buildMusicRecord(overview.groups, songs));
+    } catch {
+      setMoments([]);
+    }
   }, [eventId]);
+
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const totalSongs = (sections ?? []).reduce((n, s) => n + s.songCount, 0);
+  const sections = useMemo(
+    () => (moments ?? []).filter((m) => m.id !== 'do-not-play').map((m) => ({
+      id: m.id,
+      title: m.title,
+      label: `${m.side}${m.index}`,
+    })),
+    [moments],
+  );
+
+  const music = useAddMusic({
+    eventId: eventId ?? '',
+    eventName: event?.name ?? '',
+    sections,
+    onAdded: () => { load(); },
+    onReload: () => { load(); },
+  });
+
+  const target = defaultMoment(moments ?? []);
+  const isStaff = profile?.accountType === 'staff';
+  const canSwitch = isStaff || events.length > 1;
+
+  const requireMoment = (run: (moment: MusicMoment) => void) => {
+    if (eventLoading || moments === null) return;
+    if (!target) {
+      Alert.alert('No music moments yet', 'Your DJ adds ceremony and reception moments to your plan. Songs can be added once those are here.');
+      return;
+    }
+    run(target);
+  };
+
+  const openMoment = (moment: MusicMoment) => {
+    if (!eventId || moment.id === 'do-not-play') return;
+    router.push({ pathname: '/section/[id]', params: { id: moment.id, eventId } });
+  };
 
   return (
     <View style={{ flex: 1 }}>
-      <Backdrop />
-      <AppHeader />
-      <View style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl * 3, gap: Space.md }}>
-          <Text style={[styles.title, { color: c.text }]}>Music</Text>
-
-          <LinearGradient colors={[Brand.purple, '#6a4fb8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.aiHero, Shadow.card]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Icon name="sparkles" size={12} color="rgba(255,255,255,0.9)" />
-              <Text style={styles.aiTag}>FOR YOU</Text>
-            </View>
-            <Text style={styles.aiTitle}>Songs picked for you</Text>
-            <Text style={styles.aiSub}>Open any moment below — we suggest tracks based on your story and cultural influences, so every set feels like yours.</Text>
-            {totalSongs > 0 && <Text style={styles.aiCount}>{totalSongs} song{totalSongs === 1 ? '' : 's'} picked so far</Text>}
-          </LinearGradient>
-
-          <View style={[styles.note, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Text style={{ color: c.textSecondary, fontSize: 13.5, lineHeight: 20 }}>
-              There&apos;s no pressure to fill these playlists all the way up. Even a general sense of the vibe — or just a few songs — gives us plenty to work with. What matters most is sharing what you and your guests love, especially your cultural influences and the music that means something to you.
-            </Text>
-          </View>
-
-          <Text style={[styles.lab, { color: c.textTertiary }]}>VIBE CURATION</Text>
-          {eventLoading || !sections ? (
-            <ActivityIndicator color={Brand.purple} style={{ marginTop: Space.xl }} />
-          ) : sections.length === 0 ? (
-            <Text style={{ color: c.textSecondary }}>No song moments yet — your DJ will add these to your plan.</Text>
-          ) : (
-            sections.map((s) => {
-              const pct = s.song_limit ? Math.min(100, Math.round((s.songCount / s.song_limit) * 100)) : s.songCount > 0 ? 100 : 0;
-              return (
-                <Pressable key={s.id} onPress={() => eventId && router.push({ pathname: '/section/[id]', params: { id: s.id, eventId } })}>
-                  <View style={[styles.row, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
-                    <View style={[styles.rowIcon, { backgroundColor: c.cardAlt }]}><EmojiIcon glyph={s.icon} size={22} fallback="music" /></View>
-                    <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ color: c.text, fontSize: 16, fontWeight: '700' }}>{s.title}</Text>
-                      <Bar pct={pct} height={5} />
-                      <Text style={{ color: c.textTertiary, fontSize: 12 }}>
-                        {s.songCount} song{s.songCount === 1 ? '' : 's'}{s.song_limit != null ? ` of ${s.song_limit}` : ' added'}
-                      </Text>
-                    </View>
-                    <Icon name="chev-r" size={20} color={Brand.purpleLight} />
-                  </View>
-                </Pressable>
-              );
-            })
-          )}
-        </ScrollView>
-      </View>
+      <MusicRecord
+        moments={moments ?? []}
+        loading={eventLoading || moments === null}
+        onOpenMoment={openMoment}
+        onAddToMoment={(moment) => music.open({ sectionId: moment.id, segment: 'search' })}
+        onAddMusic={() => requireMoment((moment) => music.open({ sectionId: moment.id, segment: 'search' }))}
+        onImport={() => requireMoment((moment) => music.open({ sectionId: moment.id, segment: 'import' }))}
+        onForYou={() => requireMoment((moment) => music.open({ sectionId: moment.id, segment: 'foryou' }))}
+        onSearch={() => requireMoment((moment) => music.open({ sectionId: moment.id, segment: 'search' }))}
+        onSwitchEvent={canSwitch ? () => (isStaff ? router.push('/events') : setSwitcher(true)) : undefined}
+      />
+      {music.sheet}
+      {events.length > 1 ? <EventSwitcher visible={switcher} onClose={() => setSwitcher(false)} /> : null}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  title: { fontSize: 30, fontFamily: Fonts.display },
-  aiHero: { borderRadius: Radius.xl, padding: Space.xl, gap: 4 },
-  aiTag: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
-  aiTitle: { color: '#fff', fontSize: 22, fontWeight: '800' },
-  aiSub: { color: 'rgba(255,255,255,0.88)', fontSize: 13, lineHeight: 19, marginTop: 4 },
-  aiCount: { color: '#fff', fontSize: 12, fontWeight: '700', marginTop: Space.sm },
-  note: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: Space.md },
-  lab: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginTop: Space.sm },
-  row: { flexDirection: 'row', alignItems: 'center', gap: Space.md, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: Space.md },
-  rowIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-});
