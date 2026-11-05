@@ -8,6 +8,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 
 import { Ring, useC, useScheme } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
+import { Countdown } from '@/components/Countdown';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { AppHeader } from '@/components/AppHeader';
 import { Logo } from '@/components/Logo';
@@ -15,7 +16,7 @@ import { pickCoverImage, uploadCoverPhoto } from '@/lib/coverPhoto';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
-import { loadOverview, type Group, type Overview } from '@/lib/planning';
+import { blendedProgress, loadOverview, setupMilestones, type Group, type Overview } from '@/lib/planning';
 
 const TOUR_KEY = 'onboarding_seen_v1';
 
@@ -68,8 +69,17 @@ export default function PlanScreen() {
 
   if (loading || eventLoading) return <View style={[styles.center, { backgroundColor: c.bg }]}><ActivityIndicator color={Brand.purple} /></View>;
 
-  const pct = overview && overview.totalQuestions > 0 ? Math.round((overview.answeredQuestions / overview.totalQuestions) * 100) : 0;
-  const countdown = event?.event_date ? daysUntil(event.event_date) : null;
+  const answered = overview?.answeredQuestions ?? 0;
+  const totalQ = overview?.totalQuestions ?? 0;
+  // Endowed progress: credit booking milestones the DJ already did so a fresh plan
+  // opens with honest momentum (~15–25%) instead of a demoralizing 0%.
+  const milestones = event ? setupMilestones(event) : [];
+  const pct = event ? blendedProgress(milestones, answered, totalQ) : 0;
+  const doneShorts = milestones.filter((m) => m.done && m.key !== 'account').map((m) => m.short);
+  const seedLine = doneShorts.length
+    ? `You're already ${pct}% there — ${doneShorts.map((s) => `${s} ✓`).join(', ')}`
+    : `You're already ${pct}% there`;
+  const cheer = pct >= 80 ? "You're almost there!" : answered > 0 ? 'Looking great so far' : "You're already on your way";
   const dateLabel = event?.event_date
     ? new Date(event.event_date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })
     : null;
@@ -128,19 +138,12 @@ export default function PlanScreen() {
                 <Text style={styles.heroWelcome}>Welcome back{profile?.firstName ? `, ${profile.firstName}` : ''}</Text>
                 {dateLabel && <Text style={styles.heroDate}>{dateLabel.toUpperCase()}</Text>}
                 <Text style={styles.heroTitle}>{event.name || 'Your Event'}</Text>
-                {countdown != null && countdown >= 0 && (
-                  <View style={styles.countPill}>
-                    <Text style={styles.countNum}>{countdown}</Text>
-                    <Text style={styles.countLab}>{countdown === 1 ? 'day to go' : 'days to go'}</Text>
-                  </View>
-                )}
+                {event.event_date && <Countdown date={event.event_date} />}
                 <View style={styles.heroProgRow}>
                   <Ring pct={pct} size={78} stroke={7} color="#fff" track="rgba(255,255,255,0.28)" />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.heroCheer}>{pct >= 80 ? "You're almost there!" : pct > 0 ? 'Looking great so far' : "Let's get started!"}</Text>
-                    {overview && overview.totalQuestions > 0 && (
-                      <Text style={styles.heroSub}>{overview.answeredQuestions} of {overview.totalQuestions} questions answered</Text>
-                    )}
+                    <Text style={styles.heroCheer}>{cheer}</Text>
+                    <Text style={styles.heroSub}>{answered > 0 ? `${answered} of ${totalQ} questions answered` : seedLine}</Text>
                   </View>
                 </View>
 
@@ -238,13 +241,6 @@ function CategoryCard({ group, index, onPress }: { group: Group; index: number; 
   );
 }
 
-function daysUntil(dateStr: string): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(dateStr + 'T00:00:00');
-  return Math.round((target.getTime() - today.getTime()) / 86400000);
-}
-
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   card: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: Space.lg },
@@ -258,9 +254,6 @@ const styles = StyleSheet.create({
   addPhotoHintText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   heroDate: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
   heroTitle: { color: '#fff', fontSize: 32, fontFamily: Fonts.display, marginTop: 4 },
-  countPill: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: Space.md, backgroundColor: Brand.red, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill },
-  countNum: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  countLab: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '600' },
   heroProgRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md, marginTop: Space.lg },
   heroCheer: { color: '#fff', fontSize: 17, fontWeight: '800' },
   heroSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 2 },

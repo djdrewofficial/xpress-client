@@ -39,14 +39,16 @@ export async function loadAccount(eventId: string, isGuest: boolean, canSeeFinan
   const { data: ev } = await supabase.from('events').select('*').eq('id', eventId).maybeSingle();
 
   // Visibility: guests NEVER see financials, and neither do plain staff employees
-  // (canSeeFinancials=false). Otherwise a per-event override (true/false) wins,
-  // else the event type's default.
+  // (canSeeFinancials=false). Otherwise XOS's one rule decides: event_financials_hidden
+  // folds in the per-event override, venue-paid packages (Toscana), the "Booked EV"
+  // status and the event type. Falls back to override → type if the RPC fails.
   let typeHide = false;
   if (ev?.event_type_id) {
     const { data: et } = await supabase.from('event_types').select('hide_financials').eq('id', ev.event_type_id).maybeSingle();
     typeHide = !!et?.hide_financials;
   }
-  const hidden = ev?.hide_financials ?? typeHide;
+  const { data: hiddenByRule } = await supabase.rpc('event_financials_hidden', { p_event_id: eventId });
+  const hidden = typeof hiddenByRule === 'boolean' ? hiddenByRule : (ev?.hide_financials ?? typeHide);
   const financialsVisible = !isGuest && !hidden && canSeeFinancials;
 
   const [{ data: eAddons }, { data: company }] = await Promise.all([

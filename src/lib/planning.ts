@@ -1,7 +1,41 @@
 import { supabase } from '@/lib/supabase';
 import { apiBase } from '@/lib/api';
 
-export type EventLite = { id: string; name: string; event_date: string | null; cover_photo_url: string | null };
+export type EventLite = {
+  id: string;
+  name: string;
+  event_date: string | null;
+  cover_photo_url: string | null;
+  // Booking essentials the DJ already set — drive the endowed-progress seed below.
+  venue_id?: string | null;
+  package_id?: string | null;
+};
+
+export type SetupMilestone = { key: 'account' | 'date' | 'package' | 'venue'; label: string; short: string; done: boolean };
+
+/** Booking steps that are genuinely already done for a couple (the DJ set the date,
+    booked a package, picked a venue; the account exists). Honest, event-derived — no
+    faked progress. Powers the goal-gradient seed so a new plan never opens at 0%. */
+export function setupMilestones(event: Pick<EventLite, 'event_date' | 'venue_id' | 'package_id'>): SetupMilestone[] {
+  return [
+    { key: 'account', label: 'Account created', short: 'signed up', done: true },
+    { key: 'date', label: 'Date set', short: 'date set', done: !!event.event_date },
+    { key: 'package', label: 'Package booked', short: 'booked', done: !!event.package_id },
+    { key: 'venue', label: 'Venue set', short: 'venue set', done: !!event.venue_id },
+  ];
+}
+
+/** Share of the progress bar reserved for booking milestones already completed.
+    The rest tracks planning answers, so the seed reflects real work, never inflates. */
+export const SETUP_WEIGHT = 0.2;
+
+/** Blend the honest setup seed with answered questions into a 0–100 display percent.
+    Fully-booked couple, zero answers → SETUP_WEIGHT (20%); grows to 100% as they answer. */
+export function blendedProgress(milestones: SetupMilestone[], answeredQuestions: number, totalQuestions: number): number {
+  const setupPct = milestones.length ? milestones.filter((m) => m.done).length / milestones.length : 0;
+  const questionPct = totalQuestions > 0 ? answeredQuestions / totalQuestions : 0;
+  return Math.round((SETUP_WEIGHT * setupPct + (1 - SETUP_WEIGHT) * questionPct) * 100);
+}
 
 export type SectionRow = {
   id: string;
@@ -81,8 +115,8 @@ export type SongRow = {
 export async function getMyEvents(account: { clientId: string | null; eventGuestId: string | null }): Promise<EventLite[]> {
   if (account.clientId) {
     const [{ data: primary }, { data: linked }] = await Promise.all([
-      supabase.from('events').select('id, name, event_date, cover_photo_url').eq('client_id', account.clientId).is('archived_at', null),
-      supabase.from('event_clients').select('event:events(id, name, event_date, cover_photo_url, archived_at)').eq('client_id', account.clientId),
+      supabase.from('events').select('id, name, event_date, cover_photo_url, venue_id, package_id').eq('client_id', account.clientId).is('archived_at', null),
+      supabase.from('event_clients').select('event:events(id, name, event_date, cover_photo_url, venue_id, package_id, archived_at)').eq('client_id', account.clientId),
     ]);
     const seen = new Set<string>();
     const out: EventLite[] = [];
@@ -96,7 +130,7 @@ export async function getMyEvents(account: { clientId: string | null; eventGuest
   if (account.eventGuestId) {
     const { data: g } = await supabase
       .from('event_guests')
-      .select('event:events(id, name, event_date, cover_photo_url)')
+      .select('event:events(id, name, event_date, cover_photo_url, venue_id, package_id)')
       .eq('id', account.eventGuestId)
       .maybeSingle();
     const e = (g as unknown as { event: EventLite | null } | null)?.event;
@@ -111,6 +145,8 @@ export type StaffEvent = {
   event_date: string | null;
   start_time: string | null;
   cover_photo_url: string | null;
+  venue_id: string | null;
+  package_id: string | null;
   clientName: string | null;
   status: { name: string; color: string | null; textColor: string | null } | null;
 };
@@ -121,6 +157,8 @@ type StaffEventRow = {
   event_date: string | null;
   start_time: string | null;
   cover_photo_url: string | null;
+  venue_id: string | null;
+  package_id: string | null;
   client: { first_name: string | null; last_name: string | null } | null;
   status: { name: string; color: string | null; text_color: string | null } | null;
 };
@@ -129,7 +167,7 @@ type StaffEventRow = {
     see only events they're assigned to (event_staff). No financials/contracts here. */
 export async function getStaffEvents(opts: { employeeId: string | null; seesAll: boolean }): Promise<StaffEvent[]> {
   const cols =
-    'id, name, event_date, start_time, cover_photo_url, client:clients(first_name, last_name), status:event_statuses(name, color, text_color)';
+    'id, name, event_date, start_time, cover_photo_url, venue_id, package_id, client:clients(first_name, last_name), status:event_statuses(name, color, text_color)';
   const today = new Date().toISOString().slice(0, 10);
   let query = supabase
     .from('events')
@@ -152,6 +190,8 @@ export async function getStaffEvents(opts: { employeeId: string | null; seesAll:
       event_date: r.event_date,
       start_time: r.start_time,
       cover_photo_url: r.cover_photo_url,
+      venue_id: r.venue_id,
+      package_id: r.package_id,
       clientName: r.client ? [r.client.first_name, r.client.last_name].filter(Boolean).join(' ') || null : null,
       status: r.status ? { name: r.status.name, color: r.status.color, textColor: r.status.text_color } : null,
     });
