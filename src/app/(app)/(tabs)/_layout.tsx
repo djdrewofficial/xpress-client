@@ -1,9 +1,8 @@
 import { Redirect, Tabs } from 'expo-router';
-import { StyleSheet, Text, useColorScheme } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { StyleSheet } from 'react-native';
 
-import { Brand } from '@/lib/theme';
-import { useC } from '@/components/ui';
+import { Fonts } from '@/lib/theme';
+import { Icon, useC, type IconName } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
 
@@ -12,7 +11,6 @@ export const unstable_settings = { initialRouteName: '(plan)' };
 
 export default function TabsLayout() {
   const c = useC();
-  const scheme = useColorScheme();
   const { profile } = useAuth();
   const { eventId, loading } = useEvent();
 
@@ -21,34 +19,30 @@ export default function TabsLayout() {
   if (profile?.accountType === 'staff' && !loading && !eventId) {
     return <Redirect href="/events" />;
   }
-  const icon = (glyph: string) =>
-    function TabIcon({ focused }: { focused: boolean }) {
-      return <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>{glyph}</Text>;
+  const icon = (name: IconName) =>
+    function TabIcon({ color }: { color: string }) {
+      return <Icon name={name} size={24} color={color} />;
     };
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: Brand.purple,
-        tabBarInactiveTintColor: c.textTertiary,
-        // Liquid glass: a floating, frosted bar that content scrolls beneath.
+        tabBarActiveTintColor: c.accent,
+        tabBarInactiveTintColor: c.ink3,
         tabBarStyle: {
           position: 'absolute',
           borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: c.border,
-          backgroundColor: 'transparent',
+          borderTopColor: c.line,
+          backgroundColor: c.surface,
           elevation: 0,
         },
-        tabBarBackground: () => (
-          <BlurView intensity={60} tint={scheme === 'dark' ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
-        ),
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600', fontFamily: Fonts.semibold },
       }}>
-      <Tabs.Screen name="music" options={{ title: 'Music', tabBarIcon: icon('🎵') }} />
-      <Tabs.Screen name="(plan)" options={{ title: 'Plan', tabBarIcon: icon('📋') }} />
-      <Tabs.Screen name="timeline" options={{ title: 'Timeline', tabBarIcon: icon('🗓️') }} />
-      <Tabs.Screen name="you" options={{ title: 'My Event', tabBarIcon: icon('💍') }} />
+      <Tabs.Screen name="music" options={{ title: 'Music', tabBarIcon: icon('music') }} />
+      <Tabs.Screen name="(plan)" options={{ title: 'Plan', tabBarIcon: icon('home') }} />
+      <Tabs.Screen name="timeline" options={{ title: 'Timeline', tabBarIcon: icon('timeline') }} />
+      <Tabs.Screen name="you" options={{ title: 'My Event', tabBarIcon: icon('rings') }} />
     </Tabs>
   );
 }

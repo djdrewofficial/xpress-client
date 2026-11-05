@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 
-import { useC } from '@/components/ui';
+import { Icon, PlayPauseIcon, useC } from '@/components/ui';
 import { Brand, Radius, Space } from '@/lib/theme';
 import { addSong, type SongRow } from '@/lib/planning';
 import { searchTracks, resolvePreview, type Track } from '@/lib/musicSearch';
@@ -198,7 +198,7 @@ export function SongPicker({
               <Text style={{ color: c.textTertiary, fontSize: 12 }} numberOfLines={1}>{sectionTitle}</Text>
             </View>
             <Pressable onPress={onClose} hitSlop={12} style={[styles.close, { backgroundColor: c.cardAlt }]}>
-              <Text style={{ color: c.textSecondary, fontSize: 16, fontWeight: '700' }}>✕</Text>
+              <Icon name="close" size={16} color={c.ink2} />
             </Pressable>
           </View>
 
@@ -210,9 +210,9 @@ export function SongPicker({
               </View>
               {tab === 'search' && (
                 <View style={[styles.searchBox, { backgroundColor: c.cardAlt, borderColor: c.border }]}>
-                  <Text style={{ color: c.textTertiary, fontSize: 16 }}>🔍</Text>
+                  <Icon name="search" size={18} color={c.ink3} />
                   <TextInput style={{ flex: 1, color: c.text, fontSize: 16 }} value={query} onChangeText={setQuery} placeholder="Search songs — or paste a YouTube link…" placeholderTextColor={c.textTertiary} autoFocus returnKeyType="search" />
-                  {query.length > 0 && <Pressable onPress={() => setQuery('')} hitSlop={8}><Text style={{ color: c.textTertiary }}>✕</Text></Pressable>}
+                  {query.length > 0 && <Pressable onPress={() => setQuery('')} hitSlop={8}><Icon name="close" size={16} color={c.ink3} /></Pressable>}
                 </View>
               )}
             </View>
@@ -259,7 +259,7 @@ export function SongPicker({
                     returnKeyType="go"
                     onSubmitEditing={runImport}
                   />
-                  {plUrl.length > 0 && <Pressable onPress={() => setPlUrl('')} hitSlop={8}><Text style={{ color: c.textTertiary }}>✕</Text></Pressable>}
+                  {plUrl.length > 0 && <Pressable onPress={() => setPlUrl('')} hitSlop={8}><Icon name="close" size={16} color={c.ink3} /></Pressable>}
                 </View>
                 <Pressable disabled={plBusy || !plUrl.trim()} onPress={runImport} style={[styles.importBtn, (plBusy || !plUrl.trim()) && { opacity: 0.6 }]}>
                   {plBusy ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Import playlist</Text>}
@@ -300,8 +300,8 @@ function SongRowView({ item, c, playing, state, onPlay, onAdd }: { item: PickIte
   return (
     <View style={[styles.row, { backgroundColor: c.card, borderColor: c.border }]}>
       <Pressable onPress={onPlay} style={styles.artWrap}>
-        {item.artworkUrl ? <Image source={{ uri: item.artworkUrl }} style={styles.art} /> : <View style={[styles.art, { backgroundColor: c.cardAlt, alignItems: 'center', justifyContent: 'center' }]}><Text>🎵</Text></View>}
-        <View style={styles.playOverlay}><Text style={{ color: '#fff', fontSize: 16 }}>{playing ? '⏸' : '▶'}</Text></View>
+        {item.artworkUrl ? <Image source={{ uri: item.artworkUrl }} style={styles.art} /> : <View style={[styles.art, { backgroundColor: c.cardAlt, alignItems: 'center', justifyContent: 'center' }]}><Icon name="music" size={20} color={c.ink3} /></View>}
+        <View style={styles.playOverlay}><PlayPauseIcon playing={playing} size={16} color="#fff" /></View>
       </Pressable>
       <View style={{ flex: 1 }}>
         <Text style={{ color: c.text, fontWeight: '600', fontSize: 14 }} numberOfLines={1}>{item.title}</Text>
@@ -312,9 +312,9 @@ function SongRowView({ item, c, playing, state, onPlay, onAdd }: { item: PickIte
         {item.reason ? <Text style={{ color: c.textTertiary, fontSize: 11, marginTop: 2 }} numberOfLines={1}>{item.reason}</Text> : null}
       </View>
       <Pressable disabled={state != null} onPress={onAdd} hitSlop={8}>
-        {state === 'done' ? <View style={[styles.addBtn, { backgroundColor: '#16a34a22' }]}><Text style={{ color: '#16a34a', fontWeight: '700', fontSize: 18 }}>✓</Text></View>
+        {state === 'done' ? <View style={[styles.addBtn, { backgroundColor: '#16a34a22' }]}><Icon name="check" size={18} color="#16a34a" /></View>
           : state === 'busy' ? <View style={[styles.addBtn, { backgroundColor: c.cardAlt }]}><ActivityIndicator size="small" color={Brand.purple} /></View>
-          : <View style={[styles.addBtn, { backgroundColor: Brand.purple }]}><Text style={{ color: '#fff', fontWeight: '800', fontSize: 20, marginTop: -2 }}>+</Text></View>}
+          : <View style={[styles.addBtn, { backgroundColor: Brand.purple }]}><Icon name="plus" size={18} color="#fff" /></View>}
       </Pressable>
     </View>
   );

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { Icon, type IconName } from '@/components/ui';
 import { Brand, Fonts, Radius, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
@@ -13,7 +14,7 @@ import { SongPicker } from '@/components/SongPicker';
    mock control + arrow pointing to where the feature lives. Shown once; the
    caller persists "seen" and can re-open it from a help button. */
 
-type Slide = { icon: string; title: string; body: string; mock?: { label: string; caption: string }; kind?: 'song' };
+type Slide = { icon: IconName; title: string; body: string; mock?: { label: string; caption: string }; kind?: 'song' };
 
 export function OnboardingTour({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { profile } = useAuth();
@@ -57,36 +58,36 @@ export function OnboardingTour({ visible, onClose }: { visible: boolean; onClose
 
   const slides: Slide[] = [
     {
-      icon: '👋',
+      icon: 'sparkles',
       title: `Welcome${name}!`,
       body: "Let's take a quick tour so you can plan every detail of your big day right from your phone.",
     },
     {
-      icon: '🗂️',
+      icon: 'home',
       title: 'Your plan, organized',
       body: 'Everything is split into simple sections. On the Home screen, tap a category card to open its sections.',
-      mock: { label: '✨  Your Plan', caption: 'Tap a category on Home' },
+      mock: { label: 'Your Plan', caption: 'Tap a category on Home' },
     },
     {
-      icon: '✅',
+      icon: 'check',
       title: 'Answer a few questions',
       body: 'Open a section and tap your answers — they save automatically as you go. Watch your progress fill up!',
     },
     ...(!isGuest
       ? [
           {
-            icon: '🎵',
+            icon: 'music',
             title: 'Add your music',
             body: 'In a music section, tap “Add music” to search Spotify, Apple Music & YouTube — then tap a song to add it.',
-            mock: { label: '＋ Add music', caption: 'Inside a music section' },
+            mock: { label: 'Add music', caption: 'Inside a music section' },
           } as Slide,
           {
-            icon: '⭐',
+            icon: 'star',
             title: 'Must-play & do-not-play',
             body: 'Mark the songs you love as must-play, or add songs to your do-not-play list so we know what to skip.',
           } as Slide,
           {
-            icon: '📸',
+            icon: 'camera',
             title: 'Design your photo booth',
             body: 'Pick a backdrop and a photo-strip design — tap a design to preview it, then “Use This Design”.',
           } as Slide,
@@ -95,7 +96,7 @@ export function OnboardingTour({ visible, onClose }: { visible: boolean; onClose
     ...(canManage
       ? [
           {
-            icon: '↕️',
+            icon: 'grip',
             title: 'Rearrange & manage',
             body: 'Tap “Edit” on a section list to reorder sections with the arrows, remove ones you don\'t need, or restore removed ones.',
             mock: { label: 'Edit', caption: 'Top-right of a section list' },
@@ -106,7 +107,7 @@ export function OnboardingTour({ visible, onClose }: { visible: boolean; onClose
       ? [
           {
             kind: 'song',
-            icon: '🎵',
+            icon: 'music',
             title: 'Make it real',
             body: 'Add one song that has to be on your dance floor — the track that’ll pack it out. We’ll drop it on your Dancing Playlist and mark it must-play so your DJ never misses it.',
           } as Slide,
@@ -114,12 +115,12 @@ export function OnboardingTour({ visible, onClose }: { visible: boolean; onClose
       : []),
     addedSong
       ? {
-          icon: '🎉',
-          title: 'You just added your first song 🎉',
+          icon: 'party',
+          title: 'You just added your first song',
           body: `“${addedSong.title}” is on your must-play list. This is going to be YOURS.`,
         }
       : {
-          icon: '🎉',
+          icon: 'party',
           title: "You're all set!",
           body: 'That\'s the tour. You can reopen it anytime from the “?” button on your Home screen. Let\'s make it amazing!',
         },
@@ -170,7 +171,7 @@ export function OnboardingTour({ visible, onClose }: { visible: boolean; onClose
               {slides.map((s, idx) => (
                 <View key={idx} style={{ width, height: h, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Space.xl }}>
                   <View style={styles.iconWrap}>
-                    <Text style={{ fontSize: 60 }}>{s.icon}</Text>
+                    <Icon name={s.icon} size={56} color="#fff" />
                   </View>
                   <Text style={styles.title}>{s.title}</Text>
                   <Text style={styles.body}>{s.body}</Text>
@@ -180,7 +181,7 @@ export function OnboardingTour({ visible, onClose }: { visible: boolean; onClose
                       <View style={styles.mockPill}>
                         <Text style={styles.mockPillTxt}>{s.mock.label}</Text>
                       </View>
-                      <Text style={styles.arrow}>↑</Text>
+                      <Icon name="chev-d" size={22} color="rgba(255,255,255,0.9)" style={{ transform: [{ rotate: '180deg' }], marginTop: 6 }} />
                       <Text style={styles.mockCaption}>{s.mock.caption}</Text>
                     </View>
                   )}
@@ -189,11 +190,14 @@ export function OnboardingTour({ visible, onClose }: { visible: boolean; onClose
                     <View style={styles.songWrap}>
                       {addedSong && (
                         <View style={styles.addedPill}>
-                          <Text style={styles.addedPillTxt} numberOfLines={1}>✓  {addedSong.title}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Icon name="check" size={16} color="#fff" />
+                            <Text style={styles.addedPillTxt} numberOfLines={1}>{addedSong.title}</Text>
+                          </View>
                         </View>
                       )}
                       <Pressable onPress={() => setPickerOpen(true)} style={styles.songBtn}>
-                        <Text style={styles.songBtnTxt}>{addedSong ? 'Add another song' : '＋  Add your song'}</Text>
+                        <Text style={styles.songBtnTxt}>{addedSong ? 'Add another song' : 'Add your song'}</Text>
                       </Pressable>
                       {starter && (
                         <Text style={styles.songHint}>Saved to “{starter.title}” · marked must-play</Text>

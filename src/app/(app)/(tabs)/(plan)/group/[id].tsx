@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
-import { Bar, useC } from '@/components/ui';
+import { Bar, EmojiIcon, Icon, useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
 import { Encourager } from '@/components/Encourager';
 import { AddSectionSheet } from '@/components/AddSectionSheet';
@@ -104,7 +104,7 @@ export default function GroupScreen() {
         <SafeAreaView edges={['top']}>
           <View style={styles.hdrRow}>
             <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
-              <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>‹</Text>
+              <Icon name="chev-l" size={20} color="#fff" />
               <Text style={{ color: '#fff', fontSize: 16 }}>Back</Text>
             </Pressable>
             {canManage && (sections?.length || removed.length) ? (
@@ -115,7 +115,7 @@ export default function GroupScreen() {
           </View>
 
           <View style={styles.hdrBody}>
-            <View style={styles.hdrIcon}><Text style={{ fontSize: 30 }}>{group?.icon ?? '✨'}</Text></View>
+            <View style={styles.hdrIcon}><EmojiIcon glyph={group?.icon} size={30} color="#fff" /></View>
             <View style={{ flex: 1 }}>
               <Text style={styles.hdrTitle} numberOfLines={2}>{group?.title ?? title ?? 'Sections'}</Text>
               <Text style={styles.hdrSub}>
@@ -152,15 +152,15 @@ export default function GroupScreen() {
                 {editing ? (
                   <View style={{ justifyContent: 'center', gap: 2 }}>
                     <Pressable onPress={() => move(i, -1)} disabled={i === 0 || busy} hitSlop={6} style={styles.arrow}>
-                      <Text style={{ color: i === 0 ? c.textTertiary : Brand.purpleLight, fontSize: 18, fontWeight: '800' }}>↑</Text>
+                      <Icon name="chev-d" size={18} color={i === 0 ? c.ink3 : Brand.purpleLight} style={{ transform: [{ rotate: '180deg' }] }} />
                     </Pressable>
                     <Pressable onPress={() => move(i, 1)} disabled={i === sections.length - 1 || busy} hitSlop={6} style={styles.arrow}>
-                      <Text style={{ color: i === sections.length - 1 ? c.textTertiary : Brand.purpleLight, fontSize: 18, fontWeight: '800' }}>↓</Text>
+                      <Icon name="chev-d" size={18} color={i === sections.length - 1 ? c.ink3 : Brand.purpleLight} />
                     </Pressable>
                   </View>
                 ) : (
                   <View style={[styles.icon, { backgroundColor: complete ? '#22c55e22' : c.cardAlt }]}>
-                    <Text style={{ fontSize: 22 }}>{complete ? '✅' : s.icon ?? '•'}</Text>
+                    {complete ? <Icon name="check" size={22} color="#16a34a" /> : <EmojiIcon glyph={s.icon} size={22} />}
                   </View>
                 )}
                 <View style={{ flex: 1, gap: 7 }}>
@@ -169,14 +169,20 @@ export default function GroupScreen() {
                   <View style={styles.chipRow}>
                     {s.questionCount > 0 && (
                       <View style={[styles.chip, { backgroundColor: complete ? '#22c55e1f' : c.cardAlt }]}>
-                        <Text style={{ color: complete ? '#16a34a' : c.textSecondary, fontSize: 11.5, fontWeight: '700' }}>
-                          {complete ? '✓ All answered' : `${s.answeredCount}/${s.questionCount} answered`}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          {complete ? <Icon name="check" size={12} color="#16a34a" /> : null}
+                          <Text style={{ color: complete ? '#16a34a' : c.textSecondary, fontSize: 11.5, fontWeight: '700' }}>
+                            {complete ? 'All answered' : `${s.answeredCount}/${s.questionCount} answered`}
+                          </Text>
+                        </View>
                       </View>
                     )}
                     {s.songCount > 0 && (
                       <View style={[styles.chip, { backgroundColor: c.cardAlt }]}>
-                        <Text style={{ color: c.textSecondary, fontSize: 11.5, fontWeight: '700' }}>🎵 {s.songCount}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Icon name="music" size={12} color={c.ink2} />
+                          <Text style={{ color: c.textSecondary, fontSize: 11.5, fontWeight: '700' }}>{s.songCount}</Text>
+                        </View>
                       </View>
                     )}
                     {s.questionCount === 0 && s.songCount === 0 && (
@@ -186,10 +192,10 @@ export default function GroupScreen() {
                 </View>
                 {editing ? (
                   <Pressable onPress={() => confirmDelete(s)} disabled={busy} hitSlop={8} style={styles.trash}>
-                    <Text style={{ fontSize: 18 }}>🗑️</Text>
+                    <Icon name="trash" size={18} color={c.danger} />
                   </Pressable>
                 ) : (
-                  <Text style={{ color: c.textTertiary, fontSize: 22, marginLeft: 4 }}>›</Text>
+                  <Icon name="chev-r" size={20} color={c.ink3} />
                 )}
               </View>
             );
@@ -213,7 +219,10 @@ export default function GroupScreen() {
 
         {canManage && !editing && sections && (
           <Pressable onPress={() => setAdding(true)} style={[styles.addSectionBtn, { borderColor: Brand.purple }]}>
-            <Text style={{ color: Brand.purpleLight, fontWeight: '800', fontSize: 15 }}>＋ Add a section</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name="plus" size={16} color={Brand.purpleLight} />
+              <Text style={{ color: Brand.purpleLight, fontWeight: '800', fontSize: 15 }}>Add a section</Text>
+            </View>
           </Pressable>
         )}
 
@@ -223,7 +232,7 @@ export default function GroupScreen() {
             <Text style={[styles.lab, { color: c.textTertiary }]}>REMOVED SECTIONS</Text>
             {removed.map((r) => (
               <View key={r.id} style={[styles.removedRow, { backgroundColor: c.cardAlt, borderColor: c.border }]}>
-                <Text style={{ fontSize: 18 }}>{r.icon ?? '•'}</Text>
+                <EmojiIcon glyph={r.icon} size={18} color={c.ink3} />
                 <Text style={{ flex: 1, color: c.textSecondary, fontSize: 15 }} numberOfLines={1}>{r.title}</Text>
                 <Pressable onPress={() => onRestore(r)} disabled={busy} style={styles.restoreBtn}>
                   <Text style={{ color: Brand.purpleLight, fontWeight: '700', fontSize: 13 }}>Restore</Text>

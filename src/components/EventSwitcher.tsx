@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useC } from '@/components/ui';
+import { Icon, useC } from '@/components/ui';
 import { useEvent } from '@/lib/events';
 import { Brand, Fonts, Radius, Space } from '@/lib/theme';
 
@@ -43,7 +43,7 @@ export function EventSwitcher({ visible, onClose }: { visible: boolean; onClose:
                   <Text numberOfLines={1} style={{ color: c.text, fontSize: 15, fontWeight: '700' }}>{e.name || 'Your Event'}</Text>
                   <Text style={{ color: c.textTertiary, fontSize: 12 }}>{fmt(e.event_date)}</Text>
                 </View>
-                {active ? <Text style={{ color: Brand.purple, fontSize: 18, fontWeight: '800' }}>✓</Text> : null}
+                {active ? <Icon name="check" size={18} color={Brand.purple} /> : null}
               </Pressable>
             );
           })}

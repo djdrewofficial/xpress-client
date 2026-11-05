@@ -11,7 +11,7 @@ import {
 } from 'react-native-reorderable-list';
 import { useFocusEffect } from 'expo-router';
 
-import { useC } from '@/components/ui';
+import { EmojiIcon, Icon, useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
 import { AppHeader } from '@/components/AppHeader';
 import { TimePickerSheet } from '@/components/TimePickerSheet';
@@ -75,7 +75,7 @@ export default function TimelineScreen() {
     setPtBusy(true);
     try {
       const res = await pickAndUploadPlannerTimeline(eventId, src);
-      if (res) { await load(); Alert.alert('Uploaded ✓', `We saved "${res.name}" and shared it with your Xpress team.`); }
+      if (res) { await load(); Alert.alert('Uploaded', `We saved "${res.name}" and shared it with your Xpress team.`); }
     } catch (e) {
       Alert.alert('Upload failed', e instanceof Error ? e.message : 'Please try again.');
     } finally {
@@ -159,7 +159,10 @@ export default function TimelineScreen() {
                 <ActivityIndicator color={Brand.purple} style={{ marginVertical: Space.md, alignSelf: 'flex-start' }} />
               ) : pt ? (
                 <>
-                  <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', marginTop: 4 }} numberOfLines={1}>✓ {pt.name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                    <Icon name="check" size={16} color={c.success} />
+                    <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', flex: 1 }} numberOfLines={1}>{pt.name}</Text>
+                  </View>
                   <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 2, marginBottom: Space.md }}>Shared with your Xpress team. You can replace it anytime.</Text>
                   <Pressable onPress={uploadPlanner} disabled={ptBusy} style={[styles.plannerBtn, { borderColor: Brand.purple }]}>
                     {ptBusy ? <ActivityIndicator color={Brand.purple} /> : <Text style={{ color: Brand.purpleLight, fontWeight: '700' }}>Replace file</Text>}
@@ -171,7 +174,12 @@ export default function TimelineScreen() {
                     Have a timeline from your wedding planner? Upload it (PDF or photo) and we&apos;ll work from it. No planner or don&apos;t have it yet? No worries — we&apos;ll coordinate with them directly.
                   </Text>
                   <Pressable onPress={uploadPlanner} disabled={ptBusy} style={[styles.plannerBtn, { backgroundColor: Brand.purple, borderColor: Brand.purple }]}>
-                    {ptBusy ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800' }}>⬆  Upload timeline</Text>}
+                    {ptBusy ? <ActivityIndicator color="#fff" /> : (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Icon name="upload" size={16} color="#fff" />
+                        <Text style={{ color: '#fff', fontWeight: '800' }}>Upload timeline</Text>
+                      </View>
+                    )}
                   </Pressable>
                 </>
               )}
@@ -180,13 +188,16 @@ export default function TimelineScreen() {
             {groups.map((g) => (
               <View key={g.id} style={{ marginBottom: Space.lg }}>
                 <View style={styles.catHead}>
-                  {g.icon ? <Text style={{ fontSize: 16 }}>{g.icon}</Text> : null}
+                  {g.icon ? <EmojiIcon glyph={g.icon} size={16} color={Brand.purpleLight} /> : null}
                   <Text style={[styles.catTitle, { color: Brand.purpleLight }]}>{g.title.toUpperCase()}</Text>
                   <View style={{ flex: 1 }} />
                   <Text style={{ color: c.textTertiary, fontSize: 12, fontWeight: '600' }}>{g.on.length}</Text>
                   {canManage ? (
                     <Pressable onPress={() => setAddingGroup({ id: g.id, title: g.title })} hitSlop={8} style={[styles.addChip, { borderColor: Brand.purple }]}>
-                      <Text style={{ color: Brand.purpleLight, fontSize: 12, fontWeight: '800' }}>＋ Add</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                        <Icon name="plus" size={12} color={Brand.purpleLight} />
+                        <Text style={{ color: Brand.purpleLight, fontSize: 12, fontWeight: '800' }}>Add</Text>
+                      </View>
                     </Pressable>
                   ) : null}
                 </View>
@@ -208,7 +219,7 @@ export default function TimelineScreen() {
                 </Text>
                 {archived.map((r) => (
                   <View key={r.id} style={[styles.offRow, { backgroundColor: c.cardAlt, borderColor: c.border }]}>
-                    <Text style={{ fontSize: 18, opacity: 0.6 }}>{r.icon ?? '•'}</Text>
+                    <EmojiIcon glyph={r.icon} size={18} color={c.ink3} />
                     <Text style={{ flex: 1, color: c.textSecondary, fontSize: 15, textDecorationLine: 'line-through' }} numberOfLines={1}>{r.title}</Text>
                     <Pressable onPress={() => restore(r)} hitSlop={8} style={[styles.addBtn, { borderColor: Brand.purple }]}>
                       <Text style={{ color: Brand.purpleLight, fontWeight: '700', fontSize: 13 }}>Restore</Text>
@@ -264,7 +275,7 @@ function Row({ section, canManage, onArchive, onEditTime, c }: { section: Sectio
   const timeEl = section.time_enabled && !section.locked && canManage ? (
     <Pressable onPress={onEditTime} hitSlop={6} style={[styles.timePill, section.time_label ? { backgroundColor: Brand.purple } : { borderWidth: 1, borderColor: Brand.purple }]}>
       <Text style={{ color: section.time_label ? '#fff' : Brand.purpleLight, fontWeight: '700', fontSize: 13 }}>
-        {section.time_label ?? '＋ Time'}
+        {section.time_label ?? '+ Time'}
       </Text>
     </Pressable>
   ) : section.time_label ? (
@@ -276,8 +287,8 @@ function Row({ section, canManage, onArchive, onEditTime, c }: { section: Sectio
       onLongPress={canManage ? drag : undefined}
       delayLongPress={180}
       style={[styles.row, Shadow.card, { backgroundColor: c.card, borderColor: active ? Brand.purple : c.border, opacity: active ? 0.95 : 1 }]}>
-      {canManage ? <Text style={{ color: c.textTertiary, fontSize: 20, fontWeight: '700' }}>≡</Text> : null}
-      <Text style={{ fontSize: 22 }}>{section.icon ?? '🎵'}</Text>
+      {canManage ? <Icon name="drag" size={20} color={c.ink3} /> : null}
+      <EmojiIcon glyph={section.icon} size={22} fallback="music" />
       <View style={{ flex: 1 }}>
         <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }} numberOfLines={1}>{section.title}</Text>
         {meta ? <Text style={{ color: c.textTertiary, fontSize: 12, marginTop: 1 }}>{meta}</Text> : null}
@@ -295,7 +306,10 @@ function Row({ section, canManage, onArchive, onEditTime, c }: { section: Sectio
       friction={2}
       rightThreshold={60}
       renderRightActions={() => (
-        <View style={styles.archiveAction}><Text style={styles.archiveTxt}>🗑  Archive</Text></View>
+        <View style={[styles.archiveAction, { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }]}>
+          <Icon name="trash" size={16} color="#fff" />
+          <Text style={styles.archiveTxt}>Archive</Text>
+        </View>
       )}
       onSwipeableOpen={confirmArchive}>
       {inner}

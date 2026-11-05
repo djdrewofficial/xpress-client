@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { Bar, useC } from '@/components/ui';
+import { Bar, EmojiIcon, Icon, useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
 import { AppHeader } from '@/components/AppHeader';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
@@ -37,7 +37,10 @@ export default function MusicScreen() {
           <Text style={[styles.title, { color: c.text }]}>Music</Text>
 
           <LinearGradient colors={[Brand.purple, '#6a4fb8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.aiHero, Shadow.card]}>
-            <Text style={styles.aiTag}>✨ FOR YOU</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name="sparkles" size={12} color="rgba(255,255,255,0.9)" />
+              <Text style={styles.aiTag}>FOR YOU</Text>
+            </View>
             <Text style={styles.aiTitle}>Songs picked for you</Text>
             <Text style={styles.aiSub}>Open any moment below — we suggest tracks based on your story and cultural influences, so every set feels like yours.</Text>
             {totalSongs > 0 && <Text style={styles.aiCount}>{totalSongs} song{totalSongs === 1 ? '' : 's'} picked so far</Text>}
@@ -60,7 +63,7 @@ export default function MusicScreen() {
               return (
                 <Pressable key={s.id} onPress={() => eventId && router.push({ pathname: '/section/[id]', params: { id: s.id, eventId } })}>
                   <View style={[styles.row, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
-                    <View style={[styles.rowIcon, { backgroundColor: c.cardAlt }]}><Text style={{ fontSize: 22 }}>{s.icon ?? '🎵'}</Text></View>
+                    <View style={[styles.rowIcon, { backgroundColor: c.cardAlt }]}><EmojiIcon glyph={s.icon} size={22} fallback="music" /></View>
                     <View style={{ flex: 1, gap: 6 }}>
                       <Text style={{ color: c.text, fontSize: 16, fontWeight: '700' }}>{s.title}</Text>
                       <Bar pct={pct} height={5} />
@@ -68,7 +71,7 @@ export default function MusicScreen() {
                         {s.songCount} song{s.songCount === 1 ? '' : 's'}{s.song_limit != null ? ` of ${s.song_limit}` : ' added'}
                       </Text>
                     </View>
-                    <Text style={{ color: Brand.purpleLight, fontSize: 22 }}>›</Text>
+                    <Icon name="chev-r" size={20} color={Brand.purpleLight} />
                   </View>
                 </Pressable>
               );

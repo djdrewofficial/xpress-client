@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { useC } from '@/components/ui';
+import { Icon, useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
 import { AppHeader } from '@/components/AppHeader';
 import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
@@ -72,7 +72,7 @@ export default function StaffEventsScreen() {
       <View style={{ paddingHorizontal: Space.lg, paddingTop: Space.md }}>
         <Text style={[styles.h1, { color: c.text }]}>Events</Text>
         <View style={[styles.search, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={{ color: c.textTertiary, fontSize: 16 }}>⌕</Text>
+          <Icon name="search" size={16} color={c.ink3} />
           <TextInput
             style={[styles.searchInput, { color: c.text }]}
             placeholder="Search name, client, or date"
@@ -129,10 +129,18 @@ function EventCard({ event, onPress, c }: { event: StaffEvent; onPress: () => vo
 
         <View style={{ padding: Space.md, gap: 3 }}>
           <Text style={{ color: c.text, fontSize: 17, fontWeight: '800' }} numberOfLines={1}>{event.name || 'Untitled event'}</Text>
-          <Text style={{ color: c.textSecondary, fontSize: 13 }}>
-            📅 {fmtDate(event.event_date)}{time ? `  ·  ${time}` : ''}
-          </Text>
-          {event.clientName ? <Text style={{ color: c.textTertiary, fontSize: 13 }} numberOfLines={1}>👤 {event.clientName}</Text> : null}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Icon name="calendar" size={14} color={c.ink2} />
+            <Text style={{ color: c.textSecondary, fontSize: 13 }}>
+              {fmtDate(event.event_date)}{time ? `  ·  ${time}` : ''}
+            </Text>
+          </View>
+          {event.clientName ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name="user" size={14} color={c.ink3} />
+              <Text style={{ color: c.textTertiary, fontSize: 13, flex: 1 }} numberOfLines={1}>{event.clientName}</Text>
+            </View>
+          ) : null}
         </View>
       </View>
     </Pressable>

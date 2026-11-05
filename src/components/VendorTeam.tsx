@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { useC } from '@/components/ui';
+import { Icon, useC } from '@/components/ui';
 import { Brand, Radius, Shadow, Space } from '@/lib/theme';
 import { addEventVendor, listEventVendors, listVendorCategories, removeEventVendor, type EventVendor, type VendorCategory } from '@/lib/vendors';
 
@@ -24,7 +24,10 @@ export function VendorTeam({ eventId }: { eventId: string }) {
     <View style={{ gap: Space.lg }}>
       {/* Why this matters */}
       <View style={[styles.why, { backgroundColor: Brand.purple + '14', borderColor: Brand.purple + '33' }]}>
-        <Text style={{ color: c.text, fontWeight: '700', fontSize: 14, marginBottom: 4 }}>🤝 Why we ask for this</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+          <Icon name="users" size={16} color={c.ink} />
+          <Text style={{ color: c.text, fontWeight: '700', fontSize: 14 }}>Why we ask for this</Text>
+        </View>
         <Text style={{ color: c.textSecondary, fontSize: 13, lineHeight: 19 }}>
           Add everyone working your day — photographer, planner, venue, florist, and more. Having each vendor's contact
           info lets our team reach out and coordinate timing directly with them, so your day flows seamlessly —
@@ -56,7 +59,10 @@ export function VendorTeam({ eventId }: { eventId: string }) {
             />
           ) : (
             <Pressable onPress={() => setAdding(true)} style={[styles.addBtn, { borderColor: Brand.purple }]}>
-              <Text style={{ color: Brand.purple, fontWeight: '700', fontSize: 15 }}>＋ Add a vendor</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Icon name="plus" size={16} color={Brand.purple} />
+                <Text style={{ color: Brand.purple, fontWeight: '700', fontSize: 15 }}>Add a vendor</Text>
+              </View>
             </Pressable>
           )}
         </>
@@ -75,7 +81,7 @@ function VendorCard({ v, c, onRemove }: { v: EventVendor; c: ReturnType<typeof u
           <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginTop: 2 }}>{v.company}</Text>
           {v.contactName ? <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 2 }}>{v.contactName}</Text> : null}
         </View>
-        <Pressable onPress={onRemove} hitSlop={10}><Text style={{ color: c.textTertiary, fontSize: 16 }}>✕</Text></Pressable>
+        <Pressable onPress={onRemove} hitSlop={10} accessibilityLabel="Remove vendor"><Icon name="close" size={16} color={c.ink3} /></Pressable>
       </View>
       <View style={{ flexDirection: 'row', gap: Space.sm, marginTop: Space.sm, flexWrap: 'wrap' }}>
         {tel ? <Chip label="Call" onPress={() => Linking.openURL(`tel:${tel}`)} c={c} /> : null}

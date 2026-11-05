@@ -6,7 +6,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { Ring, useC, useScheme } from '@/components/ui';
+import { EmojiIcon, Icon, Ring, useC, useScheme } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
 import { Countdown } from '@/components/Countdown';
 import { OnboardingTour } from '@/components/OnboardingTour';
@@ -77,7 +77,7 @@ export default function PlanScreen() {
   const pct = event ? blendedProgress(milestones, answered, totalQ) : 0;
   const doneShorts = milestones.filter((m) => m.done && m.key !== 'account').map((m) => m.short);
   const seedLine = doneShorts.length
-    ? `You're already ${pct}% there — ${doneShorts.map((s) => `${s} ✓`).join(', ')}`
+    ? `You're already ${pct}% there — ${doneShorts.join(', ')}`
     : `You're already ${pct}% there`;
   const cheer = pct >= 80 ? "You're almost there!" : answered > 0 ? 'Looking great so far' : "You're already on your way";
   const dateLabel = event?.event_date
@@ -122,10 +122,10 @@ export default function PlanScreen() {
                   <View style={{ flex: 1 }} />
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.md }}>
                     <Pressable onPress={() => setShowTour(true)} hitSlop={8} style={styles.camBtn}>
-                      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>?</Text>
+                      <Icon name="help" size={18} color="#fff" />
                     </Pressable>
                     <Pressable onPress={onChangePhoto} disabled={uploading} hitSlop={8} style={styles.camBtn}>
-                      {uploading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ fontSize: 15 }}>📷</Text>}
+                      {uploading ? <ActivityIndicator color="#fff" size="small" /> : <Icon name="camera" size={16} color="#fff" />}
                     </Pressable>
                     <Pressable onPress={signOut} hitSlop={8}>
                       <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '600' }}>Sign out</Text>
@@ -148,8 +148,9 @@ export default function PlanScreen() {
                 </View>
 
                 {!event.cover_photo_url && (
-                  <Pressable onPress={onChangePhoto} disabled={uploading} style={styles.addPhotoHint} hitSlop={6}>
-                    <Text style={styles.addPhotoHintText}>📷  Add a photo of you two</Text>
+                  <Pressable onPress={onChangePhoto} disabled={uploading} style={[styles.addPhotoHint, { flexDirection: 'row', alignItems: 'center', gap: 6 }]} hitSlop={6}>
+                    <Icon name="camera" size={14} color="#fff" />
+                    <Text style={styles.addPhotoHintText}>Add a photo of you two</Text>
                   </Pressable>
                 )}
               </View>
@@ -159,7 +160,7 @@ export default function PlanScreen() {
                   <Text style={[styles.lab, { color: c.textTertiary }]}>PICK UP WHERE YOU LEFT OFF</Text>
                   <Pressable onPress={() => router.push({ pathname: '/section/[id]', params: { id: nextUp.id, eventId: event.id } })}>
                     <View style={[styles.card, Shadow.card, { backgroundColor: c.card, borderColor: c.border, flexDirection: 'row', alignItems: 'center', gap: Space.md }]}>
-                      <Text style={{ fontSize: 26 }}>{nextUp.icon ?? '🎵'}</Text>
+                      <EmojiIcon glyph={nextUp.icon} size={26} fallback="music" />
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.contTitle, { color: c.text }]}>{nextUp.title}</Text>
                         <Text style={{ color: c.textSecondary, fontSize: 13 }}>{nextUp.answeredCount}/{nextUp.questionCount} answered</Text>
@@ -210,9 +211,12 @@ function CategoryCard({ group, index, onPress }: { group: Group; index: number; 
         <BlurView intensity={dark ? 36 : 60} tint={dark ? 'dark' : 'light'} style={[styles.cat, { borderColor: glassBorder }]}>
           <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: glassFill }]} />
           <View style={styles.catHead}>
-          <Text style={[styles.catEyebrow, { color: done ? Brand.red : Brand.purpleLight }]}>
-            {done ? '✓ COMPLETE' : `STEP ${index + 1}`}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            {done ? <Icon name="check" size={13} color={Brand.red} /> : null}
+            <Text style={[styles.catEyebrow, { color: done ? Brand.red : Brand.purpleLight }]}>
+              {done ? 'COMPLETE' : `STEP ${index + 1}`}
+            </Text>
+          </View>
           <View style={{ flex: 1 }} />
           <Text style={[styles.catPct, { color: c.textTertiary }]}>{pct}%</Text>
         </View>
@@ -220,7 +224,7 @@ function CategoryCard({ group, index, onPress }: { group: Group; index: number; 
         <View style={styles.catTitleRow}>
           <Text style={[styles.catTitle, { color: c.text }]} numberOfLines={2}>{group.title}</Text>
           <View style={[styles.catChevron, { backgroundColor: Brand.purple + '14' }]}>
-            <Text style={{ color: Brand.purpleLight, fontSize: 22, fontWeight: '700', marginTop: -2 }}>›</Text>
+            <Icon name="chev-r" size={18} color={Brand.purpleLight} />
           </View>
         </View>
         <Text style={[styles.catMeta, { color: c.textTertiary }]}>{meta}</Text>

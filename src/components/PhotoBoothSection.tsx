@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 
-import { useC } from '@/components/ui';
+import { Icon, useC } from '@/components/ui';
 import { Brand, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import {
@@ -133,7 +133,10 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
   return (
     <View style={{ gap: Space.xl }}>
       <View style={[styles.why, { backgroundColor: Brand.purple + '14', borderColor: Brand.purple + '33' }]}>
-        <Text style={{ color: c.text, fontWeight: '700', fontSize: 14, marginBottom: 4 }}>📸 Design your photo booth</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+          <Icon name="camera" size={16} color={c.ink} />
+          <Text style={{ color: c.text, fontWeight: '700', fontSize: 14 }}>Design your photo booth</Text>
+        </View>
         <Text style={{ color: c.textSecondary, fontSize: 13, lineHeight: 19 }}>
           Browse our backdrops and photo-strip designs, then tap to pick your favorites. Your choices go straight to our team.
         </Text>
@@ -155,7 +158,7 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
                   style={[styles.bdCard, Shadow.card, { width: cardW, borderColor: sel ? Brand.purple : c.border, backgroundColor: c.card }]}
                 >
                   <Image source={{ uri: b.image_url }} style={{ width: '100%', height: cardW * 1.2 }} contentFit="cover" />
-                  {sel && <View style={styles.check}><Text style={{ color: '#fff', fontWeight: '800' }}>✓</Text></View>}
+                  {sel && <View style={styles.check}><Icon name="check" size={14} color="#fff" /></View>}
                   <View style={styles.bdLabel}>
                     <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }} numberOfLines={1}>{b.name}</Text>
                     {b.category ? <Text style={{ color: '#ffffffcc', fontSize: 11 }} numberOfLines={1}>{b.category}</Text> : null}
@@ -192,7 +195,7 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
                     style={[styles.dCard, { width: cardW, borderColor: sel ? Brand.purple : c.border, backgroundColor: c.cardAlt }]}
                   >
                     <Image source={{ uri: d.src }} style={{ width: '100%', height: cardW * 1.35, backgroundColor: '#fff' }} contentFit="contain" />
-                    {sel && <View style={styles.check}><Text style={{ color: '#fff', fontWeight: '800' }}>✓</Text></View>}
+                    {sel && <View style={styles.check}><Icon name="check" size={14} color="#fff" /></View>}
                     {d.no_of_images ? (
                       <View style={styles.dLabel}>
                         <Text style={styles.tag}>{d.no_of_images}</Text>
@@ -210,7 +213,10 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
                 disabled={page <= 1}
                 style={[styles.pageBtn, { backgroundColor: c.cardAlt, opacity: page <= 1 ? 0.4 : 1 }]}
               >
-                <Text style={{ color: c.text, fontWeight: '700' }}>‹ Prev</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                  <Icon name="chev-l" size={16} color={c.ink} />
+                  <Text style={{ color: c.text, fontWeight: '700' }}>Prev</Text>
+                </View>
               </Pressable>
               <Text style={{ color: c.textSecondary, fontSize: 13, fontWeight: '600' }}>Page {page} of {totalPages}</Text>
               <Pressable
@@ -218,7 +224,10 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
                 disabled={page >= totalPages}
                 style={[styles.pageBtn, { backgroundColor: c.cardAlt, opacity: page >= totalPages ? 0.4 : 1 }]}
               >
-                <Text style={{ color: c.text, fontWeight: '700' }}>Next ›</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                  <Text style={{ color: c.text, fontWeight: '700' }}>Next</Text>
+                  <Icon name="chev-r" size={16} color={c.ink} />
+                </View>
               </Pressable>
             </View>
           </>
@@ -239,7 +248,10 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
                   </View>
                   {design?.src === preview.src ? (
                     <View style={styles.selectedNote}>
-                      <Text style={{ color: '#10b981', fontWeight: '700' }}>✓ This is your selected design</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Icon name="check" size={16} color="#10b981" />
+                        <Text style={{ color: '#10b981', fontWeight: '700' }}>This is your selected design</Text>
+                      </View>
                     </View>
                   ) : (
                     <Pressable onPress={() => useDesign(preview)} style={styles.useBtn}>

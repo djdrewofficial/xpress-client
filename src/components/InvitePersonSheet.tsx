@@ -38,7 +38,7 @@ export function InvitePersonSheet({ visible, eventId, onClose, onInvited }: {
       onInvited?.();
       reset();
       onClose();
-      Alert.alert('Invite sent ✓', `We emailed ${email.trim()} a link to set their password and join your event.`);
+      Alert.alert('Invite sent', `We emailed ${email.trim()} a link to set their password and join your event.`);
     } else {
       setErr(res.error ?? 'Could not send the invite.');
     }

@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 
 import { Logo } from '@/components/Logo';
 import { EventSwitcher } from '@/components/EventSwitcher';
-import { useC } from '@/components/ui';
+import { Icon, useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
 import { Brand, Space } from '@/lib/theme';
@@ -58,7 +58,7 @@ export function AppHeader({
         <View style={styles.side}>
           {showBack ? (
             <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back} accessibilityRole="button" accessibilityLabel="Back">
-              <Text style={{ color: Brand.purpleLight, fontSize: 30, marginTop: -3 }}>‹</Text>
+              <Icon name="chev-l" size={26} color={Brand.purpleLight} />
             </Pressable>
           ) : null}
         </View>
@@ -66,7 +66,7 @@ export function AppHeader({
         <Pressable onPress={canSwitch ? onTitle : undefined} disabled={!canSwitch} style={styles.center} hitSlop={8}>
           <View style={styles.titleRow}>
             <Text numberOfLines={1} style={[styles.title, { color: c.text }]}>{label}</Text>
-            {canSwitch ? <Text style={{ color: c.textTertiary, fontSize: 13 }}>⌄</Text> : null}
+            {canSwitch ? <Icon name="chev-d" size={14} color={c.ink3} /> : null}
           </View>
           {subtitle ? <Text numberOfLines={1} style={[styles.sub, { color: c.textTertiary }]}>{subtitle}</Text> : null}
         </Pressable>

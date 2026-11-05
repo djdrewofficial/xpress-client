@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { useC } from '@/components/ui';
+import { Icon, useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
 import { AppHeader } from '@/components/AppHeader';
 import { InvitePersonSheet } from '@/components/InvitePersonSheet';
@@ -194,7 +194,10 @@ export default function AccountScreen() {
                   </Text>
                   <Pressable onPress={() => setShowInvite(true)} style={{ width: '100%' }}>
                     <LinearGradient colors={[Brand.purple, Brand.purpleLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bigBtn}>
-                      <Text style={styles.bigBtnTxt}>＋ Invite someone</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Icon name="plus" size={16} color="#fff" />
+                        <Text style={styles.bigBtnTxt}>Invite someone</Text>
+                      </View>
                     </LinearGradient>
                   </Pressable>
                 </View>
@@ -207,11 +210,14 @@ export default function AccountScreen() {
 
               {/* Legal footer: AI disclosure (Guideline 5.1.2) + privacy policy link (5.1.1). */}
               <View style={{ marginTop: Space.md, gap: Space.sm, alignItems: 'center' }}>
-                <Text style={{ color: c.textTertiary, fontSize: 11, lineHeight: 16, textAlign: 'center', paddingHorizontal: Space.md }}>
-                  ✨ &ldquo;For You&rdquo; song suggestions are AI-generated. To create them, the event details and music
-                  preferences you enter are sent to OpenAI to build recommendations. This information is never used for
-                  advertising.
-                </Text>
+                <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: Space.md }}>
+                  <Icon name="sparkles" size={13} color={c.ink3} />
+                  <Text style={{ color: c.textTertiary, fontSize: 11, lineHeight: 16, textAlign: 'center', flex: 1 }}>
+                    &ldquo;For You&rdquo; song suggestions are AI-generated. To create them, the event details and music
+                    preferences you enter are sent to OpenAI to build recommendations. This information is never used for
+                    advertising.
+                  </Text>
+                </View>
                 <Pressable onPress={() => Linking.openURL(PRIVACY_URL)} hitSlop={8}>
                   <Text style={{ color: Brand.purpleLight, fontSize: 13, fontWeight: '700' }}>Privacy Policy</Text>
                 </Pressable>

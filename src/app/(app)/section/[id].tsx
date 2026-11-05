@@ -4,7 +4,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 
-import { Bar, useC } from '@/components/ui';
+import { Bar, EmojiIcon, Icon, useC } from '@/components/ui';
 import { Backdrop } from '@/components/Backdrop';
 import { AppHeader } from '@/components/AppHeader';
 import { Encourager } from '@/components/Encourager';
@@ -93,7 +93,7 @@ export default function SectionScreen() {
         >
           <View style={{ gap: Space.md }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.sm }}>
-              {meta?.icon ? <Text style={{ fontSize: 26 }}>{meta.icon}</Text> : null}
+              {meta?.icon ? <EmojiIcon glyph={meta.icon} size={26} /> : null}
               <Text style={[styles.title, { color: c.text, flex: 1 }]}>{meta?.title}</Text>
             </View>
             {meta?.intro ? <Text style={{ color: c.textSecondary, fontSize: 14, lineHeight: 20 }}>{meta.intro}</Text> : null}
@@ -101,7 +101,7 @@ export default function SectionScreen() {
               <View style={{ gap: 6, marginTop: 2 }}>
                 <Bar pct={pct} height={6} track={c.cardAlt} />
                 <Text style={{ color: c.textTertiary, fontSize: 12, fontWeight: '600' }}>
-                  {answeredCount === visible.length ? '✓ All answered' : `${answeredCount} of ${visible.length} answered`}
+                  {answeredCount === visible.length ? 'All answered' : `${answeredCount} of ${visible.length} answered`}
                 </Text>
               </View>
             )}
@@ -136,11 +136,17 @@ export default function SectionScreen() {
                 <View style={{ flexDirection: 'row', gap: Space.sm }}>
                   {meta.ai_picks_enabled && (
                     <Pressable onPress={() => setPicker('foryou')} style={({ pressed }) => [styles.actionBtn, { backgroundColor: Brand.purple, opacity: pressed ? 0.9 : 1 }]}>
-                      <Text style={styles.actionTxt}>✨ For You</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Icon name="sparkles" size={16} color="#fff" />
+                        <Text style={styles.actionTxt}>For You</Text>
+                      </View>
                     </Pressable>
                   )}
                   <Pressable onPress={() => setPicker('search')} style={({ pressed }) => [styles.actionBtn, { backgroundColor: c.cardAlt, borderWidth: 1, borderColor: c.border, opacity: pressed ? 0.9 : 1 }]}>
-                    <Text style={[styles.actionTxt, { color: c.text }]}>＋ Add music</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Icon name="plus" size={16} color={c.ink} />
+                      <Text style={[styles.actionTxt, { color: c.text }]}>Add music</Text>
+                    </View>
                   </Pressable>
                 </View>
               )}
@@ -155,10 +161,11 @@ export default function SectionScreen() {
                     allowDoNotPlay={isDoNotPlay}
                   />
                   {songs.length > 4 && (
-                    <Pressable onPress={() => setSongsExpanded((o) => !o)} style={[styles.showAll, { borderColor: Brand.purple }]}>
+                    <Pressable onPress={() => setSongsExpanded((o) => !o)} style={[styles.showAll, { borderColor: Brand.purple, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }]}>
                       <Text style={{ color: Brand.purple, fontWeight: '800', fontSize: 14 }}>
-                        {songsExpanded ? 'Show fewer ▲' : `Show all ${songs.length} songs ▼`}
+                        {songsExpanded ? 'Show fewer' : `Show all ${songs.length} songs`}
                       </Text>
+                      <Icon name="chev-d" size={16} color={Brand.purple} style={songsExpanded ? { transform: [{ rotate: '180deg' }] } : undefined} />
                     </Pressable>
                   )}
                 </View>
@@ -229,7 +236,7 @@ function QuestionField({
     <View style={[styles.qCard, Shadow.card, { backgroundColor: c.card, borderColor: answered ? Brand.purple + '55' : c.border }]}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: Space.sm }}>
         <View style={[styles.qNum, { backgroundColor: answered ? Brand.purple : c.cardAlt }]}>
-          <Text style={{ color: answered ? '#fff' : c.textTertiary, fontSize: 12, fontWeight: '800' }}>{answered ? '✓' : index}</Text>
+          {answered ? <Icon name="check" size={12} color="#fff" /> : <Text style={{ color: c.textTertiary, fontSize: 12, fontWeight: '800' }}>{index}</Text>}
         </View>
         <View style={{ flex: 1, gap: 3 }}>
           <Text style={{ color: c.text, fontSize: 15, fontWeight: '600', lineHeight: 21 }}>{q.prompt}</Text>

@@ -4,7 +4,7 @@ import { LogBox, Pressable, ScrollView, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
-import { useFonts, DMSerifDisplay_400Regular } from '@expo-google-fonts/dm-serif-display';
+import { useFonts, DMSerifDisplay_400Regular, DMSerifDisplay_400Regular_Italic } from '@expo-google-fonts/dm-serif-display';
 import {
   Montserrat_400Regular,
   Montserrat_500Medium,
@@ -101,6 +101,7 @@ function RootNavigator() {
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     DMSerifDisplay_400Regular,
+    DMSerifDisplay_400Regular_Italic,
     Montserrat_400Regular,
     Montserrat_500Medium,
     Montserrat_600SemiBold,

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GradientButton, useC } from '@/components/ui';
+import { EmojiIcon, GradientButton, Icon, useC } from '@/components/ui';
 import { Brand, Radius, Space } from '@/lib/theme';
 import {
   getAddableSections,
@@ -116,8 +116,9 @@ export function AddSectionSheet({
       <View style={{ flex: 1, backgroundColor: c.bg }}>
         <SafeAreaView edges={['top']} style={{ flex: 1 }}>
           <View style={[styles.hdr, { borderColor: c.border }]}>
-            <Pressable onPress={mode === 'custom' ? () => setMode('menu') : onClose} hitSlop={10}>
-              <Text style={{ color: Brand.purpleLight, fontSize: 16, fontWeight: '600' }}>{mode === 'custom' ? '‹ Back' : 'Cancel'}</Text>
+            <Pressable onPress={mode === 'custom' ? () => setMode('menu') : onClose} hitSlop={10} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+              {mode === 'custom' ? <Icon name="chev-l" size={18} color={Brand.purpleLight} /> : null}
+              <Text style={{ color: Brand.purpleLight, fontSize: 16, fontWeight: '600' }}>{mode === 'custom' ? 'Back' : 'Cancel'}</Text>
             </Pressable>
             <Text style={{ color: c.text, fontSize: 16, fontWeight: '700' }}>{mode === 'custom' ? 'Custom section' : 'Add a section'}</Text>
             <View style={{ width: 54 }} />
@@ -137,15 +138,18 @@ export function AddSectionSheet({
                     <Text style={[styles.lab, { color: c.textTertiary }]}>SUGGESTED</Text>
                     {addable.map((t) => (
                       <Pressable key={t.templateSectionId} disabled={busy} onPress={() => pickTemplate(t)} style={[styles.row, { backgroundColor: c.card, borderColor: c.border }]}>
-                        <Text style={{ fontSize: 22 }}>{t.icon ?? '✨'}</Text>
+                        <EmojiIcon glyph={t.icon} size={22} color={c.ink} />
                         <Text style={{ flex: 1, color: c.text, fontSize: 16, fontWeight: '600' }}>{t.title}</Text>
-                        <Text style={{ color: Brand.purpleLight, fontSize: 22 }}>＋</Text>
+                        <Icon name="plus" size={20} color={Brand.purpleLight} />
                       </Pressable>
                     ))}
                   </>
                 )}
                 <Pressable disabled={busy} onPress={() => setMode('custom')} style={[styles.customBtn, { borderColor: Brand.purple }]}>
-                  <Text style={{ color: Brand.purpleLight, fontWeight: '800', fontSize: 15 }}>＋ Create a custom section</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Icon name="plus" size={16} color={Brand.purpleLight} />
+                    <Text style={{ color: Brand.purpleLight, fontWeight: '800', fontSize: 15 }}>Create a custom section</Text>
+                  </View>
                 </Pressable>
                 {error ? <Text style={styles.err}>{error}</Text> : null}
               </>
@@ -162,7 +166,7 @@ export function AddSectionSheet({
                       <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{s.title}</Text>
                       {s.artist ? <Text style={{ color: c.textTertiary, fontSize: 12 }} numberOfLines={1}>{s.artist}</Text> : null}
                     </View>
-                    <Pressable hitSlop={8} onPress={() => setSongs((prev) => prev.filter((_, j) => j !== i))}><Text style={{ color: c.textTertiary, fontSize: 20 }}>✕</Text></Pressable>
+                    <Pressable hitSlop={8} onPress={() => setSongs((prev) => prev.filter((_, j) => j !== i))} accessibilityLabel="Remove song"><Icon name="close" size={18} color={c.ink3} /></Pressable>
                   </View>
                 ))}
 
@@ -177,7 +181,7 @@ export function AddSectionSheet({
                           <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{t.title}</Text>
                           <Text style={{ color: c.textTertiary, fontSize: 12 }} numberOfLines={1}>{t.artist}</Text>
                         </View>
-                        <Text style={{ color: Brand.purpleLight, fontSize: 22 }}>＋</Text>
+                        <Icon name="plus" size={20} color={Brand.purpleLight} />
                       </Pressable>
                     ))}
                   </>

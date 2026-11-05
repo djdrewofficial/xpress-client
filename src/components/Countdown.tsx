@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/ui/Icon';
 import { Brand, Fonts, Radius, Space } from '@/lib/theme';
 
 /* A living wedding countdown for the Plan hero. Rather than a flat "247 days
@@ -18,9 +19,19 @@ const MOMENTS = [
   'the party of your lives',
 ] as const;
 
-type Tier = 'married' | 'dayOf' | 'finalWeek' | 'mid' | 'far';
+export type CountdownTier = 'married' | 'dayOf' | 'finalWeek' | 'mid' | 'far';
 
-function tierFor(days: number): Tier {
+export type CountdownModel = {
+  days: number;
+  tier: CountdownTier;
+  toneLabel: string;
+  toneColor: string;
+  moment: string;
+  /** Sentence beside the numeral. No emoji. */
+  line: string;
+};
+
+function tierFor(days: number): CountdownTier {
   if (days < 0) return 'married';
   if (days === 0) return 'dayOf';
   if (days <= 7) return 'finalWeek';
@@ -28,7 +39,7 @@ function tierFor(days: number): Tier {
   return 'far';
 }
 
-const TONE: Record<Tier, { label: string; accent: string }> = {
+const TONE: Record<CountdownTier, { label: string; accent: string }> = {
   far: { label: 'DREAM BIG — THERE’S NO RUSH', accent: Brand.purpleLighter },
   mid: { label: 'LET’S SHAPE THE NIGHT', accent: Brand.purpleLighter },
   finalWeek: { label: 'THE FINAL MAGICAL TOUCHES', accent: Brand.redLight },
@@ -44,26 +55,35 @@ export function daysUntil(dateStr: string): number {
   return Math.round((target.getTime() - today.getTime()) / 86400000);
 }
 
-export function Countdown({ date }: { date: string }) {
+/** Shared by the Plan hero (`Countdown`) and the v2 `CountdownHero`. */
+export function countdownModel(date: string): CountdownModel {
   const days = daysUntil(date);
   const tier = tierFor(days);
   const tone = TONE[tier];
   const moment = MOMENTS[Math.abs(days) % MOMENTS.length];
-
-  // Lead glyph/number + the line that frames the moment, per tier.
-  const lead = tier === 'dayOf' ? '✨' : tier === 'married' ? '💍' : String(days);
-  const leadSmall = tier === 'dayOf' || tier === 'married';
   const line =
-    tier === 'dayOf' ? `Today, ${moment} 💫`
+    tier === 'dayOf' ? `Today, ${moment}`
     : tier === 'married' ? 'Congratulations, newlyweds'
     : `${days === 1 ? 'day' : 'days'} until ${moment}`;
+  return { days, tier, toneLabel: tone.label, toneColor: tone.accent, moment, line };
+}
+
+export function Countdown({ date }: { date: string }) {
+  const model = countdownModel(date);
+  const leadSmall = model.tier === 'dayOf' || model.tier === 'married';
 
   return (
     <View style={styles.banner}>
-      <Text style={[styles.lead, leadSmall && styles.leadSmall, { color: tone.accent }]}>{lead}</Text>
+      {model.tier === 'dayOf' ? (
+        <Icon name="sparkles" size={34} color={model.toneColor} />
+      ) : model.tier === 'married' ? (
+        <Icon name="rings" size={34} color={model.toneColor} />
+      ) : (
+        <Text style={[styles.lead, leadSmall && styles.leadSmall, { color: model.toneColor }]}>{model.days}</Text>
+      )}
       <View style={{ flex: 1 }}>
-        <Text style={styles.line}>{line}</Text>
-        <Text style={[styles.tone, { color: tone.accent }]}>{tone.label}</Text>
+        <Text style={styles.line}>{model.line}</Text>
+        <Text style={[styles.tone, { color: model.toneColor }]}>{model.toneLabel}</Text>
       </View>
     </View>
   );
