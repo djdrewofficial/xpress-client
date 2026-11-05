@@ -410,7 +410,7 @@ export async function loadSection(eventId: string, sectionId: string): Promise<{
 export async function loadEventSongs(eventId: string): Promise<EventSong[]> {
   const { data } = await supabase
     .from('planning_songs')
-    .select('id, section_id, title, artist, artwork_url, preview_url, must_play, do_not_play, note, sort_order')
+    .select('id, section_id, title, artist, artwork_url, preview_url, must_play, do_not_play, note, provider, sort_order')
     .eq('event_id', eventId)
     .order('sort_order');
   return (data ?? []).map((s) => ({ ...toSongRow(s), section_id: s.section_id }));
