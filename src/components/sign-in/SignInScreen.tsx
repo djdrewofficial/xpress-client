@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView, KeyboardController, KeyboardEvents } from 'react-native-keyboard-controller';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 
@@ -62,8 +62,14 @@ export function SignInScreen({ transport = liveOtp, initial }: { transport?: Otp
   const [focused, setFocused] = useState(false);
   const [busy, setBusy] = useState(false);
   const [seconds, setSeconds] = useState(initial?.seconds ?? RESEND_SECONDS);
+  const [keyboardOpen, setKeyboardOpen] = useState(() => KeyboardController.isVisible());
+  const scrollRef = useRef<ScrollView>(null);
 
-  const heroH = phase === 'code' ? Math.round(height * 0.32) : Math.round(height * 0.46);
+  // Full-bleed screen (no nav header), so KeyboardAvoidingView's offset stays 0.
+  // The hero is a fixed slice of the window — leave it expanded and the send
+  // button lands under the keypad. Phone-pad has no return key to dismiss it.
+  const expandedHero = phase === 'code' ? Math.round(height * 0.32) : Math.round(height * 0.46);
+  const heroH = keyboardOpen ? insets.top + 72 : expandedHero;
   const target = channel === 'phone' ? phone : email;
   const canSend = channel === 'phone' ? !!toE164(phone) : emailLooksValid(email);
 
@@ -72,6 +78,31 @@ export function SignInScreen({ transport = liveOtp, initial }: { transport?: Otp
     const id = setTimeout(() => setSeconds((s) => s - 1), 1000);
     return () => clearTimeout(id);
   }, [phase, codeError, seconds]);
+
+  useEffect(() => {
+    const show = KeyboardEvents.addListener('keyboardWillShow', (e) => {
+      if (e.height > 0) setKeyboardOpen(true);
+    });
+    const didShow = KeyboardEvents.addListener('keyboardDidShow', () => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+    // Expand only after the keyboard is gone so the button isn't covered mid-dismiss.
+    const hide = KeyboardEvents.addListener('keyboardDidHide', () => {
+      setKeyboardOpen(false);
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    });
+    return () => {
+      show.remove();
+      didShow.remove();
+      hide.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!keyboardOpen) return;
+    const id = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+    return () => clearTimeout(id);
+  }, [keyboardOpen, phase, channel, formError, codeError]);
 
   function switchChannel(next: OtpChannel) {
     setChannel(next);
@@ -143,8 +174,8 @@ export function SignInScreen({ transport = liveOtp, initial }: { transport?: Otp
           <LinearGradient colors={[...Gradients.loginHero]} style={StyleSheet.absoluteFill} />
           <MovingBlobs />
           <SafeAreaView edges={['top']} style={styles.heroInner}>
-            <Logo variant="full" height={phase === 'code' ? 64 : 84} tone="#ffffff" />
-            {phase === 'form' ? (
+            <Logo variant="full" height={keyboardOpen ? 48 : phase === 'code' ? 64 : 84} tone="#ffffff" />
+            {phase === 'form' && !keyboardOpen ? (
               <Text style={kickerStyle}>
                 {kickerBefore}
                 <Text style={kickerAccentStyle}>{t('login.kickerAccent')}</Text>
@@ -152,9 +183,24 @@ export function SignInScreen({ transport = liveOtp, initial }: { transport?: Otp
               </Text>
             ) : null}
           </SafeAreaView>
+          {keyboardOpen ? (
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => { KeyboardController.dismiss(); }}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.done')}
+            />
+          ) : null}
         </View>
 
-        <View style={[styles.panel, { backgroundColor: c.bg, paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <View style={[styles.panel, { backgroundColor: c.bg, paddingBottom: keyboardOpen ? 8 : Math.max(insets.bottom, 12) }]}>
+          <ScrollView
+            ref={scrollRef}
+            style={{ flex: 1 }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            automaticallyAdjustKeyboardInsets={false}
+            contentContainerStyle={{ flexGrow: 1, gap: 16 }}>
           {phase === 'form' ? (
             <View style={{ gap: 16 }}>
               <View style={{ gap: 6 }}>
@@ -189,6 +235,9 @@ export function SignInScreen({ transport = liveOtp, initial }: { transport?: Otp
                     autoCorrect={false}
                     autoComplete={channel === 'phone' ? 'tel' : 'email'}
                     textContentType={channel === 'phone' ? 'telephoneNumber' : 'emailAddress'}
+                    returnKeyType={channel === 'email' ? 'send' : 'done'}
+                    blurOnSubmit
+                    onSubmitEditing={() => send('form')}
                     onFocus={() => setFocused(true)}
                     onBlur={() => setFocused(false)}
                     style={[styles.input, { color: c.ink }]}
@@ -209,8 +258,6 @@ export function SignInScreen({ transport = liveOtp, initial }: { transport?: Otp
               <Text style={[Type.footnote, styles.invite, { color: c.ink3 }]}>{t('login.invite')}</Text>
             </View>
           ) : (
-            <View style={{ flex: 1 }}>
-              <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 16 }}>
               <View style={{ gap: 16 }}>
                 <View style={{ gap: 6 }}>
                   <Text style={[Type.overline, { color: c.red }]}>
@@ -252,12 +299,13 @@ export function SignInScreen({ transport = liveOtp, initial }: { transport?: Otp
                   )
                 ) : null}
               </View>
-              </ScrollView>
-              <Pressable onPress={useDifferent} hitSlop={10} style={styles.switchBtn}>
-                <Text style={[Type.label, styles.center, { color: c.red }]}>{t('code.switch')}</Text>
-              </Pressable>
-            </View>
           )}
+          </ScrollView>
+          {phase === 'code' ? (
+            <Pressable onPress={useDifferent} hitSlop={10} style={styles.switchBtn}>
+              <Text style={[Type.label, styles.center, { color: c.red }]}>{t('code.switch')}</Text>
+            </Pressable>
+          ) : null}
         </View>
       </KeyboardAvoidingView>
     </View>
