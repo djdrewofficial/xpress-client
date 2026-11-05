@@ -38,7 +38,7 @@ export function InvitePersonSheet({ visible, eventId, onClose, onInvited }: {
       onInvited?.();
       reset();
       onClose();
-      Alert.alert('Invite sent', `We emailed ${email.trim()} a link to set their password and join your event.`);
+      Alert.alert('Invite sent', `We emailed ${email.trim()} a link to sign in with a one-time code and join your event.`);
     } else {
       setErr(res.error ?? 'Could not send the invite.');
     }
@@ -62,7 +62,7 @@ export function InvitePersonSheet({ visible, eventId, onClose, onInvited }: {
 
               <ScrollView contentContainerStyle={{ padding: Space.lg, gap: Space.md }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
                 <Text style={{ color: c.textSecondary, fontSize: 13, lineHeight: 19 }}>
-                  Invite your partner or wedding planner to help plan your event. We&apos;ll email them a link to set a password and sign in.
+                  Invite your partner or wedding planner to help plan your event. We&apos;ll email them a link to sign in with a one-time code.
                 </Text>
 
                 <View style={{ flexDirection: 'row', gap: Space.sm }}>

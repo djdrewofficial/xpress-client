@@ -32,7 +32,9 @@ export default function PlanScreen() {
   const [showTour, setShowTour] = useState(false);
   const tourChecked = useRef(false);
 
-  // First run after sign-in: show the walkthrough once (per device).
+  // Couples finish Welcome in OnboardingGate, which marks this seen.
+  // If the flag is still empty (staff opening an event, or an interrupted
+  // first run), show the music + first-song steps once. Welcome/legal is not here.
   useEffect(() => {
     if (tourChecked.current || !profile) return;
     tourChecked.current = true;

@@ -1,15 +1,21 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect } from 'react';
+import { ActivityIndicator, Linking, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { GradientButton, useC } from '@/components/ui';
-import { Brand, Fonts, Radius, Space } from '@/lib/theme';
+import { useC } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
+import { Type } from '@/lib/theme';
 
-/** Parse #fragment (or ?query) params from a deep link URL. */
+/**
+ * Legacy invite / reset links (xpressclient://auth/set-password).
+ * There is no password form. If the link carries a session, we sign them in
+ * and continue. Otherwise we send them to the one-time-code screen.
+ */
+
+const HASH_TYPES = ['signup', 'invite', 'magiclink', 'recovery', 'email_change', 'email'] as const;
+type HashType = (typeof HASH_TYPES)[number];
+
 function parseParams(url: string): Record<string, string> {
   const out: Record<string, string> = {};
   const raw = url.includes('#') ? url.split('#')[1] : url.includes('?') ? url.split('?')[1] : '';
@@ -20,97 +26,75 @@ function parseParams(url: string): Record<string, string> {
   return out;
 }
 
-type Phase = 'loading' | 'form' | 'error' | 'saving';
-
-export default function SetPasswordScreen() {
-  const c = useC();
-  const router = useRouter();
-  const [phase, setPhase] = useState<Phase>('loading');
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    async function handle(url: string | null) {
-      if (!url) return;
-      const p = parseParams(url);
-      if (p.access_token && p.refresh_token) {
-        const { error: e } = await supabase.auth.setSession({ access_token: p.access_token, refresh_token: p.refresh_token });
-        if (mounted) setPhase(e ? 'error' : 'form');
-      } else {
-        const { data } = await supabase.auth.getSession();
-        if (mounted) setPhase(data.session ? 'form' : 'error');
-      }
-    }
-    Linking.getInitialURL().then(handle);
-    const sub = Linking.addEventListener('url', (e) => handle(e.url));
-    return () => { mounted = false; sub.remove(); };
-  }, []);
-
-  async function save() {
-    setError(null);
-    if (password.length < 8) return setError('Use at least 8 characters.');
-    if (password !== confirm) return setError('Passwords don’t match.');
-    setPhase('saving');
-    const { error: e } = await supabase.auth.updateUser({ password });
-    if (e) {
-      setError(e.message);
-      setPhase('form');
-      return;
-    }
-    router.replace('/');
-  }
-
-  return (
-    <LinearGradient colors={[Brand.purple, '#2c1d57']} style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoidingView style={styles.wrap} behavior="padding">
-          <Text style={styles.brand}>Set your password</Text>
-          <Text style={styles.tagline}>Welcome to Xpress Entertainment</Text>
-
-          {phase === 'loading' ? (
-            <ActivityIndicator color="#fff" style={{ marginTop: Space.xl }} />
-          ) : phase === 'error' ? (
-            <View style={styles.card}>
-              <Text style={{ color: c.textSecondary, textAlign: 'center' }}>
-                This link has expired or is invalid. Ask your DJ to resend your invitation.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.card}>
-              <TextInput
-                style={[styles.input, { backgroundColor: c.cardAlt, color: c.text }]}
-                placeholder="New password"
-                placeholderTextColor={c.textTertiary}
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
-              <TextInput
-                style={[styles.input, { backgroundColor: c.cardAlt, color: c.text }]}
-                placeholder="Confirm password"
-                placeholderTextColor={c.textTertiary}
-                secureTextEntry
-                value={confirm}
-                onChangeText={setConfirm}
-                onSubmitEditing={save}
-              />
-              {error && <Text style={styles.error}>{error}</Text>}
-              <GradientButton label={phase === 'saving' ? 'Saving…' : 'Set password & continue'} onPress={save} disabled={phase === 'saving'} style={{ marginTop: Space.sm }} />
-            </View>
-          )}
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </LinearGradient>
-  );
+function isHashType(value: string): value is HashType {
+  return (HASH_TYPES as readonly string[]).includes(value);
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, justifyContent: 'center', paddingHorizontal: Space.xl, gap: Space.md },
-  brand: { color: '#fff', fontSize: 26, fontFamily: Fonts.display, textAlign: 'center' },
-  tagline: { color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center', marginBottom: Space.lg },
-  card: { backgroundColor: '#fff', borderRadius: Radius.xl, padding: Space.xl, gap: Space.md },
-  input: { letterSpacing: 0, borderRadius: Radius.md, paddingHorizontal: Space.lg, paddingVertical: 14, fontSize: 16 },
-  error: { color: '#dc2626', textAlign: 'center', fontSize: 14 },
-});
+async function adoptInviteUrl(url: string): Promise<boolean> {
+  try {
+    const p = parseParams(url);
+    if (p.access_token && p.refresh_token) {
+      const { error } = await supabase.auth.setSession({
+        access_token: p.access_token,
+        refresh_token: p.refresh_token,
+      });
+      return !error;
+    }
+    if (p.token_hash && p.type && isHashType(p.type)) {
+      const { error } = await supabase.auth.verifyOtp({ token_hash: p.token_hash, type: p.type });
+      return !error;
+    }
+    if (p.code) {
+      const { error } = await supabase.auth.exchangeCodeForSession(p.code);
+      return !error;
+    }
+    const { data } = await supabase.auth.getSession();
+    return !!data.session;
+  } catch {
+    return false;
+  }
+}
+
+export default function SetPasswordScreen() {
+  const router = useRouter();
+  const c = useC();
+  const { t } = useT();
+
+  useEffect(() => {
+    let cancelled = false;
+    let settled = false;
+    const finish = (ok: boolean) => {
+      if (cancelled || settled) return;
+      settled = true;
+      router.replace(ok ? '/' : '/login');
+    };
+    const timer = setTimeout(() => finish(false), 1500);
+
+    Linking.getInitialURL()
+      .then(async (url) => {
+        if (url && (await adoptInviteUrl(url))) finish(true);
+      })
+      .catch(() => {});
+
+    const sub = Linking.addEventListener('url', async (event) => {
+      try {
+        finish(await adoptInviteUrl(event.url));
+      } catch {
+        finish(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      sub.remove();
+    };
+  }, [router]);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <ActivityIndicator color={c.accent} />
+      <Text style={[Type.callout, { color: c.ink2 }]}>{t('auth.signingIn')}</Text>
+    </View>
+  );
+}

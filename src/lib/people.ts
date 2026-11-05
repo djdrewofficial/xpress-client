@@ -3,7 +3,7 @@ import { apiBase } from '@/lib/api';
 
 /* Invite a partner or planner to the couple's event. Posts to the XOS mobile
    endpoint, which creates/refreshes the event_guests row and emails a branded
-   set-password invite (the link deep-links back into this app). */
+   invite (the link deep-links back into this app; sign-in is a one-time code). */
 
 export async function inviteGuest(input: {
   eventId: string;

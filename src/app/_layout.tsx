@@ -14,6 +14,7 @@ import {
 } from '@expo-google-fonts/montserrat';
 
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { LocaleProvider } from '@/lib/i18n';
 import { BrandSplash } from '@/components/BrandSplash';
 import { patchTextFonts } from '@/lib/fontPatch';
 
@@ -90,9 +91,8 @@ function RootNavigator() {
       <Stack.Protected guard={!session}>
         <Stack.Screen name="login" />
       </Stack.Protected>
-      {/* Always reachable — invite/reset deep links land here (xpressclient://auth/set-password). */}
+      {/* Legacy invite/reset links. They no longer set a password — they sign in or return to the code screen. */}
       <Stack.Screen name="auth/set-password" />
-      {/* In-app password reset (email → code → new password), from the login screen. */}
       <Stack.Screen name="auth/forgot-password" />
     </Stack>
   );
@@ -132,8 +132,10 @@ export default function RootLayout() {
         <GestureHandlerRootView style={{ flex: 1 }}>
           <KeyboardProvider>
             <AuthProvider>
-              <StatusBar style="auto" />
-              <RootNavigator />
+              <LocaleProvider>
+                <StatusBar style="auto" />
+                <RootNavigator />
+              </LocaleProvider>
             </AuthProvider>
           </KeyboardProvider>
         </GestureHandlerRootView>

@@ -22,6 +22,7 @@ export function CountdownHero({
   progress,
   size = 'compact',
   locale = 'en',
+  showMoment = true,
 }: {
   date: string;
   venue?: string | null;
@@ -31,6 +32,11 @@ export function CountdownHero({
   progress?: number;
   size?: 'compact' | 'large';
   locale?: 'en' | 'es';
+  /**
+   * Living moment sentence under the unit. Welcome passes false: that line is
+   * English-only, and the welcome artboard doesn't show it.
+   */
+  showMoment?: boolean;
 }) {
   const model = countdownModel(date);
   const showCount = model.tier !== 'dayOf' && model.tier !== 'married';
@@ -63,7 +69,7 @@ export function CountdownHero({
             <Icon name="rings" size={56} color={Gradients.countdownHero.glow} />
           )}
           <Text style={[Type.callout, styles.unit]}>{unit}</Text>
-          <Text style={[Type.footnote, styles.moment]}>{model.line}</Text>
+          {showMoment ? <Text style={[Type.footnote, styles.moment]}>{model.line}</Text> : null}
           {progressLabel ? <Text style={[Type.subhead, styles.progress]}>{progressLabel}</Text> : null}
         </View>
       ) : (
