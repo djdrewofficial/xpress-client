@@ -31,13 +31,10 @@ import {
   type AccountData,
 } from '@/lib/account';
 import { readMarketingTexts, writeMarketingTexts } from '@/lib/language';
-import { useT } from '@/lib/i18n';
+import { translate, useT, type Locale } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 
 const PRIVACY_URL = 'https://xos.xpressdjs.com/app-privacy';
-
-const AI_DISCLOSURE =
-  '“For You” song suggestions are AI-generated. To create them, the event details and music preferences you enter are sent to OpenAI to build recommendations. This information is never used for advertising.';
 
 export default function AccountScreen() {
   const c = useC();
@@ -54,7 +51,7 @@ export default function AccountScreen() {
   const [accountName, setAccountName] = useState(profile?.firstName || 'Your account');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const { locale, setLocale } = useT();
+  const { locale, setLocale, t } = useT();
   const [marketing, setMarketing] = useState(false);
 
   const [showInvite, setShowInvite] = useState(false);
@@ -79,8 +76,8 @@ export default function AccountScreen() {
         event ? loadVenueName(event.venue_id) : Promise.resolve(null),
         event ? loadCoupleName(event.id, event.name) : Promise.resolve(null),
         isGuest && profile.eventGuestId ? loadGuestRole(profile.eventGuestId) : Promise.resolve('Guest'),
-        event ? loadTeamPerson(event.id, account?.companyName ?? null) : Promise.resolve(null),
-        loadAccountName(profile),
+        event ? loadTeamPerson(event.id, account?.companyName ?? null, locale) : Promise.resolve(null),
+        loadAccountName(profile, locale),
       ]);
       setData(account);
       setVenueName(venue);
@@ -91,7 +88,7 @@ export default function AccountScreen() {
     } finally {
       setLoading(false);
     }
-  }, [profile, event]);
+  }, [profile, event, locale]);
 
   useEffect(() => {
     load();
@@ -120,7 +117,7 @@ export default function AccountScreen() {
   const phone = OFFICE_PHONE.replace(/[^\d+]/g, '');
 
   const financials: MyEventFinancials | null = data?.financialsVisible
-    ? buildFinancials(data)
+    ? buildFinancials(data, locale)
     : null;
   const hiddenReason = !data || data.financialsVisible
     ? null
@@ -136,7 +133,7 @@ export default function AccountScreen() {
         loading={loading || eventLoading}
         refreshing={refreshing}
         onRefresh={onRefresh}
-        eyebrow={event ? formatEyebrow(event.name, event.event_date) : null}
+        eyebrow={event ? formatEyebrow(event.name, event.event_date, locale) : null}
         onBack={
           isStaff
             ? () => {
@@ -148,24 +145,24 @@ export default function AccountScreen() {
         onSwitch={events.length > 1 ? () => setSwitcher(true) : undefined}
         hasEvent={!!event && !!data}
         financials={financials}
-        banner={hiddenReason ? hiddenFinancialsBanner(hiddenReason) : null}
+        banner={hiddenReason ? hiddenFinancialsBanner(hiddenReason, locale) : null}
         guest={
           profile?.accountType === 'event_guest' && event
-            ? { role: guestRole || 'Guest', invitedBy: coupleName || event.name }
+            ? { role: guestRole === 'Guest' || !guestRole ? t('common.guest') : guestRole, invitedBy: coupleName || event.name }
             : null
         }
         eventFacts={
           data && !data.financialsVisible
-            ? { dateLabel: formatMediumDate(event?.event_date) ?? 'Date TBD', venue: venueName }
+            ? { dateLabel: formatMediumDate(event?.event_date, locale) ?? t('common.dateTbd'), venue: venueName }
             : null
         }
         packageInfo={
           data
             ? {
-                name: data.packageName ?? 'Custom Package',
+                name: data.packageName ?? t('event.customPackage'),
                 detail:
                   data.packageDescription?.trim() ||
-                  (data.includedHours ? `${data.includedHours} hours of entertainment` : null),
+                  (data.includedHours ? t('event.hours', { count: data.includedHours }) : null),
               }
             : null
         }
@@ -226,91 +223,98 @@ export default function AccountScreen() {
           signOut();
         }}
       />
-      <Sheet visible={disclosure} onClose={() => setDisclosure(false)} title="AI disclosure">
-        <Text style={[Type.footnote, { color: c.ink2 }]}>{AI_DISCLOSURE}</Text>
+      <Sheet visible={disclosure} onClose={() => setDisclosure(false)} title={t('event.ai')}>
+        <Text style={[Type.footnote, { color: c.ink2 }]}>{t('event.aiBody')}</Text>
       </Sheet>
-      <Sheet visible={packageOpen} onClose={() => setPackageOpen(false)} title={data?.packageName ?? 'Your package'}>
+      <Sheet visible={packageOpen} onClose={() => setPackageOpen(false)} title={data?.packageName ?? t('event.package')}>
         {data ? <PackageDetails data={data} /> : null}
       </Sheet>
     </View>
   );
 }
 
-function buildFinancials(data: AccountData): MyEventFinancials {
+function buildFinancials(data: AccountData, locale: Locale): MyEventFinancials {
   const schedule = decorateSchedule(data.schedule, data.payments);
   const pendingTotal = data.payments.filter((p) => p.pending).reduce((sum, p) => sum + p.amount, 0);
   const progress = data.total > 0 ? Math.max(0, Math.min(100, (data.paid / data.total) * 100)) : 0;
+  const money = (n: number) => formatMoney(n, locale);
   return {
-    balance: formatMoney(Math.max(0, data.balance)),
-    nextLine: nextPaymentLine(schedule, data.balance),
-    paidLabel: `${formatMoney(data.paid)} paid`,
-    ofLabel: `of ${formatMoney(data.total)}`,
+    balance: money(Math.max(0, data.balance)),
+    nextLine: nextPaymentLine(schedule, data.balance, locale),
+    paidLabel: translate(locale, 'event.paidOf', { amount: money(data.paid) }),
+    ofLabel: translate(locale, 'event.ofTotal', { amount: money(data.total) }),
     progress,
-    schedule: schedule.map((item) => ({
-      id: item.id,
-      seqLabel: item.seqLabel,
-      title: item.label?.trim() || `Payment ${item.seqLabel}`,
-      detail: item.paid
-        ? `Paid${formatMediumDate(item.paidAt) ? ` ${formatMediumDate(item.paidAt)}` : ''}`
-        : `Due${formatMediumDate(item.dueDate) ? ` ${formatMediumDate(item.dueDate)}` : ''}`,
-      paid: item.paid,
-      amount: formatMoney(item.amount),
-    })),
+    schedule: schedule.map((item) => {
+      const paidWhen = formatMediumDate(item.paidAt, locale);
+      const dueWhen = formatMediumDate(item.dueDate, locale);
+      return {
+        id: item.id,
+        seqLabel: item.seqLabel,
+        title: item.label?.trim() || translate(locale, 'event.paymentN', { n: item.seqLabel }),
+        detail: item.paid
+          ? (paidWhen ? translate(locale, 'event.paidOn', { when: paidWhen }) : translate(locale, 'event.paid'))
+          : (dueWhen ? translate(locale, 'event.dueOn', { when: dueWhen }) : translate(locale, 'event.due')),
+        paid: item.paid,
+        amount: money(item.amount),
+      };
+    }),
     footnote: data.billingTerms,
     pendingNote:
       pendingTotal > 0
-        ? `A pending payment of ${formatMoney(pendingTotal)} isn't included in the balance yet.`
+        ? translate(locale, 'event.pendingNote', { amount: money(pendingTotal) })
         : null,
   };
 }
 
 function PackageDetails({ data }: { data: AccountData }) {
   const c = useC();
+  const { t, locale } = useT();
+  const money = (n: number) => formatMoney(n, locale);
   const addonsTotal = data.addons.reduce((sum, a) => sum + a.price, 0);
   return (
     <ScrollView style={{ maxHeight: 460 }} contentContainerStyle={{ gap: 12, paddingBottom: 8 }}>
       {data.includedHours ? (
-        <Text style={[Type.footnote, { color: c.accent }]}>{data.includedHours} hours of entertainment</Text>
+        <Text style={[Type.footnote, { color: c.accent }]}>{t('event.hours', { count: data.includedHours })}</Text>
       ) : null}
       {data.packageDescription ? (
         <Text style={[Type.footnote, { color: c.ink2 }]}>{data.packageDescription}</Text>
       ) : null}
       {data.addons.length > 0 ? (
         <View style={{ gap: 8 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>What's included</Text>
+          <Text style={[Type.label, { color: c.ink3 }]}>{t('event.included')}</Text>
           {data.addons.map((addon, index) => (
             <Line
               key={`${addon.name}-${index}`}
               label={`${addon.qty > 1 ? `${addon.qty}× ` : ''}${addon.name}`}
-              value={data.financialsVisible ? formatMoney(addon.price) : ''}
+              value={data.financialsVisible ? money(addon.price) : ''}
             />
           ))}
         </View>
       ) : null}
       {data.financialsVisible ? (
         <View style={{ gap: 8 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>Your investment</Text>
-          <Line label="Package" value={formatMoney(data.packagePrice)} />
-          {addonsTotal > 0 ? <Line label="Add-ons" value={formatMoney(addonsTotal)} /> : null}
-          {data.travelFee > 0 ? <Line label="Travel" value={formatMoney(data.travelFee)} /> : null}
-          {data.overtimeFee > 0 ? <Line label="Overtime" value={formatMoney(data.overtimeFee)} /> : null}
+          <Text style={[Type.label, { color: c.ink3 }]}>{t('event.investment')}</Text>
+          <Line label={t('event.packageLine')} value={money(data.packagePrice)} />
+          {addonsTotal > 0 ? <Line label={t('event.addons')} value={money(addonsTotal)} /> : null}
+          {data.travelFee > 0 ? <Line label={t('event.travel')} value={money(data.travelFee)} /> : null}
+          {data.overtimeFee > 0 ? <Line label={t('event.overtime')} value={money(data.overtimeFee)} /> : null}
           {data.discounts.map((discount, index) => (
-            <Line key={`${discount.label}-${index}`} label={discount.label} value={`– ${formatMoney(discount.amount)}`} accent={c.success} />
+            <Line key={`${discount.label}-${index}`} label={discount.label} value={`– ${money(discount.amount)}`} accent={c.success} />
           ))}
-          <Line label="Total" value={formatMoney(data.total)} />
-          <Line label="Paid" value={formatMoney(data.paid)} accent={c.success} />
-          <Line label="Balance" value={formatMoney(data.balance)} />
+          <Line label={t('event.total')} value={money(data.total)} />
+          <Line label={t('event.paid')} value={money(data.paid)} accent={c.success} />
+          <Line label={t('event.balanceLine')} value={money(data.balance)} />
         </View>
       ) : null}
       {data.financialsVisible && data.payments.length > 0 ? (
         <View style={{ gap: 8 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>Payments made</Text>
+          <Text style={[Type.label, { color: c.ink3 }]}>{t('event.paymentsMade')}</Text>
           {data.payments.map((payment) => (
             <Line
               key={payment.id}
-              label={`${payment.reason || payment.method || 'Payment'}${payment.pending ? ' · Pending' : ''}`}
-              value={formatMoney(payment.amount)}
-              hint={formatMediumDate(payment.paidAt ? payment.paidAt.slice(0, 10) : null) ?? undefined}
+              label={`${payment.reason || payment.method || t('event.payment')}${payment.pending ? ` · ${t('event.pending')}` : ''}`}
+              value={money(payment.amount)}
+              hint={formatMediumDate(payment.paidAt ? payment.paidAt.slice(0, 10) : null, locale) ?? undefined}
             />
           ))}
         </View>
@@ -383,9 +387,9 @@ async function loadGuestRole(guestId: string): Promise<string> {
   }
 }
 
-async function loadTeamPerson(eventId: string, companyName: string | null): Promise<{ name: string; detail: string }> {
+async function loadTeamPerson(eventId: string, companyName: string | null, locale: Locale): Promise<{ name: string; detail: string }> {
   const company = companyName?.trim() || 'Xpress Entertainment';
-  const fallback = { name: company, detail: 'Your event team' };
+  const fallback = { name: company, detail: translate(locale, 'event.teamFallback') };
   try {
     const { data, error } = await supabase
       .from('event_staff')
@@ -404,7 +408,7 @@ async function loadTeamPerson(eventId: string, companyName: string | null): Prom
     }));
     const dj = rows.find((row) => /dj|mc|entertain/i.test(row.role ?? '')) ?? rows[0];
     const name = [dj.employee?.first_name, dj.employee?.last_name].filter(Boolean).join(' ') || company;
-    const role = dj.role?.trim() || 'Your DJ and MC';
+    const role = dj.role?.trim() || translate(locale, 'event.djFallback');
     return { name, detail: `${role} · ${company}` };
   } catch {
     return fallback;
@@ -416,7 +420,7 @@ async function loadAccountName(profile: {
   clientId: string | null;
   eventGuestId: string | null;
   employeeId: string | null;
-}): Promise<string> {
+}, locale: Locale): Promise<string> {
   try {
     const table = profile.clientId ? 'clients' : profile.eventGuestId ? 'event_guests' : profile.employeeId ? 'employees' : null;
     const id = profile.clientId ?? profile.eventGuestId ?? profile.employeeId;
@@ -430,7 +434,7 @@ async function loadAccountName(profile: {
   } catch {
     /* the profile first name is enough */
   }
-  return profile.firstName || 'Your account';
+  return profile.firstName || translate(locale, 'event.yourAccount');
 }
 
 const styles = StyleSheet.create({

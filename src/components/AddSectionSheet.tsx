@@ -13,6 +13,7 @@ import {
   type AddableSection,
 } from '@/lib/planning';
 import { MOMENT_ICONS, NewMomentForm, type Suggestion } from '@/components/plan/NewMomentForm';
+import { useT } from '@/lib/i18n';
 
 /* New moment — suggested rows come from the event's XOS template sections
    flagged client_addable (the existing addable-sections API). Custom moments
@@ -46,6 +47,7 @@ export function AddSectionSheet({
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useT();
 
   useEffect(() => {
     if (!visible) return;
@@ -86,8 +88,8 @@ export function AddSectionSheet({
   const submit = async () => {
     const title = name.trim();
     const gid = partOf || groupId;
-    if (!title) { setError('Give your moment a name.'); return; }
-    if (!gid) { setError('Choose which part of the day this belongs to.'); return; }
+    if (!title) { setError(t('newMoment.needName')); return; }
+    if (!gid) { setError(t('newMoment.needPart')); return; }
     setBusy(true);
     setError(null);
     const fromTemplate = selected != null && title === selected.title;
@@ -96,7 +98,7 @@ export function AddSectionSheet({
       : await addCustomSection(eventId, gid, { title, notes: notes.trim() || undefined, icon });
     if (!ok) {
       setBusy(false);
-      setError('Could not add that moment. Please try again.');
+      setError(t('newMoment.fail'));
       return;
     }
     if (time) {
@@ -136,7 +138,7 @@ export function AddSectionSheet({
       <TimePickerSheet
         visible={pickingTime}
         initial={time}
-        title="Time"
+        title={t('time.sheet')}
         onClose={() => setPickingTime(false)}
         onSave={(t) => { setTime(t); setPickingTime(false); }}
       />

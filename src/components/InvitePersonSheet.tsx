@@ -4,11 +4,20 @@ import { KeyboardAvoidingView, KeyboardProvider } from 'react-native-keyboard-co
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, useC } from '@/components/ui';
+import { useT, type TranslationKey } from '@/lib/i18n';
 import { Fonts, Radius, Type } from '@/lib/theme';
 import { inviteGuest } from '@/lib/people';
 
 const emailValid = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
-const RELATIONSHIPS = ['Partner', 'Fiancé(e)', 'Wedding Planner', 'Parent', 'Sibling', 'Friend', 'Other'];
+const RELATIONSHIPS: { value: string; key: TranslationKey }[] = [
+  { value: 'Partner', key: 'invite.partner' },
+  { value: 'Fiancé(e)', key: 'invite.fiance' },
+  { value: 'Wedding Planner', key: 'invite.planner' },
+  { value: 'Parent', key: 'invite.parent' },
+  { value: 'Sibling', key: 'invite.sibling' },
+  { value: 'Friend', key: 'invite.friend' },
+  { value: 'Other', key: 'invite.other' },
+];
 
 export function InvitePersonSheet({
   visible,
@@ -25,6 +34,7 @@ export function InvitePersonSheet({
   onSent?: (email: string) => void;
 }) {
   const c = useC();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const [first, setFirst] = useState('');
   const [last, setLast] = useState('');
@@ -49,9 +59,9 @@ export function InvitePersonSheet({
 
   const submit = async () => {
     if (busy) return;
-    if (!first.trim() || !last.trim()) return setErr('First and last name are required.');
-    if (!emailValid(email)) return setErr('A valid email is required.');
-    if (!relationship.trim()) return setErr('Let us know their relationship to the wedding.');
+    if (!first.trim() || !last.trim()) return setErr(t('invite.needNames'));
+    if (!emailValid(email)) return setErr(t('invite.needEmail'));
+    if (!relationship.trim()) return setErr(t('invite.needRel'));
     setErr(null);
     setBusy(true);
     const sentEmail = email.trim();
@@ -63,7 +73,7 @@ export function InvitePersonSheet({
       onClose();
       onSent?.(sentEmail);
     } else {
-      setErr(res.error ?? 'Could not send the invite.');
+      setErr(res.error ?? t('invite.sendFail'));
     }
   };
 
@@ -71,56 +81,56 @@ export function InvitePersonSheet({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
       <KeyboardProvider>
         <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
-          <Pressable style={styles.scrim} onPress={close} accessibilityRole="button" accessibilityLabel="Close">
+          <Pressable style={styles.scrim} onPress={close} accessibilityRole="button" accessibilityLabel={t('invite.close')}>
             <Pressable
               style={[styles.sheet, { backgroundColor: c.surface, paddingBottom: Math.max(insets.bottom, 16) }]}
               onPress={(e) => e.stopPropagation()}>
               <View style={[styles.handle, { backgroundColor: c.ink3 }]} />
-              <Text style={[Type.headline, { color: c.ink, marginBottom: 6 }]}>Invite someone</Text>
+              <Text style={[Type.headline, { color: c.ink, marginBottom: 6 }]}>{t('invite.title')}</Text>
               <ScrollView
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="interactive"
                 contentContainerStyle={{ gap: 14, paddingBottom: 8 }}
                 style={{ maxHeight: 520 }}>
                 <Text style={[Type.footnote, { color: c.ink2 }]}>
-                  Invite your partner or wedding planner to help plan your event. We&apos;ll email them a link to sign in with a one-time code.
+                  {t('invite.help')}
                 </Text>
 
                 <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <Field label="First name" style={{ flex: 1 }}>
-                    <Input value={first} onChangeText={setFirst} placeholder="First" autoCapitalize="words" />
+                  <Field label={t('invite.first')} style={{ flex: 1 }}>
+                    <Input value={first} onChangeText={setFirst} placeholder={t('invite.firstPh')} autoCapitalize="words" />
                   </Field>
-                  <Field label="Last name" style={{ flex: 1 }}>
-                    <Input value={last} onChangeText={setLast} placeholder="Last" autoCapitalize="words" />
+                  <Field label={t('invite.last')} style={{ flex: 1 }}>
+                    <Input value={last} onChangeText={setLast} placeholder={t('invite.lastPh')} autoCapitalize="words" />
                   </Field>
                 </View>
 
-                <Field label="Email">
+                <Field label={t('invite.email')}>
                   <Input
                     value={email}
                     onChangeText={setEmail}
-                    placeholder="name@email.com"
+                    placeholder={t('invite.emailPh')}
                     autoCapitalize="none"
                     keyboardType="email-address"
                     autoCorrect={false}
                   />
                 </Field>
 
-                <Field label="Relationship to the wedding">
+                <Field label={t('invite.relationship')}>
                   <View style={styles.chips}>
                     {RELATIONSHIPS.map((r) => {
-                      const active = relationship.trim().toLowerCase() === r.toLowerCase();
+                      const active = relationship.trim().toLowerCase() === r.value.toLowerCase();
                       return (
                         <Pressable
-                          key={r}
-                          onPress={() => setRelationship(r === 'Other' ? '' : r)}
+                          key={r.value}
+                          onPress={() => setRelationship(r.value === 'Other' ? '' : r.value)}
                           style={[
                             styles.chip,
                             active
                               ? { backgroundColor: c.accent, borderColor: c.accent }
                               : { backgroundColor: c.surface2, borderColor: c.line },
                           ]}>
-                          <Text style={{ color: active ? c.onAccent : c.ink, fontFamily: Fonts.semibold, fontSize: 13 }}>{r}</Text>
+                          <Text style={{ color: active ? c.onAccent : c.ink, fontFamily: Fonts.semibold, fontSize: 13 }}>{t(r.key)}</Text>
                         </Pressable>
                       );
                     })}
@@ -128,15 +138,15 @@ export function InvitePersonSheet({
                   <Input
                     value={relationship}
                     onChangeText={setRelationship}
-                    placeholder="Partner, wedding planner, parent…"
+                    placeholder={t('invite.relPh')}
                     autoCapitalize="words"
                   />
                 </Field>
 
                 {err ? <Text style={[Type.footnote, { color: c.danger }]}>{err}</Text> : null}
-                <Button label={busy ? 'Sending…' : 'Send invite'} onPress={submit} disabled={busy} />
+                <Button label={busy ? t('invite.sending') : t('invite.send')} onPress={submit} disabled={busy} />
                 {busy ? <ActivityIndicator color={c.accent} /> : null}
-                <Button label="Cancel" variant="ghost" onPress={close} disabled={busy} />
+                <Button label={t('common.cancel')} variant="ghost" onPress={close} disabled={busy} />
               </ScrollView>
             </Pressable>
           </Pressable>

@@ -2,6 +2,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, EmojiIcon, Icon, MomentRow, NavBar, useC } from '@/components/ui';
+import { translate, useT, type Locale } from '@/lib/i18n';
 import { Fonts, Radius, Space, Type } from '@/lib/theme';
 
 export type GroupMoment = {
@@ -50,6 +51,7 @@ export function GroupBody({
   busy?: boolean;
 }) {
   const c = useC();
+  const { t } = useT();
   const showEdit = canManage && (moments.length > 0 || removed.length > 0);
 
   return (
@@ -59,14 +61,14 @@ export function GroupBody({
           large
           title={title}
           onBack={onBack}
-          trailing={showEdit ? { label: editing ? 'Done' : 'Edit', onPress: onToggleEdit } : undefined}
+          trailing={showEdit ? { label: editing ? t('common.done') : t('common.edit'), onPress: onToggleEdit } : undefined}
         />
         <Text style={[Type.footnote, { color: c.ink2, paddingHorizontal: 20, marginBottom: 8 }]}>{subtitle}</Text>
       </SafeAreaView>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140, gap: 10 }}>
         {editing ? (
           <Text style={[Type.footnote, { color: c.ink3 }]}>
-            Reorder with the arrows, or remove a moment. {busy ? 'Saving…' : ''}
+            {t('group.reorderHint')} {busy ? t('common.saving') : ''}
           </Text>
         ) : null}
         {loading ? (
@@ -87,7 +89,7 @@ export function GroupBody({
                 <Text style={[styles.editTitle, { color: c.ink, flex: 1 }]} numberOfLines={1}>
                   {m.title}
                 </Text>
-                <Pressable onPress={() => onDelete(m.id)} disabled={busy} hitSlop={8} accessibilityLabel={`Remove ${m.title}`}>
+                <Pressable onPress={() => onDelete(m.id)} disabled={busy} hitSlop={8} accessibilityLabel={t('group.removeA11y', { title: m.title })}>
                   <Icon name="trash" size={18} color={c.danger} />
                 </Pressable>
               </View>
@@ -97,12 +99,12 @@ export function GroupBody({
           )
         )}
         {!loading && moments.length === 0 ? (
-          <Text style={[Type.footnote, { color: c.ink3, paddingVertical: 8 }]}>No moments in this chapter yet.</Text>
+          <Text style={[Type.footnote, { color: c.ink3, paddingVertical: 8 }]}>{t('group.empty')}</Text>
         ) : null}
-        {canManage && !editing ? <Button label="Add a moment" variant="ghost" onPress={onAdd} /> : null}
+        {canManage && !editing ? <Button label={t('group.add')} variant="ghost" onPress={onAdd} /> : null}
         {canManage && editing && removed.length > 0 ? (
           <View style={{ marginTop: 12, gap: 8 }}>
-            <Text style={[Type.label, { color: c.ink3 }]}>Removed</Text>
+            <Text style={[Type.label, { color: c.ink3 }]}>{t('group.removed')}</Text>
             {removed.map((r) => (
               <View key={r.id} style={[styles.removed, { borderColor: c.line, backgroundColor: c.surface2 }]}>
                 <EmojiIcon glyph={r.icon} size={18} color={c.ink3} />
@@ -110,7 +112,7 @@ export function GroupBody({
                   {r.title}
                 </Text>
                 <Pressable onPress={() => onRestore(r.id)} disabled={busy} hitSlop={8}>
-                  <Text style={[Type.button, { color: c.accent }]}>Restore</Text>
+                  <Text style={[Type.button, { color: c.accent }]}>{t('common.restore')}</Text>
                 </Pressable>
               </View>
             ))}
@@ -145,7 +147,7 @@ const styles = StyleSheet.create({
   },
 });
 
-export function groupSubtitle(moments: number, status: string | null): string {
-  const count = `${moments} ${moments === 1 ? 'moment' : 'moments'}`;
+export function groupSubtitle(moments: number, status: string | null, locale: Locale = 'en'): string {
+  const count = `${moments} ${translate(locale, moments === 1 ? 'home.moment' : 'home.moments')}`;
   return status ? `${count} · ${status}` : count;
 }

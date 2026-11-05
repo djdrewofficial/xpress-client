@@ -1,6 +1,7 @@
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Sheet } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 import { Type } from '@/lib/theme';
 import { useC } from '@/components/ui/useC';
 
@@ -20,15 +21,16 @@ export function DeleteAccountSheet({
   onDone: () => void;
 }) {
   const c = useC();
+  const { t } = useT();
   const working = phase === 'working';
   const title =
-    phase === 'done' ? 'Account deleted' : phase === 'error' ? 'Something went wrong' : 'Delete your account?';
+    phase === 'done' ? t('event.deletedTitle') : phase === 'error' ? t('event.deleteError') : t('event.deleteTitle');
   const body =
     phase === 'done'
-      ? `Your account has been deleted. To return, email ${SUPPORT_EMAIL} for a new invite.`
+      ? t('event.deletedBody', { email: SUPPORT_EMAIL })
       : phase === 'error'
-        ? `We couldn't delete your account. Please try again, or email ${SUPPORT_EMAIL}.`
-        : `This permanently deletes your login and removes your access to this event. To use the app again you'll need a new invite — email ${SUPPORT_EMAIL}.`;
+        ? t('event.deleteFailBody', { email: SUPPORT_EMAIL })
+        : t('event.deleteBody', { email: SUPPORT_EMAIL });
 
   const dismiss = () => {
     if (working) return;
@@ -42,12 +44,12 @@ export function DeleteAccountSheet({
       <View style={styles.actions}>
         {phase === 'confirm' || phase === 'working' ? (
           <>
-            <Button label={working ? 'Deleting…' : 'Delete account'} onPress={onConfirm} disabled={working} />
-            <Button label="Cancel" variant="ghost" onPress={onClose} disabled={working} />
+            <Button label={working ? t('event.deleting') : t('event.deleteBtn')} onPress={onConfirm} disabled={working} />
+            <Button label={t('common.cancel')} variant="ghost" onPress={onClose} disabled={working} />
             {working ? <ActivityIndicator color={c.red} style={styles.spin} /> : null}
           </>
         ) : (
-          <Button label="OK" onPress={phase === 'done' ? onDone : onClose} />
+          <Button label={t('common.done')} onPress={phase === 'done' ? onDone : onClose} />
         )}
       </View>
     </Sheet>
@@ -64,12 +66,13 @@ export function InviteSentSheet({
   onClose: () => void;
 }) {
   const c = useC();
+  const { t } = useT();
   return (
-    <Sheet visible={visible} onClose={onClose} title="Invite sent">
+    <Sheet visible={visible} onClose={onClose} title={t('event.inviteSent')}>
       <Text style={[Type.footnote, styles.body, { color: c.ink2 }]}>
-        We emailed {email} a link to sign in with a one-time code and join your event.
+        {t('event.inviteSentBody', { email })}
       </Text>
-      <Button label="Done" onPress={onClose} />
+      <Button label={t('common.done')} onPress={onClose} />
     </Sheet>
   );
 }

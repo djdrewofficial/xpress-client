@@ -10,6 +10,7 @@ import { MomentBody, type MomentSong, type MomentTab } from '@/components/plan/M
 import { findDanceFloor, isDanceFloorSection, isDoNotPlaySection, momentEyebrow, momentNumber } from '@/components/plan/model';
 import { useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { useT } from '@/lib/i18n';
 import { resolvePreview } from '@/lib/musicSearch';
 import {
   loadOverview,
@@ -41,10 +42,11 @@ type Meta = {
 
 export default function SectionScreen() {
   const c = useC();
+  const { t, locale } = useT();
   const router = useRouter();
   const { session, profile } = useAuth();
   const { id, eventId, from } = useLocalSearchParams<{ id: string; eventId: string; from?: string }>();
-  const backLabel = (Array.isArray(from) ? from[0] : from) || 'Timeline';
+  const backLabel = (Array.isArray(from) ? from[0] : from) || t('moment.backTimeline');
 
   const [meta, setMeta] = useState<Meta | null>(null);
   const [eventName, setEventName] = useState('');
@@ -119,14 +121,14 @@ export default function SectionScreen() {
   async function persist(qid: string, v: string) {
     if (!session?.user.id) return;
     const ok = await saveAnswer(eventId, qid, v, session.user.id);
-    if (!ok) Alert.alert("Couldn't save", "That answer didn't save — check your connection and try again.");
+    if (!ok) Alert.alert(t('common.couldntSave'), t('moment.saveFailBody'));
   }
   function pick(qid: string, v: string) {
     setLocal(qid, v);
     persist(qid, v);
   }
 
-  const failed = () => Alert.alert("Couldn't save", 'Please check your connection and try again.');
+  const failed = () => Alert.alert(t('common.couldntSave'), t('common.checkConnection'));
 
   const onToggleMust = async (song: MomentSong) => {
     const current = songs.find((s) => s.id === song.id);
@@ -170,7 +172,7 @@ export default function SectionScreen() {
     if (!meta) return;
     setMeta({ ...meta, time_label: time });
     if (!(await setSectionTime(eventId, id, time))) {
-      Alert.alert("Couldn't update the time", 'Please try again.');
+      Alert.alert(t('moment.timeFail'), t('common.tryAgain'));
       load();
     }
   };
@@ -195,7 +197,7 @@ export default function SectionScreen() {
       <MomentBody
         backLabel={backLabel}
         onBack={() => router.back()}
-        eyebrow={momentEyebrow(momentNo, meta.time_label)}
+        eyebrow={momentEyebrow(momentNo, meta.time_label, locale)}
         onEyebrow={canManage && meta.time_enabled && !meta.locked ? () => setPickingTime(true) : undefined}
         title={meta.title}
         icon={meta.icon}
@@ -250,7 +252,7 @@ export default function SectionScreen() {
       <TimePickerSheet
         visible={pickingTime}
         initial={meta.time_label}
-        title={`${meta.title} time`}
+        title={t('moment.timeTitle', { title: meta.title })}
         onClose={() => setPickingTime(false)}
         onSave={saveTime}
       />

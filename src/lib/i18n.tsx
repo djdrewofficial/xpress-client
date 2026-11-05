@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type PropsWithChildren } from 'react';
 
+import { appEn, appEs } from '@/lib/appCopy';
 import { useAuth } from '@/lib/auth';
 import { readClientLanguage, readInitialLocale, readLanguagePref, saveLocale } from '@/lib/preferences';
 
@@ -12,7 +13,7 @@ import { readClientLanguage, readInitialLocale, readLanguagePref, saveLocale } f
  * `{{accent}}` is left in place so a screen can paint that word in italic.
  */
 
-const en = {
+const phaseEn = {
   'login.kicker': 'The {{accent}}\nWedding\nExperience',
   'login.kickerAccent': 'Ultimate',
   'login.welcome': 'Welcome back',
@@ -105,7 +106,7 @@ const en = {
   'auth.signingIn': 'Signing you in…',
 };
 
-const es: Record<keyof typeof en, string> = {
+const phaseEs: Record<keyof typeof phaseEn, string> = {
   'login.kicker': 'La {{accent}}\nde Boda\nDefinitiva',
   'login.kickerAccent': 'Experiencia',
   'login.welcome': 'Bienvenido de nuevo',
@@ -198,8 +199,16 @@ const es: Record<keyof typeof en, string> = {
   'auth.signingIn': 'Entrando…',
 };
 
+const en = { ...phaseEn, ...appEn };
+const es: Record<keyof typeof en, string> = { ...phaseEs, ...appEs };
+
 export type Locale = 'en' | 'es';
 export type TranslationKey = keyof typeof en;
+
+/** BCP 47 tag for dates and times. Spanish follows Latin American usage. */
+export function localeTag(locale: Locale): string {
+  return locale === 'es' ? 'es-419' : 'en-US';
+}
 
 const tables: Record<Locale, Record<TranslationKey, string>> = { en, es };
 

@@ -9,6 +9,7 @@ import { EventSwitcher } from '@/components/EventSwitcher';
 import { HomeBody } from '@/components/plan/HomeBody';
 import { chapterStatus, greeting, heroDateLabel } from '@/components/plan/model';
 import { useC } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
 import { blendedProgress, loadOverview, setupMilestones, type Group, type Overview, type SectionRow } from '@/lib/planning';
@@ -18,6 +19,7 @@ const TOUR_KEY = 'onboarding_seen_v1';
 
 export default function HomeScreen() {
   const c = useC();
+  const { t, locale } = useT();
   const router = useRouter();
   const { profile } = useAuth();
   const { event, events, loading: eventLoading } = useEvent();
@@ -73,13 +75,13 @@ export default function HomeScreen() {
     ? {
         icon: next.section.icon,
         title: next.section.title,
-        meta: resumeMeta(next.section, next.group.title),
+        meta: resumeMeta(next.section, next.group.title, questionLabel(next.section, t)),
       }
     : overview && overview.sections[0]
       ? {
           icon: overview.sections[0].icon,
           title: overview.sections[0].title,
-          meta: overview.groups.find((g) => g.sections.some((s) => s.id === overview.sections[0].id))?.title ?? 'Your plan',
+          meta: overview.groups.find((g) => g.sections.some((s) => s.id === overview.sections[0].id))?.title ?? t('home.yourPlan'),
         }
       : null;
 
@@ -93,8 +95,8 @@ export default function HomeScreen() {
       <StatusBar style="light" />
       {!event ? (
         <HomeBody
-          greeting={greeting(profile?.firstName)}
-          eventName="Your event"
+          greeting={greeting(profile?.firstName, locale)}
+          eventName={t('home.yourEvent')}
           progress={0}
           canSwitch={false}
           onSwitch={() => {}}
@@ -103,15 +105,15 @@ export default function HomeScreen() {
           chapters={[]}
           onChapter={() => {}}
           onSeeAll={() => {}}
-          emptyMessage="No event is linked to your account yet. Your DJ will set this up shortly."
+          emptyMessage={t('home.noEvent')}
         />
       ) : (
         <HomeBody
-          greeting={greeting(profile?.firstName)}
-          eventName={event.name || 'Your Event'}
+          greeting={greeting(profile?.firstName, locale)}
+          eventName={event.name || t('home.yourEventTitle')}
           coverUrl={event.cover_photo_url}
           date={event.event_date}
-          dateLabel={event.event_date ? heroDateLabel(event.event_date) : undefined}
+          dateLabel={event.event_date ? heroDateLabel(event.event_date, locale) : undefined}
           venue={venue}
           progress={pct}
           canSwitch={canSwitch}
@@ -120,13 +122,13 @@ export default function HomeScreen() {
           onContinue={() => {
             if (!next && overview?.sections[0]) {
               const g = overview.groups.find((x) => x.sections.some((s) => s.id === overview.sections[0].id));
-              openSection(overview.sections[0], g?.title ?? 'Home');
+              openSection(overview.sections[0], g?.title ?? t('tab.home'));
               return;
             }
             if (next) openSection(next.section, next.group.title);
           }}
           chapters={(overview?.groups ?? []).map((g, i) => {
-            const status = chapterStatus(g);
+            const status = chapterStatus(g, locale);
             return {
               id: g.id,
               index: i + 1,
@@ -160,8 +162,11 @@ function nextMoment(overview: Overview | null): { section: SectionRow; group: Gr
   return null;
 }
 
-function resumeMeta(section: SectionRow, chapter: string): string {
+function questionLabel(section: SectionRow, t: (key: 'home.questionLeft' | 'home.questionsLeft', vars?: { count: number }) => string): string {
   const left = Math.max(0, section.questionCount - section.answeredCount);
-  const q = left === 1 ? '1 question left' : `${left} questions left`;
-  return section.time_label ? `${q} · ${chapter}, ${section.time_label}` : `${q} · ${chapter}`;
+  return left === 1 ? t('home.questionLeft') : t('home.questionsLeft', { count: left });
+}
+
+function resumeMeta(section: SectionRow, chapter: string, label: string): string {
+  return section.time_label ? `${label} · ${chapter}, ${section.time_label}` : `${label} · ${chapter}`;
 }

@@ -1,5 +1,7 @@
 /** Pure display helpers for My Event and the staff events list. */
 
+import { localeTag, translate, type Locale } from '@/lib/i18n';
+
 export type ScheduleInput = {
   id: string;
   label: string | null;
@@ -52,10 +54,10 @@ export type StaffMonthGroup = { title: string; rows: StaffRowModel[] };
 
 const cents = (n: number) => Math.round((Number.isFinite(n) ? n : 0) * 100);
 
-export function formatMoney(n: number): string {
+export function formatMoney(n: number, locale: Locale = 'en'): string {
   const value = Number.isFinite(n) ? n : 0;
   const whole = Math.abs(value - Math.round(value)) < 0.005;
-  return value.toLocaleString('en-US', {
+  return value.toLocaleString(localeTag(locale), {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: whole ? 0 : 2,
@@ -71,34 +73,34 @@ function parseDay(d: string | null | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export function formatLongDate(d: string | null | undefined): string | null {
+export function formatLongDate(d: string | null | undefined, locale: Locale = 'en'): string | null {
   const date = parseDay(d);
   if (!date) return null;
-  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  return date.toLocaleDateString(localeTag(locale), { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
-export function formatMediumDate(d: string | null | undefined): string | null {
+export function formatMediumDate(d: string | null | undefined, locale: Locale = 'en'): string | null {
   const date = parseDay(d);
   if (!date) return null;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return date.toLocaleDateString(localeTag(locale), { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export function formatEyebrow(name: string | null | undefined, date: string | null | undefined): string | null {
-  const when = formatLongDate(date)?.toUpperCase() ?? null;
+export function formatEyebrow(name: string | null | undefined, date: string | null | undefined, locale: Locale = 'en'): string | null {
+  const when = formatLongDate(date, locale)?.toUpperCase() ?? null;
   const who = name?.trim() ? name.trim().toUpperCase() : null;
   const line = [who, when].filter(Boolean).join(' · ');
   return line || null;
 }
 
-export function formatTime(t: string | null | undefined): string | null {
+export function formatTime(t: string | null | undefined, locale: Locale = 'en'): string | null {
   if (!t) return null;
   const [hRaw, mRaw] = t.split(':');
   const h = Number(hRaw);
   const m = Number(mRaw);
   if (!Number.isFinite(h)) return null;
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const hr = h % 12 === 0 ? 12 : h % 12;
-  return `${hr}:${String(Number.isFinite(m) ? m : 0).padStart(2, '0')} ${ampm}`;
+  const when = new Date();
+  when.setHours(h, Number.isFinite(m) ? m : 0, 0, 0);
+  return when.toLocaleTimeString(localeTag(locale), { hour: 'numeric', minute: '2-digit' });
 }
 
 export function initials(name: string): string {
@@ -114,10 +116,10 @@ export function teamActions(phoneRaw: string, email: string | null | undefined):
   return { call: phone.length > 0, text: phone.length > 0, email: !!email?.trim() };
 }
 
-export function hiddenFinancialsBanner(reason: 'guest' | 'role' | 'event'): string {
-  if (reason === 'guest') return 'Payment details are only visible to the couple.';
-  if (reason === 'role') return "Payment details aren't available for your role.";
-  return "Payment details aren't shown for this event.";
+export function hiddenFinancialsBanner(reason: 'guest' | 'role' | 'event', locale: Locale = 'en'): string {
+  if (reason === 'guest') return translate(locale, 'event.payGuest');
+  if (reason === 'role') return translate(locale, 'event.payRole');
+  return translate(locale, 'event.payEvent');
 }
 
 /** Apply cleared payments onto the schedule in order. Pending payments do not count. */
@@ -148,46 +150,48 @@ export function decorateSchedule(schedule: ScheduleInput[], payments: PaymentInp
   });
 }
 
-export function nextPaymentLine(schedule: DecoratedInstallment[], balance: number): string | null {
+export function nextPaymentLine(schedule: DecoratedInstallment[], balance: number, locale: Locale = 'en'): string | null {
   const next = schedule.find((item) => !item.paid);
   if (next) {
-    const when = formatLongDate(next.dueDate);
+    const amount = formatMoney(next.amount, locale);
+    const when = formatLongDate(next.dueDate, locale);
     return when
-      ? `Next payment ${formatMoney(next.amount)} due ${when}`
-      : `Next payment ${formatMoney(next.amount)}`;
+      ? translate(locale, 'event.nextDue', { amount, when })
+      : translate(locale, 'event.nextAmount', { amount });
   }
-  if (balance <= 0.009) return 'Paid in full';
+  if (balance <= 0.009) return translate(locale, 'event.paidFull');
   return null;
 }
 
 export function planStatus(
   progress: PlanProgress | null,
   crmName: string | null,
+  locale: Locale = 'en',
 ): { label: string; tone: StaffRowModel['tone'] } {
   if (progress && progress.total > 0) {
-    if (progress.answered >= progress.total) return { label: 'Ready', tone: 'ready' };
-    if (progress.answered <= 0) return { label: 'Not started', tone: 'idle' };
+    if (progress.answered >= progress.total) return { label: translate(locale, 'staff.ready'), tone: 'ready' };
+    if (progress.answered <= 0) return { label: translate(locale, 'staff.notStarted'), tone: 'idle' };
     const pct = Math.max(0, Math.min(100, Math.round(progress.pct)));
-    return { label: `Planning ${pct}%`, tone: 'progress' };
+    return { label: translate(locale, 'staff.planning', { pct }), tone: 'progress' };
   }
   if (crmName?.trim()) return { label: crmName.trim(), tone: 'crm' };
-  return { label: 'Not started', tone: 'idle' };
+  return { label: translate(locale, 'staff.notStarted'), tone: 'idle' };
 }
 
-export function staffMatches(item: StaffListItem, needle: string): boolean {
+export function staffMatches(item: StaffListItem, needle: string, locale: Locale = 'en'): boolean {
   const q = needle.trim().toLowerCase();
   if (!q) return true;
-  const status = planStatus(item.progress, item.statusName).label;
+  const status = planStatus(item.progress, item.statusName, locale).label;
   const parts = [
     item.title,
     item.haystack,
     item.venueName,
     status,
     item.statusName,
-    formatMediumDate(item.eventDate),
-    formatLongDate(item.eventDate),
-    item.eventDate ? monthTitle(item.eventDate) : null,
-    formatTime(item.startTime),
+    formatMediumDate(item.eventDate, locale),
+    formatLongDate(item.eventDate, locale),
+    item.eventDate ? monthTitle(item.eventDate, locale) : null,
+    formatTime(item.startTime, locale),
   ];
   return parts.some((part) => part?.toLowerCase().includes(q));
 }
@@ -205,13 +209,13 @@ export function sortStaffItems(items: StaffListItem[], segment: 'upcoming' | 'pa
   });
 }
 
-export function groupStaffRows(items: StaffListItem[]): StaffMonthGroup[] {
+export function groupStaffRows(items: StaffListItem[], locale: Locale = 'en'): StaffMonthGroup[] {
   const groups: StaffMonthGroup[] = [];
   const index = new Map<string, StaffMonthGroup>();
   const undated: StaffRowModel[] = [];
   for (const item of items) {
-    const parts = item.eventDate ? dayParts(item.eventDate) : null;
-    const row = toRow(item, parts);
+    const parts = item.eventDate ? dayParts(item.eventDate, locale) : null;
+    const row = toRow(item, parts, locale);
     if (!parts || !item.eventDate) {
       undated.push(row);
       continue;
@@ -219,37 +223,37 @@ export function groupStaffRows(items: StaffListItem[]): StaffMonthGroup[] {
     const key = item.eventDate.slice(0, 7);
     let group = index.get(key);
     if (!group) {
-      group = { title: monthTitle(item.eventDate), rows: [] };
+      group = { title: monthTitle(item.eventDate, locale), rows: [] };
       index.set(key, group);
       groups.push(group);
     }
     group.rows.push(row);
   }
-  if (undated.length) groups.push({ title: 'DATE TBD', rows: undated });
+  if (undated.length) groups.push({ title: translate(locale, 'staff.dateTbd'), rows: undated });
   return groups;
 }
 
-function monthTitle(date: string): string {
+function monthTitle(date: string, locale: Locale): string {
   const parsed = parseDay(date);
-  if (!parsed) return 'DATE TBD';
-  return parsed.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
+  if (!parsed) return translate(locale, 'staff.dateTbd');
+  return parsed.toLocaleDateString(localeTag(locale), { month: 'long', year: 'numeric' }).toUpperCase();
 }
 
-function dayParts(date: string): { month: string; day: string } | null {
+function dayParts(date: string, locale: Locale): { month: string; day: string } | null {
   const parsed = parseDay(date);
   if (!parsed) return null;
   return {
-    month: parsed.toLocaleDateString('en-US', { month: 'short' }).replace('.', '').slice(0, 3).toUpperCase(),
+    month: parsed.toLocaleDateString(localeTag(locale), { month: 'short' }).replace('.', '').slice(0, 3).toUpperCase(),
     day: String(parsed.getDate()).padStart(2, '0'),
   };
 }
 
-function toRow(item: StaffListItem, parts: { month: string; day: string } | null): StaffRowModel {
-  const status = planStatus(item.progress, item.statusName);
-  const subtitle = [item.venueName, formatTime(item.startTime)].filter(Boolean).join(' · ') || null;
+function toRow(item: StaffListItem, parts: { month: string; day: string } | null, locale: Locale): StaffRowModel {
+  const status = planStatus(item.progress, item.statusName, locale);
+  const subtitle = [item.venueName, formatTime(item.startTime, locale)].filter(Boolean).join(' · ') || null;
   return {
     id: item.id,
-    month: parts?.month ?? 'TBD',
+    month: parts?.month ?? translate(locale, 'staff.tbd'),
     day: parts?.day ?? '–',
     title: item.title,
     subtitle,

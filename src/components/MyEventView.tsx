@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Logo } from '@/components/Logo';
 import { Icon, LanguageCard, NavBar, useC, type IconName } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 import { Brand, Fonts, Radius, Shadow, Space, Type } from '@/lib/theme';
 import type { AppLanguage } from '@/lib/language';
 
@@ -92,6 +93,7 @@ export function MyEventView({
   onMarketing: (on: boolean) => void;
 }) {
   const c = useC();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const [compact, setCompact] = useState(false);
   const packageInsideEvent = !!eventFacts && !!packageInfo;
@@ -109,9 +111,9 @@ export function MyEventView({
       {compact ? (
         <View style={[styles.compact, { paddingTop: insets.top, backgroundColor: c.bg, borderBottomColor: c.line }]}>
           <NavBar
-            title="My Event"
+            title={t('event.title')}
             onBack={onBack}
-            trailing={onSwitch ? { label: 'Switch', onPress: onSwitch } : undefined}
+            trailing={onSwitch ? { label: t('common.switch'), onPress: onSwitch } : undefined}
           />
         </View>
       ) : null}
@@ -136,18 +138,18 @@ export function MyEventView({
           ) : null}
           <View style={styles.titleRow}>
             {onBack ? (
-              <Pressable onPress={onBack} hitSlop={12} accessibilityRole="button" accessibilityLabel="Back" style={styles.back}>
+              <Pressable onPress={onBack} hitSlop={12} accessibilityRole="button" accessibilityLabel={t('common.back')} style={styles.back}>
                 <Icon name="chev-l" size={24} color={c.ink} />
               </Pressable>
             ) : null}
-            <Text style={[Type.largeTitle, { color: c.ink, flex: 1 }]}>My Event</Text>
+            <Text style={[Type.largeTitle, { color: c.ink, flex: 1 }]}>{t('event.title')}</Text>
           </View>
         </View>
 
         {!hasEvent ? (
           <View style={[styles.card, Shadow.card, { backgroundColor: c.surface, padding: Space.lg }]}>
             <Text style={[Type.footnote, { color: c.ink2 }]}>
-              Your event details will appear here once your booking is set up.
+              {t('event.empty')}
             </Text>
           </View>
         ) : (
@@ -160,7 +162,7 @@ export function MyEventView({
                 </View>
                 {guest.invitedBy ? (
                   <Text style={[Type.footnote, { color: c.ink2, flex: 1 }]} numberOfLines={2}>
-                    Invited by {guest.invitedBy}
+                    {t('event.invitedBy', { name: guest.invitedBy })}
                   </Text>
                 ) : null}
               </View>
@@ -180,7 +182,7 @@ export function MyEventView({
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.balance}>
-                  <Text style={styles.balanceLab}>Balance due</Text>
+                  <Text style={styles.balanceLab}>{t('event.balance')}</Text>
                   <Text style={styles.balanceAmt}>{financials.balance}</Text>
                   {financials.nextLine ? <Text style={styles.balanceNext}>{financials.nextLine}</Text> : null}
                   <View style={styles.track}>
@@ -194,7 +196,7 @@ export function MyEventView({
 
                 {financials.schedule.length > 0 ? (
                   <View style={{ gap: 8 }}>
-                    <Text style={[Type.label, { color: c.ink3 }]}>Payment schedule</Text>
+                    <Text style={[Type.label, { color: c.ink3 }]}>{t('event.schedule')}</Text>
                     <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
                       {financials.schedule.map((row, index) => (
                         <View key={row.id}>
@@ -235,13 +237,13 @@ export function MyEventView({
 
             {eventFacts ? (
               <View style={{ gap: 8 }}>
-                <Text style={[Type.label, { color: c.ink3 }]}>Event</Text>
+                <Text style={[Type.label, { color: c.ink3 }]}>{t('event.event')}</Text>
                 <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
-                  <Cell icon="calendar" title="Date" trailing={<Text style={[Type.footnote, { color: c.ink2 }]}>{eventFacts.dateLabel}</Text>} />
+                  <Cell icon="calendar" title={t('event.date')} trailing={<Text style={[Type.footnote, { color: c.ink2 }]}>{eventFacts.dateLabel}</Text>} />
                   {eventFacts.venue ? (
                     <>
                       <View style={[styles.div, { backgroundColor: c.line, marginLeft: 62 }]} />
-                      <Cell icon="pin" title="Venue" trailing={<Text style={[Type.footnote, { color: c.ink2, flexShrink: 1 }]} numberOfLines={1}>{eventFacts.venue}</Text>} />
+                      <Cell icon="pin" title={t('event.venue')} trailing={<Text style={[Type.footnote, { color: c.ink2, flexShrink: 1 }]} numberOfLines={1}>{eventFacts.venue}</Text>} />
                     </>
                   ) : null}
                   {packageInsideEvent && packageInfo ? (
@@ -256,7 +258,7 @@ export function MyEventView({
 
             {packageInfo && !packageInsideEvent ? (
               <View style={{ gap: 8 }}>
-                <Text style={[Type.label, { color: c.ink3 }]}>Your package</Text>
+                <Text style={[Type.label, { color: c.ink3 }]}>{t('event.package')}</Text>
                 <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
                   <Cell icon="gem" title={packageInfo.name} subtitle={packageInfo.detail} onPress={onPackage} chevron />
                 </View>
@@ -265,7 +267,7 @@ export function MyEventView({
 
             {team ? (
               <View style={{ gap: 8 }}>
-                <Text style={[Type.label, { color: c.ink3 }]}>Your team</Text>
+                <Text style={[Type.label, { color: c.ink3 }]}>{t('event.team')}</Text>
                 <View style={[styles.card, Shadow.card, { backgroundColor: c.surface, padding: 14, gap: 14 }]}>
                   <View style={styles.teamTop}>
                     <View style={[styles.avatar, { backgroundColor: Brand.purple }]}>
@@ -282,9 +284,9 @@ export function MyEventView({
                   </View>
                   {team.showCall || team.showText || team.showEmail ? (
                     <View style={styles.actions}>
-                      {team.showCall ? <ContactButton icon="phone" label="Call" onPress={onCall} /> : null}
-                      {team.showText ? <ContactButton icon="message" label="Text" onPress={onText} /> : null}
-                      {team.showEmail ? <ContactButton icon="mail" label="Email" onPress={onEmail} /> : null}
+                      {team.showCall ? <ContactButton icon="phone" label={t('event.call')} onPress={onCall} /> : null}
+                      {team.showText ? <ContactButton icon="message" label={t('event.text')} onPress={onText} /> : null}
+                      {team.showEmail ? <ContactButton icon="mail" label={t('event.email')} onPress={onEmail} /> : null}
                     </View>
                   ) : null}
                 </View>
@@ -293,9 +295,9 @@ export function MyEventView({
 
             {showInvite ? (
               <View style={{ gap: 8 }}>
-                <Text style={[Type.label, { color: c.ink3 }]}>People</Text>
+                <Text style={[Type.label, { color: c.ink3 }]}>{t('event.people')}</Text>
                 <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
-                  <Cell icon="users" title="Invite someone" subtitle="Planner, parent or friend" onPress={onInvite} chevron />
+                  <Cell icon="users" title={t('event.invite')} subtitle={t('event.inviteSub')} onPress={onInvite} chevron />
                 </View>
               </View>
             ) : null}
@@ -303,19 +305,19 @@ export function MyEventView({
         )}
 
         <View style={{ gap: 8 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>Account</Text>
+          <Text style={[Type.label, { color: c.ink3 }]}>{t('event.account')}</Text>
           <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
             <Cell icon="user" title={accountName} subtitle={accountEmail} />
             <View style={[styles.div, { backgroundColor: c.line, marginLeft: 62 }]} />
-            <Cell icon="shield" title="Privacy policy" onPress={onPrivacy} chevron />
+            <Cell icon="shield" title={t('event.privacy')} onPress={onPrivacy} chevron />
             <View style={[styles.div, { backgroundColor: c.line, marginLeft: 62 }]} />
-            <Cell icon="info" title="AI disclosure" onPress={onDisclosure} chevron />
+            <Cell icon="info" title={t('event.ai')} onPress={onDisclosure} chevron />
             <View style={[styles.div, { backgroundColor: c.line, marginLeft: 62 }]} />
-            <Cell icon="signout" title="Sign out" onPress={onSignOut} chevron />
+            <Cell icon="signout" title={t('event.signOut')} onPress={onSignOut} chevron />
             <View style={[styles.div, { backgroundColor: c.line, marginLeft: 62 }]} />
             <Cell
               icon="trash"
-              title={deleting ? 'Deleting…' : 'Delete account'}
+              title={deleting ? t('event.deleting') : t('event.delete')}
               titleColor={c.red}
               bubbleColor={c.redTint}
               iconColor={c.red}
@@ -325,11 +327,11 @@ export function MyEventView({
         </View>
 
         <View style={{ gap: 10 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>Settings</Text>
-          <Text style={[Type.footnote, { color: c.ink2, marginTop: -4 }]}>Language</Text>
+          <Text style={[Type.label, { color: c.ink3 }]}>{t('event.settings')}</Text>
+          <Text style={[Type.footnote, { color: c.ink2, marginTop: -4 }]}>{t('event.language')}</Text>
           <View style={styles.langRow}>
-            <LanguageCard label="English" selected={language === 'en'} selectedLabel="Selected" onPress={() => onLanguage('en')} />
-            <LanguageCard label="Español" selected={language === 'es'} selectedLabel="Elegido" onPress={() => onLanguage('es')} />
+            <LanguageCard label={t('event.english')} selected={language === 'en'} selectedLabel={t('event.selected')} onPress={() => onLanguage('en')} />
+            <LanguageCard label={t('event.spanish')} selected={language === 'es'} selectedLabel={t('event.selectedEs')} onPress={() => onLanguage('es')} />
           </View>
           <View style={[styles.card, Shadow.card, { backgroundColor: c.surface, paddingHorizontal: 14, paddingVertical: 12 }]}>
             <View style={styles.marketRow}>
@@ -337,8 +339,8 @@ export function MyEventView({
                 <Icon name="message" size={18} color={c.accent} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.cellTitle, { color: c.ink }]}>Marketing texts</Text>
-                <Text style={[Type.footnote, { color: c.ink2 }]}>Offers and news. Off until you turn this on.</Text>
+                <Text style={[styles.cellTitle, { color: c.ink }]}>{t('event.marketing')}</Text>
+                <Text style={[Type.footnote, { color: c.ink2 }]}>{t('event.marketingSub')}</Text>
               </View>
               <Switch
                 value={marketing}
@@ -346,7 +348,7 @@ export function MyEventView({
                 trackColor={{ false: c.sunken, true: c.accent }}
                 thumbColor="#ffffff"
                 ios_backgroundColor={c.sunken}
-                accessibilityLabel="Marketing texts"
+                accessibilityLabel={t('event.marketing')}
               />
             </View>
           </View>

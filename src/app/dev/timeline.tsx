@@ -2,6 +2,9 @@ import { useMemo, useState } from 'react';
 import { Redirect, useLocalSearchParams } from 'expo-router';
 
 import { ThemeSchemeOverride } from '@/components/ui';
+import { formatEventEyebrow } from '@/lib/eventDate';
+import { useDevLocale } from '@/lib/devLocale';
+import { useT } from '@/lib/i18n';
 import { TimePickerSheet } from '@/components/TimePickerSheet';
 import { TimelineBoard, type TimelineArchived, type TimelineChapter, type TimelineMoment } from '@/components/TimelineBoard';
 import { reorderItems } from 'react-native-reorderable-list';
@@ -14,6 +17,7 @@ import type { Scheme } from '@/lib/theme';
  * /dev/timeline?state=default|reorder|menu|coach|time|empty|guest|archive|dark
  */
 export default function DevTimelineRoute() {
+  useDevLocale();
   const { state } = useLocalSearchParams<{ state?: string }>();
   if (!__DEV__) return <Redirect href="/login" />;
   const name = state ?? 'default';
@@ -69,6 +73,7 @@ const SAMPLE_ARCHIVED: TimelineArchived[] = [
 ];
 
 function Preview({ state }: { state: string }) {
+  const { locale } = useT();
   const initialChapters = state === 'empty' ? [] : SAMPLE;
   const [chapters, setChapters] = useState<TimelineChapter[]>(initialChapters);
   const [archived, setArchived] = useState<TimelineArchived[]>(state === 'archive' ? SAMPLE_ARCHIVED : []);
@@ -95,7 +100,7 @@ function Preview({ state }: { state: string }) {
   return (
     <>
       <TimelineBoard
-        dateLabel="SAT · JUNE 13, 2027"
+        dateLabel={formatEventEyebrow('2027-06-13', locale)}
         chapters={chapters}
         archived={archived}
         canManage={canManage}

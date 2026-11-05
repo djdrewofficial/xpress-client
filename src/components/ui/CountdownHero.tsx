@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { countdownModel } from '@/components/Countdown';
+import { translate, type Locale } from '@/lib/i18n';
 import { Fonts, Gradients, Radius, Type } from '@/lib/theme';
 import { Icon } from './Icon';
 
@@ -34,7 +35,7 @@ export function CountdownHero({
   /** 0–100. Shown as "43% planned" / "43% planeado" when set. */
   progress?: number;
   size?: 'compact' | 'large';
-  locale?: 'en' | 'es';
+  locale?: Locale;
   /**
    * Living moment sentence under the unit. Welcome passes false: that line is
    * English-only, and the welcome artboard doesn't show it.
@@ -43,12 +44,11 @@ export function CountdownHero({
   /** No card fill — text sits directly on a photo or gradient. */
   bare?: boolean;
 }) {
-  const model = countdownModel(date);
+  const model = countdownModel(date, locale);
   const showCount = model.tier !== 'dayOf' && model.tier !== 'married';
-  const eyebrow = [dateLabel ?? formatDate(date), venue].filter(Boolean).join('  ·  ');
-  const unit = unitLabel(model.days, model.tier, locale, size);
-  const progressLabel =
-    progress == null ? null : locale === 'es' ? `${Math.round(progress)}% planeado` : `${Math.round(progress)}% planned`;
+  const eyebrow = [dateLabel ?? formatDate(date, locale), venue].filter(Boolean).join('  ·  ');
+  const unit = unitLabel(model.days, model.tier, locale);
+  const progressLabel = progress == null ? null : translate(locale, 'cd.planned', { pct: Math.round(progress) });
   const pct = progress == null ? 0 : Math.max(0, Math.min(100, progress));
 
   return (
@@ -113,18 +113,17 @@ export function CountdownHero({
   );
 }
 
-function formatDate(date: string) {
+function formatDate(date: string, locale: Locale) {
   return new Date(date + 'T00:00:00')
-    .toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+    .toLocaleDateString(locale === 'es' ? 'es-419' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
     .toUpperCase();
 }
 
-function unitLabel(days: number, tier: string, locale: 'en' | 'es', size: 'compact' | 'large') {
-  if (tier === 'dayOf') return locale === 'es' ? 'hoy es el día' : 'today is the day';
-  if (tier === 'married') return locale === 'es' ? 'recién casados' : 'just married';
-  if (size === 'compact') return locale === 'es' ? (days === 1 ? 'día' : 'días') : days === 1 ? 'day to go' : 'days to go';
-  if (locale === 'es') return days === 1 ? 'día' : 'días';
-  return days === 1 ? 'day to go' : 'days to go';
+function unitLabel(days: number, tier: string, locale: Locale) {
+  if (tier === 'dayOf') return translate(locale, 'cd.todayShort');
+  if (tier === 'married') return translate(locale, 'cd.justMarried');
+  if (locale === 'es') return translate(locale, days === 1 ? 'cd.day' : 'cd.days');
+  return translate(locale, days === 1 ? 'cd.dayToGo' : 'cd.daysToGo');
 }
 
 const styles = StyleSheet.create({

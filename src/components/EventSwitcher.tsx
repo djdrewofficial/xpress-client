@@ -5,10 +5,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Icon, Sheet, useC } from '@/components/ui';
 import { useEvent } from '@/lib/events';
 import type { EventLite } from '@/lib/planning';
+import { localeTag, useT } from '@/lib/i18n';
 import { Brand, Fonts, Radius, Space, Type } from '@/lib/theme';
-
-const fmt = (d: string | null) =>
-  d ? new Date(d + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Date TBD';
 
 /** Bottom sheet to switch between the couple's events (tap the Home title). */
 export function EventSwitcher({ visible, onClose }: { visible: boolean; onClose: () => void }) {
@@ -38,8 +36,9 @@ export function EventSwitchSheet({
   onSelect: (event: EventLite) => void;
 }) {
   const c = useC();
+  const { t, locale } = useT();
   return (
-    <Sheet visible={visible} onClose={onClose} title="Your events">
+    <Sheet visible={visible} onClose={onClose} title={t('home.events')}>
       <View style={{ gap: Space.sm }}>
         {events.map((e) => {
           const active = e.id === eventId;
@@ -56,8 +55,8 @@ export function EventSwitchSheet({
                 )}
               </View>
               <View style={{ flex: 1 }}>
-                <Text numberOfLines={1} style={[styles.name, { color: c.ink }]}>{e.name || 'Your Event'}</Text>
-                <Text style={[Type.footnote, { color: c.ink3 }]}>{fmt(e.event_date)}</Text>
+                <Text numberOfLines={1} style={[styles.name, { color: c.ink }]}>{e.name || t('home.yourEventTitle')}</Text>
+                <Text style={[Type.footnote, { color: c.ink3 }]}>{formatSwitchDate(e.event_date, locale, t('common.dateTbd'))}</Text>
               </View>
               {active ? <Icon name="check" size={18} color={c.accent} /> : <Icon name="chev-r" size={18} color={c.ink3} />}
             </Pressable>
@@ -79,9 +78,10 @@ export function EventSwitchList({
   onSelect?: (event: EventLite) => void;
 }) {
   const c = useC();
+  const { t, locale } = useT();
   return (
     <View style={{ gap: Space.sm }}>
-      <Text style={[Type.headline, { color: c.ink, marginBottom: 4 }]}>Your events</Text>
+      <Text style={[Type.headline, { color: c.ink, marginBottom: 4 }]}>{t('home.events')}</Text>
       {events.map((e) => {
         const active = e.id === eventId;
         return (
@@ -90,8 +90,8 @@ export function EventSwitchList({
               <LinearGradient colors={[Brand.purple, Brand.purpleLight]} style={StyleSheet.absoluteFill} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text numberOfLines={1} style={[styles.name, { color: c.ink }]}>{e.name || 'Your Event'}</Text>
-              <Text style={[Type.footnote, { color: c.ink3 }]}>{fmt(e.event_date)}</Text>
+              <Text numberOfLines={1} style={[styles.name, { color: c.ink }]}>{e.name || t('home.yourEventTitle')}</Text>
+              <Text style={[Type.footnote, { color: c.ink3 }]}>{formatSwitchDate(e.event_date, locale, t('common.dateTbd'))}</Text>
             </View>
             {active ? <Icon name="check" size={18} color={c.accent} /> : <Icon name="chev-r" size={18} color={c.ink3} />}
           </Pressable>
@@ -99,6 +99,11 @@ export function EventSwitchList({
       })}
     </View>
   );
+}
+
+function formatSwitchDate(d: string | null, locale: 'en' | 'es', fallback: string) {
+  if (!d) return fallback;
+  return new Date(d + 'T00:00:00').toLocaleDateString(localeTag(locale), { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 const styles = StyleSheet.create({

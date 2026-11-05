@@ -11,6 +11,8 @@ import { TimelineBoard, type TimelineArchived, type TimelineChapter, type Timeli
 import { Brand } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
+import { formatEventEyebrow } from '@/lib/eventDate';
+import { translate, useT, type Locale } from '@/lib/i18n';
 import { pickAndUploadPlannerTimeline, type PlannerSource } from '@/lib/eventFiles';
 import {
   deleteSection,
@@ -22,21 +24,17 @@ import {
   type SectionRow,
 } from '@/lib/planning';
 
-const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const;
-const MONTHS = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'] as const;
-
 const tipKey = (uid: string) => `xpress.timeline.plusTip.${uid}`;
 
-/** "SAT · JUNE 13, 2027" from an event date. Null when the event has no date. */
-export function formatTimelineDate(iso: string | null | undefined): string | null {
+/** "SAT · JUNE 13, 2027" / "SAB · 13 JUN 2027". Null when the event has no date. */
+export function formatTimelineDate(iso: string | null | undefined, locale: Locale = 'en'): string | null {
   if (!iso) return null;
-  const [y, m, d] = iso.slice(0, 10).split('-').map((n) => parseInt(n, 10));
-  if (!y || !m || !d) return null;
-  const dt = new Date(y, m - 1, d);
-  return `${DAYS[dt.getDay()]} · ${MONTHS[m - 1]} ${d}, ${y}`;
+  const day = iso.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  return formatEventEyebrow(day, locale);
 }
 
-function toMoment(s: SectionRow): TimelineMoment {
+function toMoment(s: SectionRow, locale: Locale): TimelineMoment {
   const badge = s.questionCount > 0
     ? s.answeredCount >= s.questionCount
       ? 'done'
@@ -44,10 +42,10 @@ function toMoment(s: SectionRow): TimelineMoment {
     : undefined;
   const meta = s.songs_enabled || s.songCount > 0
     ? s.songCount === 0
-      ? 'No songs'
+      ? translate(locale, 'timeline.noSongs')
       : s.songCount === 1
-        ? '1 song'
-        : `${s.songCount} songs`
+        ? translate(locale, 'timeline.oneSong')
+        : translate(locale, 'timeline.nSongs', { count: s.songCount })
     : undefined;
   return {
     id: s.id,
@@ -61,12 +59,12 @@ function toMoment(s: SectionRow): TimelineMoment {
   };
 }
 
-function momentOrdinal(chapters: TimelineChapter[], id: string): string | null {
+function momentOrdinal(chapters: TimelineChapter[], id: string, locale: Locale): string | null {
   let n = 0;
   for (const chapter of chapters) {
     for (const moment of chapter.moments) {
       n += 1;
-      if (moment.id === id) return `Moment ${String(n).padStart(2, '0')}`;
+      if (moment.id === id) return translate(locale, 'moment.eyebrowN', { n: String(n).padStart(2, '0') });
     }
   }
   return null;
@@ -74,6 +72,7 @@ function momentOrdinal(chapters: TimelineChapter[], id: string): string | null {
 
 export default function TimelineScreen() {
   const c = useC();
+  const { t, locale } = useT();
   const router = useRouter();
   const { profile, session } = useAuth();
   const uid = session?.user.id ?? null;
@@ -105,14 +104,14 @@ export default function TimelineScreen() {
         .map((grp) => ({
           id: grp.id,
           title: grp.title,
-          moments: grp.sections.filter(onTimeline).map(toMoment),
+          moments: grp.sections.filter(onTimeline).map((section) => toMoment(section, locale)),
         }))
         .filter((grp) => grp.moments.length > 0),
     );
     setAddTargets(ov.groups.map((grp) => ({ id: grp.id, title: grp.title })));
     setArchived(ov.removed);
     setLoading(false);
-  }, [eventId]);
+  }, [eventId, locale]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -139,7 +138,7 @@ export default function TimelineScreen() {
       moments: chapter.moments.map((m) => (m.id === moment.id ? { ...m, timeLabel: time } : m)),
     })));
     if (!(await setSectionTime(eventId, moment.id, time))) {
-      Alert.alert("Couldn't update the time", 'Please try again.');
+      Alert.alert(t('moment.timeFail'), t('common.tryAgain'));
       load();
     }
   }, [eventId, load]);
@@ -151,20 +150,20 @@ export default function TimelineScreen() {
       const res = await pickAndUploadPlannerTimeline(eventId, src);
       if (res) {
         await load();
-        Alert.alert('Uploaded', `We saved "${res.name}" and shared it with your Xpress team.`);
+        Alert.alert(t('timeline.uploaded'), t('timeline.uploadedBody', { name: res.name }));
       }
     } catch (e) {
-      Alert.alert('Upload failed', e instanceof Error ? e.message : 'Please try again.');
+      Alert.alert(t('timeline.uploadFail'), e instanceof Error ? e.message : t('common.tryAgain'));
     } finally {
       setPtBusy(false);
     }
   }, [eventId, load]);
 
   const uploadPlanner = useCallback(() => {
-    Alert.alert('Add your timeline', 'Where is it saved?', [
-      { text: 'Photo Library', onPress: () => runUpload('gallery') },
-      { text: 'Files (PDF or image)', onPress: () => runUpload('files') },
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('timeline.addWhere'), t('timeline.addWhereBody'), [
+      { text: t('timeline.photoLibrary'), onPress: () => runUpload('gallery') },
+      { text: t('timeline.files'), onPress: () => runUpload('files') },
+      { text: t('common.cancel'), style: 'cancel' },
     ]);
   }, [runUpload]);
 
@@ -182,7 +181,7 @@ export default function TimelineScreen() {
   const startNew = useCallback(() => {
     setMenuOpen(false);
     if (addTargets.length === 0) {
-      Alert.alert('Nothing to add to yet', 'Your event chapters will show up once your plan is set up.');
+      Alert.alert(t('timeline.nothingYet'), t('timeline.nothingBody'));
       return;
     }
     if (addTargets.length === 1) {
@@ -190,9 +189,9 @@ export default function TimelineScreen() {
       return;
     }
     setTimeout(() => {
-      Alert.alert('Which part of the day?', 'Pick where this moment belongs.', [
+      Alert.alert(t('timeline.whichPart'), t('timeline.whichBody'), [
         ...addTargets.map((g) => ({ text: g.title, onPress: () => setAddingGroup(g) })),
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
       ]);
     }, 350);
   }, [addTargets]);
@@ -204,7 +203,7 @@ export default function TimelineScreen() {
     const moments = reorderItems(chapter.moments, from, to);
     setChapters((cs) => cs.map((c) => (c.id === chapterId ? { ...c, moments } : c)));
     if (!(await reorderSections(eventId, moments.map((m) => m.id)))) {
-      Alert.alert("Couldn't save the new order", 'Please try again.');
+      Alert.alert(t('timeline.orderFail'), t('common.tryAgain'));
       load();
     }
   }, [eventId, chapters, load]);
@@ -218,7 +217,7 @@ export default function TimelineScreen() {
       .filter((chapter) => chapter.moments.length > 0));
     setArchived((prev) => [{ id: moment.id, title: moment.title, icon: moment.icon }, ...prev]);
     if (!(await deleteSection(eventId, moment.id))) {
-      Alert.alert("Couldn't archive that section", 'Please try again.');
+      Alert.alert(t('timeline.archiveFail'), t('common.tryAgain'));
       load();
     }
   }, [eventId, load]);
@@ -234,12 +233,12 @@ export default function TimelineScreen() {
     return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg }}><ActivityIndicator color={Brand.purple} /></View>;
   }
 
-  const ordinal = timeEditing ? momentOrdinal(chapters, timeEditing.id) : null;
+  const ordinal = timeEditing ? momentOrdinal(chapters, timeEditing.id, locale) : null;
 
   return (
     <View style={{ flex: 1 }}>
       <TimelineBoard
-        dateLabel={formatTimelineDate(event?.event_date)}
+        dateLabel={formatTimelineDate(event?.event_date, locale)}
         chapters={chapters}
         archived={archived}
         canManage={canManage}
@@ -265,7 +264,7 @@ export default function TimelineScreen() {
       <TimePickerSheet
         visible={timeEditing !== null}
         initial={timeEditing?.timeLabel ?? null}
-        title="Set time"
+        title={t('time.title')}
         subtitle={timeEditing ? [timeEditing.title, ordinal].filter(Boolean).join(' · ') : undefined}
         onClose={() => setTimeEditing(null)}
         onSave={(time) => { if (timeEditing) saveTime(timeEditing, time); }}

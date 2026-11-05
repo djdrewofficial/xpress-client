@@ -1,3 +1,5 @@
+import { formatEventEyebrow } from '@/lib/eventDate';
+import { translate, type Locale } from '@/lib/i18n';
 import type { Group, QuestionRow, SectionRow } from '@/lib/planning';
 
 /**
@@ -41,40 +43,37 @@ export function momentNumber(sections: Pick<SectionRow, 'id'>[], sectionId: stri
   return i >= 0 ? i + 1 : null;
 }
 
-export function momentEyebrow(n: number | null, time: string | null): string {
-  const code = n == null ? 'MOMENT' : `MOMENT ${String(n).padStart(2, '0')}`;
+export function momentEyebrow(n: number | null, time: string | null, locale: Locale = 'en'): string {
+  const code = n == null ? translate(locale, 'moment.eyebrow') : translate(locale, 'moment.eyebrowN', { n: String(n).padStart(2, '0') });
   return time?.trim() ? `${code}  ·  ${time.trim()}` : code;
 }
 
-export function greeting(firstName?: string | null): string {
+export function greeting(firstName?: string | null, locale: Locale = 'en'): string {
   const h = new Date().getHours();
-  const part = h < 12 ? 'GOOD MORNING' : h < 17 ? 'GOOD AFTERNOON' : 'GOOD EVENING';
+  const part = translate(locale, h < 12 ? 'home.greetMorning' : h < 17 ? 'home.greetAfternoon' : 'home.greetEvening');
   return firstName?.trim() ? `${part}, ${firstName.trim().toUpperCase()}` : part;
 }
 
-/** "SAT · JUNE 13, 2027" */
-export function heroDateLabel(date: string): string {
-  const d = new Date(date + 'T00:00:00');
-  const wk = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
-  const month = d.toLocaleDateString('en-US', { month: 'long' }).toUpperCase();
-  return `${wk}  ·  ${month} ${d.getDate()}, ${d.getFullYear()}`;
+/** "SAT · JUNE 13, 2027" / "SAB · 13 JUN 2027". */
+export function heroDateLabel(date: string, locale: Locale = 'en'): string {
+  return formatEventEyebrow(date, locale).replace(' · ', '  ·  ');
 }
 
 /** Chapter badge: question progress inside the chapter. "Done" when every question is answered. */
-export function chapterStatus(group: Pick<Group, 'totalQuestions' | 'answeredQuestions'>): { label: string; done: boolean } | null {
+export function chapterStatus(group: Pick<Group, 'totalQuestions' | 'answeredQuestions'>, locale: Locale = 'en'): { label: string; done: boolean } | null {
   if (group.totalQuestions <= 0) return null;
-  if (group.answeredQuestions >= group.totalQuestions) return { label: 'Done', done: true };
-  return { label: `${group.answeredQuestions} of ${group.totalQuestions}`, done: false };
+  if (group.answeredQuestions >= group.totalQuestions) return { label: translate(locale, 'home.done'), done: true };
+  return { label: translate(locale, 'home.of', { answered: group.answeredQuestions, total: group.totalQuestions }), done: false };
 }
 
-export function editedAgo(iso?: string | null): string | null {
+export function editedAgo(iso?: string | null, locale: Locale = 'en'): string | null {
   if (!iso) return null;
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return null;
   const days = Math.floor((Date.now() - t) / 86400000);
-  if (days <= 0) return 'edited today';
-  if (days === 1) return 'edited yesterday';
-  return `edited ${days} days ago`;
+  if (days <= 0) return translate(locale, 'moment.editedToday');
+  if (days === 1) return translate(locale, 'moment.editedYesterday');
+  return translate(locale, 'moment.editedDays', { count: days });
 }
 
 export function answerText(q: QuestionRow, raw: string): string {
@@ -88,6 +87,7 @@ export function answerText(q: QuestionRow, raw: string): string {
 export function composeDjNote(
   questions: QuestionRow[],
   answers: Record<string, string>,
+  locale: Locale = 'en',
 ): { text: string; edited: string | null } | null {
   const bits: string[] = [];
   let latest: string | null = null;
@@ -98,5 +98,5 @@ export function composeDjNote(
     if (q.updated_at && (!latest || q.updated_at > latest)) latest = q.updated_at;
   }
   if (!bits.length) return null;
-  return { text: bits.join('. '), edited: editedAgo(latest) };
+  return { text: bits.join('. '), edited: editedAgo(latest, locale) };
 }

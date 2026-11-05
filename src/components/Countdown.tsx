@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/ui/Icon';
+import { translate, type Locale, type TranslationKey } from '@/lib/i18n';
 import { Brand, Fonts, Radius, Space } from '@/lib/theme';
 
 /* A living wedding countdown for the Plan hero. Rather than a flat "247 days
@@ -10,16 +11,24 @@ import { Brand, Fonts, Radius, Space } from '@/lib/theme';
 
 // Future moments worth anticipating — rotated by the day count so the framing
 // feels alive day to day yet stays stable within a single render.
-const MOMENTS = [
-  'your first dance as newlyweds',
-  'you say “I do”',
-  'your first kiss as newlyweds',
-  'you walk down the aisle',
-  'your grand entrance',
-  'the party of your lives',
-] as const;
+const MOMENTS: TranslationKey[] = [
+  'cd.moment1',
+  'cd.moment2',
+  'cd.moment3',
+  'cd.moment4',
+  'cd.moment5',
+  'cd.moment6',
+];
 
 export type CountdownTier = 'married' | 'dayOf' | 'finalWeek' | 'mid' | 'far';
+
+const TONE_KEY: Record<CountdownTier, TranslationKey> = {
+  far: 'cd.toneFar',
+  mid: 'cd.toneMid',
+  finalWeek: 'cd.toneWeek',
+  dayOf: 'cd.toneDay',
+  married: 'cd.toneMarried',
+};
 
 export type CountdownModel = {
   days: number;
@@ -39,12 +48,12 @@ function tierFor(days: number): CountdownTier {
   return 'far';
 }
 
-const TONE: Record<CountdownTier, { label: string; accent: string }> = {
-  far: { label: 'DREAM BIG — THERE’S NO RUSH', accent: Brand.purpleLighter },
-  mid: { label: 'LET’S SHAPE THE NIGHT', accent: Brand.purpleLighter },
-  finalWeek: { label: 'THE FINAL MAGICAL TOUCHES', accent: Brand.redLight },
-  dayOf: { label: 'TODAY IS THE DAY', accent: Brand.redLight },
-  married: { label: 'HERE’S TO FOREVER', accent: Brand.redLight },
+const TONE: Record<CountdownTier, string> = {
+  far: Brand.purpleLighter,
+  mid: Brand.purpleLighter,
+  finalWeek: Brand.redLight,
+  dayOf: Brand.redLight,
+  married: Brand.redLight,
 };
 
 /** Whole days from local midnight today to the event date (negative = past). */
@@ -56,20 +65,19 @@ export function daysUntil(dateStr: string): number {
 }
 
 /** Shared by the Plan hero (`Countdown`) and the v2 `CountdownHero`. */
-export function countdownModel(date: string): CountdownModel {
+export function countdownModel(date: string, locale: Locale = 'en'): CountdownModel {
   const days = daysUntil(date);
   const tier = tierFor(days);
-  const tone = TONE[tier];
-  const moment = MOMENTS[Math.abs(days) % MOMENTS.length];
+  const moment = translate(locale, MOMENTS[Math.abs(days) % MOMENTS.length]);
   const line =
-    tier === 'dayOf' ? `Today, ${moment}`
-    : tier === 'married' ? 'Congratulations, newlyweds'
-    : `${days === 1 ? 'day' : 'days'} until ${moment}`;
-  return { days, tier, toneLabel: tone.label, toneColor: tone.accent, moment, line };
+    tier === 'dayOf' ? translate(locale, 'cd.today', { moment })
+    : tier === 'married' ? translate(locale, 'cd.married')
+    : `${days} ${translate(locale, days === 1 ? 'cd.dayUntil' : 'cd.daysUntil', { moment })}`;
+  return { days, tier, toneLabel: translate(locale, TONE_KEY[tier]), toneColor: TONE[tier], moment, line };
 }
 
-export function Countdown({ date }: { date: string }) {
-  const model = countdownModel(date);
+export function Countdown({ date, locale = 'en' }: { date: string; locale?: Locale }) {
+  const model = countdownModel(date, locale);
   const leadSmall = model.tier === 'dayOf' || model.tier === 'married';
 
   return (

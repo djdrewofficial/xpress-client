@@ -6,6 +6,7 @@ import { MusicStep } from '@/components/onboarding/MusicStep';
 import { WelcomeScreen } from '@/components/onboarding/WelcomeScreen';
 import { SignInScreen } from '@/components/sign-in/SignInScreen';
 import { useT } from '@/lib/i18n';
+import { useDevLocale } from '@/lib/devLocale';
 import type { OtpTransport } from '@/lib/otp';
 import type { WelcomeSnapshot } from '@/lib/welcome';
 
@@ -27,6 +28,7 @@ const fake: OtpTransport = {
 };
 
 export default function Phase2Preview() {
+  useDevLocale();
   const params = useLocalSearchParams<{ frame?: string }>();
   const frame = typeof params.frame === 'string' ? params.frame : 'login';
   const spanish = frame.endsWith('-es');

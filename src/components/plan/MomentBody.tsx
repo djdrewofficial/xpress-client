@@ -14,6 +14,7 @@ import {
   TrackRow,
   useC,
 } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 import { questionVisible, type QuestionRow } from '@/lib/planning';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
 import { answerText, composeDjNote } from './model';
@@ -105,6 +106,7 @@ export function MomentBody({
   intro?: string | null;
 }) {
   const c = useC();
+  const { t, locale } = useT();
   const insets = useSafeAreaInsets();
   const [editingAll, setEditingAll] = useState(false);
   const [focusId, setFocusId] = useState<string | null>(null);
@@ -124,7 +126,7 @@ export function MomentBody({
         visible.find((q) => !(answers[q.id] ?? '').trim())?.id ??
         null);
 
-  const dj = composeDjNote(visible, answers);
+  const dj = composeDjNote(visible, answers, locale);
   const songNotes = [...songs, ...doNotPlaySongs].filter((s) => (s.note ?? '').trim());
 
   // Avoid-list sections store the do-not-play rows. Everywhere else, flagged rows split out.
@@ -147,10 +149,10 @@ export function MomentBody({
       ? null
       : tab === 'questions'
         ? visible.length > 0
-          ? { label: 'Save and continue', arrow: true as const, onPress: saveAndContinue }
+          ? { label: t('moment.saveContinue'), arrow: true as const, onPress: saveAndContinue }
           : null
         : songsEnabled
-          ? { label: 'Add music', arrow: false as const, onPress: onAddMusic }
+          ? { label: t('moment.addMusic'), arrow: false as const, onPress: onAddMusic }
           : null;
 
   return (
@@ -161,7 +163,7 @@ export function MomentBody({
           onBack={onBack}
           trailing={
             !special && tab === 'questions' && visible.length > 0
-              ? { label: editingAll ? 'Done' : 'Edit', onPress: () => { setEditingAll((e) => !e); setReeditId(null); } }
+              ? { label: editingAll ? t('common.done') : t('common.edit'), onPress: () => { setEditingAll((e) => !e); setReeditId(null); } }
               : undefined
           }
         />
@@ -190,9 +192,9 @@ export function MomentBody({
           <>
             <SegmentedControl
               options={[
-                { value: 'questions' as const, label: visible.length ? `Questions ${answeredCount}/${visible.length}` : 'Questions' },
-                { value: 'songs' as const, label: `Songs ${songCount}` },
-                { value: 'notes' as const, label: 'DJ notes' },
+                { value: 'questions' as const, label: visible.length ? t('moment.questionsCount', { answered: answeredCount, total: visible.length }) : t('moment.questions') },
+                { value: 'songs' as const, label: t('moment.songsCount', { count: songCount }) },
+                { value: 'notes' as const, label: t('moment.djNotes') },
               ]}
               value={tab}
               onChange={onTab}
@@ -249,8 +251,8 @@ export function MomentBody({
                       <Icon name="ban" size={16} color={c.danger} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[Type.subhead, { color: c.ink }]}>Songs to avoid?</Text>
-                      <Text style={[Type.footnote, { color: c.ink2 }]}>Do not play lives in {danceTitle}</Text>
+                      <Text style={[Type.subhead, { color: c.ink }]}>{t('moment.avoidTitle')}</Text>
+                      <Text style={[Type.footnote, { color: c.ink2 }]}>{t('moment.avoidLives', { title: danceTitle })}</Text>
                     </View>
                     <Icon name="chev-r" size={18} color={c.ink3} />
                   </Pressable>
@@ -260,18 +262,18 @@ export function MomentBody({
                   <View style={[styles.noteCard, Shadow.card, { backgroundColor: c.surface }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Icon name="dj-note" size={16} color={c.accent} />
-                      <Text style={[Type.label, { color: c.accent }]}>Note for your DJ</Text>
+                      <Text style={[Type.label, { color: c.accent }]}>{t('moment.noteForDj')}</Text>
                     </View>
                     <View style={[styles.accentBar, { backgroundColor: c.red }]} />
                     <Text style={[styles.noteProse, { color: c.ink }]}>{dj.text}</Text>
                     <Text style={[Type.footnote, { color: c.ink3 }]}>
-                      From your answers{dj.edited ? ` · ${dj.edited}` : ''}
+                      {dj.edited ? t('moment.fromAnswersEdited', { edited: dj.edited }) : t('moment.fromAnswers')}
                     </Text>
                   </View>
                 ) : null}
 
                 {!songsEnabled && songs.length === 0 && !showSplit ? (
-                  <Text style={[Type.footnote, { color: c.ink3 }]}>Music isn’t part of this moment.</Text>
+                  <Text style={[Type.footnote, { color: c.ink3 }]}>{t('moment.noMusic')}</Text>
                 ) : null}
               </View>
             ) : null}
@@ -287,7 +289,7 @@ export function MomentBody({
         <View style={[styles.bottom, { backgroundColor: c.bg, paddingBottom: Math.max(insets.bottom, 16), borderTopColor: c.line }]}>
           {aiPicks && tab === 'songs' ? (
             <Pressable onPress={onForYou} hitSlop={6} style={{ alignSelf: 'center' }}>
-              <Text style={[Type.subhead, { color: c.accent }]}>For you</Text>
+              <Text style={[Type.subhead, { color: c.accent }]}>{t('moment.forYou')}</Text>
             </Pressable>
           ) : null}
           <Button label={bottom.label} arrow={bottom.arrow || undefined} onPress={bottom.onPress} />
@@ -297,21 +299,21 @@ export function MomentBody({
       <Sheet visible={menu != null} onClose={() => setMenu(null)} title={menu?.title}>
         {menu ? (
           <View style={{ gap: 10 }}>
-            <Button label={playingId === menu.id ? 'Pause preview' : 'Play preview'} variant="ghost" onPress={() => { onPlay(menu); setMenu(null); }} />
+            <Button label={playingId === menu.id ? t('moment.pause') : t('moment.play')} variant="ghost" onPress={() => { onPlay(menu); setMenu(null); }} />
             {!menu.doNotPlay ? (
               <Button
-                label={menu.mustPlay ? 'Remove must play' : 'Mark must play'}
+                label={menu.mustPlay ? t('moment.removeMust') : t('moment.markMust')}
                 variant="secondary"
                 onPress={() => { onToggleMust(menu); setMenu(null); }}
               />
             ) : null}
             <Button
-              label={menu.note ? 'Edit note' : 'Add a note for your DJ'}
+              label={menu.note ? t('moment.editNote') : t('moment.addNote')}
               variant="ghost"
               onPress={() => { setNoteFor(menu); setNoteDraft(menu.note ?? ''); setMenu(null); }}
             />
             <Pressable onPress={() => { onRemove(menu); setMenu(null); }} style={{ alignItems: 'center', paddingVertical: 12 }}>
-              <Text style={[Type.button, { color: c.danger }]}>Remove song</Text>
+              <Text style={[Type.button, { color: c.danger }]}>{t('moment.removeSong')}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -351,8 +353,9 @@ function QuestionPane({
   onFocus: (id: string) => void;
 }) {
   const c = useC();
+  const { t } = useT();
   if (visible.length === 0) {
-    return <Text style={[Type.footnote, { color: c.ink3 }]}>No questions for this moment.</Text>;
+    return <Text style={[Type.footnote, { color: c.ink3 }]}>{t('moment.noQuestions')}</Text>;
   }
   const folded = editingAll ? [] : visible.filter((q) => (answers[q.id] ?? '').trim() && q.id !== activeId);
   const rest = editingAll ? [] : visible.filter((q) => !(answers[q.id] ?? '').trim() && q.id !== activeId);
@@ -373,7 +376,7 @@ function QuestionPane({
                     <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={2}>{q.prompt}</Text>
                     <Text style={[Type.subhead, { color: c.ink }]} numberOfLines={1}>{answerText(q, answers[q.id] ?? '')}</Text>
                   </View>
-                  <Pressable onPress={() => onFocus(q.id)} hitSlop={8} accessibilityLabel="Edit answer">
+                  <Pressable onPress={() => onFocus(q.id)} hitSlop={8} accessibilityLabel={t('moment.editAnswer')}>
                     <Icon name="edit" size={16} color={c.ink3} />
                   </Pressable>
                 </View>
@@ -427,6 +430,7 @@ function ActiveQuestion({
   onPick: (v: string) => void;
 }) {
   const c = useC();
+  const { t } = useT();
   const opts = q.options.map((o) => (typeof o === 'string' ? o : o.label));
   const entries = q.options.map((o) =>
     typeof o === 'string' ? { label: o, children: [] as string[] } : { label: o.label, children: Array.isArray(o.children) ? o.children : [] },
@@ -440,11 +444,11 @@ function ActiveQuestion({
     <View style={[styles.active, Shadow.card, { backgroundColor: c.surface }]}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
         <Text style={[styles.bigNum, { color: c.red }]}>{String(index).padStart(2, '0')}</Text>
-        <Text style={[Type.footnote, { color: c.ink3 }]}>of {String(total).padStart(2, '0')}</Text>
+        <Text style={[Type.footnote, { color: c.ink3 }]}>{t('moment.of')} {String(total).padStart(2, '0')}</Text>
       </View>
       <Text style={[styles.prompt, { color: c.ink }]}>{q.prompt}</Text>
       {q.help_text ? <Text style={[Type.footnote, { color: c.ink2 }]}>{q.help_text}</Text> : null}
-      <Text style={[Type.label, { color: c.accent, marginTop: 4 }]}>Your answer</Text>
+      <Text style={[Type.label, { color: c.accent, marginTop: 4 }]}>{t('moment.yourAnswer')}</Text>
 
       {textLike ? (
         <TextInput
@@ -461,13 +465,13 @@ function ActiveQuestion({
           onChangeText={onChange}
           onBlur={() => onPersist(value)}
           multiline={q.answer_type !== 'short'}
-          placeholder="Type your answer"
+          placeholder={t('moment.placeholder')}
           placeholderTextColor={c.ink3}
         />
       ) : q.answer_type === 'yesno' ? (
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          {['Yes', 'No'].map((o) => (
-            <Chip key={o} label={o} active={value === o} onPress={() => onPick(o)} grow />
+          {(['Yes', 'No'] as const).map((o) => (
+            <Chip key={o} label={o === 'Yes' ? t('moment.yes') : t('moment.no')} active={value === o} onPress={() => onPick(o)} grow />
           ))}
         </View>
       ) : q.answer_type === 'scale' ? (
@@ -609,18 +613,19 @@ function DanceLists({
   onAddDoNotPlay?: () => void;
 } & Omit<SongListProps, 'songs' | 'onSong'>) {
   const c = useC();
+  const { t } = useT();
   return (
     <View style={{ gap: 16 }}>
       <View style={styles.sectionHead}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Icon name="star" size={14} color={c.red} />
-          <Text style={[Type.label, { color: c.red }]}>Must play</Text>
+          <Text style={[Type.label, { color: c.red }]}>{t('moment.mustPlay')}</Text>
         </View>
-        <Text style={[Type.footnote, { color: c.ink3 }]}>{mustTotal} {mustTotal === 1 ? 'song' : 'songs'}</Text>
+        <Text style={[Type.footnote, { color: c.ink3 }]}>{mustTotal} {mustTotal === 1 ? t('moment.song') : t('moment.songs')}</Text>
       </View>
       <View style={[styles.stack, { backgroundColor: c.surface, borderColor: c.line }]}>
         {must.length === 0 ? (
-          <Text style={[Type.footnote, { color: c.ink3, padding: 14 }]}>No must-play songs yet.</Text>
+          <Text style={[Type.footnote, { color: c.ink3, padding: 14 }]}>{t('moment.noMust')}</Text>
         ) : (
           must.map((s, i) => (
             <View key={s.id}>
@@ -632,7 +637,7 @@ function DanceLists({
         )}
         {mustTotal > 2 ? (
           <Pressable onPress={onToggleExpand} style={{ paddingVertical: 12, alignItems: 'center' }}>
-            <Text style={[Type.label, { color: c.accent }]}>{expanded ? 'Show less' : `See all ${mustTotal}`}</Text>
+            <Text style={[Type.label, { color: c.accent }]}>{expanded ? t('moment.showLess') : t('moment.seeAll', { count: mustTotal })}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -640,12 +645,12 @@ function DanceLists({
       <View style={styles.sectionHead}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Icon name="ban" size={14} color={c.red} />
-          <Text style={[Type.label, { color: c.red }]}>Do not play</Text>
+          <Text style={[Type.label, { color: c.red }]}>{t('moment.doNotPlay')}</Text>
         </View>
-        <Text style={[Type.footnote, { color: c.ink3 }]}>{avoid.length} {avoid.length === 1 ? 'song' : 'songs'}</Text>
+        <Text style={[Type.footnote, { color: c.ink3 }]}>{avoid.length} {avoid.length === 1 ? t('moment.song') : t('moment.songs')}</Text>
       </View>
       <Text style={[Type.footnote, { color: c.ink2, marginTop: -8 }]}>
-        Songs we will keep off the dance floor. We check guest requests against this list too.
+        {t('moment.avoidHelp')}
       </Text>
       <View style={[styles.stack, { backgroundColor: c.surface, borderColor: c.line }]}>
         {avoid.map((s, i) => (
@@ -653,7 +658,7 @@ function DanceLists({
             {i > 0 ? <View style={[styles.hair, { backgroundColor: c.line }]} /> : null}
             <View>
               <TrackRow title={s.title} artist={artistLine(s)} doNotPlay onPress={() => onSong(s)} />
-              <Pressable onPress={() => onRemove(s)} hitSlop={8} style={styles.removeX} accessibilityLabel={`Remove ${s.title}`}>
+              <Pressable onPress={() => onRemove(s)} hitSlop={8} style={styles.removeX} accessibilityLabel={t('moment.removeTitle', { title: s.title })}>
                 <Icon name="close" size={16} color={c.ink3} />
               </Pressable>
               <NoteEditor song={s} noteFor={noteFor} noteDraft={noteDraft} onNoteDraft={onNoteDraft} onStartNote={onStartNote} onSaveNote={onSaveNote} onCancelNote={onCancelNote} />
@@ -663,7 +668,7 @@ function DanceLists({
         {onAddDoNotPlay ? (
           <Pressable onPress={onAddDoNotPlay} style={styles.addAvoid}>
             <Icon name="plus" size={16} color={c.red} />
-            <Text style={[Type.subhead, { color: c.red }]}>Add a song to Do not play</Text>
+            <Text style={[Type.subhead, { color: c.red }]}>{t('moment.addAvoid')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -684,6 +689,7 @@ type SongListProps = {
 
 function NoteEditor(props: Omit<SongListProps, 'songs' | 'onSong'> & { song: MomentSong }) {
   const c = useC();
+  const { t } = useT();
   const { song, noteFor, noteDraft, onNoteDraft, onStartNote, onSaveNote, onCancelNote } = props;
   if (noteFor?.id === song.id) {
     return (
@@ -692,14 +698,14 @@ function NoteEditor(props: Omit<SongListProps, 'songs' | 'onSong'> & { song: Mom
           style={StyleSheet.flatten([styles.input, { color: c.ink, borderColor: c.line, backgroundColor: c.surface2, minHeight: 72 }])}
           value={noteDraft}
           onChangeText={onNoteDraft}
-          placeholder="Add a note for your DJ"
+          placeholder={t('moment.notePh')}
           placeholderTextColor={c.ink3}
           multiline
           autoFocus
         />
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
-          <Pressable onPress={onCancelNote}><Text style={[Type.subhead, { color: c.ink2 }]}>Cancel</Text></Pressable>
-          <Pressable onPress={onSaveNote}><Text style={[Type.subhead, { color: c.accent }]}>Save note</Text></Pressable>
+          <Pressable onPress={onCancelNote}><Text style={[Type.subhead, { color: c.ink2 }]}>{t('common.cancel')}</Text></Pressable>
+          <Pressable onPress={onSaveNote}><Text style={[Type.subhead, { color: c.accent }]}>{t('moment.saveNote')}</Text></Pressable>
         </View>
       </View>
     );
@@ -708,7 +714,7 @@ function NoteEditor(props: Omit<SongListProps, 'songs' | 'onSong'> & { song: Mom
   return (
     <Pressable onPress={() => onStartNote(song)} style={styles.addNote}>
       <Icon name="dj-note" size={14} color={c.accent} />
-      <Text style={[Type.footnote, { color: c.accent }]}>Add a note for your DJ</Text>
+      <Text style={[Type.footnote, { color: c.accent }]}>{t('moment.addNote')}</Text>
     </Pressable>
   );
 }
@@ -723,11 +729,12 @@ function NotesPane({
   songNotes: MomentSong[];
 }) {
   const c = useC();
+  const { t } = useT();
   const answered = djAnswers.filter((q) => answerText(q, answers[q.id] ?? ''));
   if (answered.length === 0 && songNotes.length === 0) {
     return (
       <Text style={[Type.callout, { color: c.ink2 }]}>
-        Answers and song notes show up here for your DJ. Nothing new is saved on this tab.
+        {t('moment.notesEmpty')}
       </Text>
     );
   }
@@ -735,7 +742,7 @@ function NotesPane({
     <View style={{ gap: 18 }}>
       {answered.length > 0 ? (
         <View style={{ gap: 12 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>From your answers</Text>
+          <Text style={[Type.label, { color: c.ink3 }]}>{t('moment.fromAnswers')}</Text>
           {answered.map((q) => (
             <View key={q.id} style={[styles.noteCard, { backgroundColor: c.surface }]}>
               <Text style={[Type.footnote, { color: c.ink2 }]}>{q.prompt}</Text>
@@ -746,7 +753,7 @@ function NotesPane({
       ) : null}
       {songNotes.length > 0 ? (
         <View style={{ gap: 12 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>Song notes</Text>
+          <Text style={[Type.label, { color: c.ink3 }]}>{t('moment.songNotes')}</Text>
           {songNotes.map((s) => (
             <View key={s.id} style={[styles.noteCard, { backgroundColor: c.surface }]}>
               <Text style={[Type.subhead, { color: c.ink }]}>{s.title}</Text>

@@ -7,11 +7,13 @@ import { useAddMusic } from '@/components/music/AddMusicSheet';
 import { buildMusicRecord, defaultMoment, type MusicMoment } from '@/components/music/model';
 import { EventSwitcher } from '@/components/EventSwitcher';
 import { useAuth } from '@/lib/auth';
+import { useT } from '@/lib/i18n';
 import { useEvent } from '@/lib/events';
 import { loadEventSongs, loadOverview } from '@/lib/planning';
 
 export default function MusicScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { profile } = useAuth();
   const { event, eventId, events, loading: eventLoading } = useEvent();
   const [moments, setMoments] = useState<MusicMoment[] | null>(null);
@@ -56,7 +58,7 @@ export default function MusicScreen() {
   const requireMoment = (run: (moment: MusicMoment) => void) => {
     if (eventLoading || moments === null) return;
     if (!target) {
-      Alert.alert('No music moments yet', 'Your DJ adds ceremony and reception moments to your plan. Songs can be added once those are here.');
+      Alert.alert(t('record.noMoments'), t('record.noMomentsBody'));
       return;
     }
     run(target);

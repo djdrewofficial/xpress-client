@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, ListCell, TrackRow, useC } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
 import {
   momentCountLabel,
@@ -61,6 +62,7 @@ export function MusicRecord({
   onSwitchEvent?: () => void;
 }) {
   const c = useC();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const stats = musicStats(moments);
   const sideA = moments.filter((m) => m.side === 'A');
@@ -70,21 +72,21 @@ export function MusicRecord({
     <View style={{ flex: 1, minHeight: 0, backgroundColor: c.bg }}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={{ flex: 1 }}>
-          <Text style={[Type.overline, { color: c.red }]}>Your wedding record</Text>
+          <Text style={[Type.overline, { color: c.red }]}>{t('record.eyebrow')}</Text>
           <Pressable
             onPress={onSwitchEvent}
             disabled={!onSwitchEvent}
             style={styles.titleRow}
             accessibilityRole={onSwitchEvent ? 'button' : undefined}
-            accessibilityLabel={onSwitchEvent ? 'Switch event' : undefined}>
-            <Text style={[Type.largeTitle, { color: c.ink }]}>Music</Text>
+            accessibilityLabel={onSwitchEvent ? t('home.switchEvent') : undefined}>
+            <Text style={[Type.largeTitle, { color: c.ink }]}>{t('record.title')}</Text>
             {onSwitchEvent ? <Icon name="chev-d" size={16} color={c.ink3} /> : null}
           </Pressable>
         </View>
         <Pressable
           onPress={onSearch}
           accessibilityRole="button"
-          accessibilityLabel="Search songs"
+          accessibilityLabel={t('record.searchA11y')}
           style={[styles.search, { backgroundColor: c.surface }, Shadow.card]}>
           <Icon name="search" size={20} color={c.ink} />
         </Pressable>
@@ -95,43 +97,43 @@ export function MusicRecord({
           <View style={styles.vinyl} pointerEvents="none">
             <RecordVinyl />
           </View>
-          <Text style={styles.sideEyebrow}>SIDE A + SIDE B</Text>
+          <Text style={styles.sideEyebrow}>{t('record.sideBoth')}</Text>
           <View style={styles.countRow}>
             <Text style={styles.count}>{loading ? '—' : stats.songs}</Text>
-            <Text style={styles.countWord}>songs</Text>
+            <Text style={styles.countWord}>{t('record.songsWord')}</Text>
           </View>
           <View style={styles.actions}>
             <Pressable onPress={onAddMusic} style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.92 : 1 }]} accessibilityRole="button">
               <Icon name="plus" size={16} color="#fff" />
-              <Text style={styles.addLabel}>Add music</Text>
+              <Text style={styles.addLabel}>{t('record.addMusic')}</Text>
             </Pressable>
             <Pressable onPress={onImport} style={({ pressed }) => [styles.importBtn, { opacity: pressed ? 0.92 : 1 }]} accessibilityRole="button">
               <Icon name="import" size={16} color="#fff" />
-              <Text style={styles.importLabel}>Import playlist</Text>
+              <Text style={styles.importLabel}>{t('record.import')}</Text>
             </Pressable>
           </View>
           <View style={styles.rule} />
           <View style={styles.stats}>
-            <Stat value={loading ? '—' : String(stats.moments)} label="Moments" />
-            <Stat value={loading ? '—' : String(stats.mustPlay)} label="Must play" />
-            <Stat value={loading ? '—' : String(stats.doNotPlay)} label="Do not play" tone="red" />
+            <Stat value={loading ? '—' : String(stats.moments)} label={t('record.moments')} />
+            <Stat value={loading ? '—' : String(stats.mustPlay)} label={t('record.mustPlay')} />
+            <Stat value={loading ? '—' : String(stats.doNotPlay)} label={t('record.doNotPlay')} tone="red" />
           </View>
         </LinearGradient>
 
-        <ListCell icon="sparkle" title="Made for you" subtitle="Picks based on your songs and genres" onPress={onForYou} />
+        <ListCell icon="sparkle" title={t('record.forYou')} subtitle={t('record.forYouSub')} onPress={onForYou} />
 
         {moments.length === 0 && !loading ? (
           <View style={[styles.empty, { backgroundColor: c.surface }]}>
             <Icon name="vinyl" size={28} color={c.ink3} />
-            <Text style={[Type.headline, { color: c.ink, textAlign: 'center' }]}>No moments on the record yet</Text>
+            <Text style={[Type.headline, { color: c.ink, textAlign: 'center' }]}>{t('record.emptyTitle')}</Text>
             <Text style={[Type.footnote, { color: c.ink2, textAlign: 'center' }]}>
-              Ceremony songs land on Side A and the reception on Side B. When those moments are on your plan, their tracks, notes, and must-plays show up here.
+              {t('record.emptyBody')}
             </Text>
           </View>
         ) : (
           <>
-            <Side label="Side A · Ceremony" moments={sideA} onOpen={onOpenMoment} onAdd={onAddToMoment} />
-            <Side label="Side B · Reception" moments={sideB} onOpen={onOpenMoment} onAdd={onAddToMoment} />
+            <Side label={t('record.sideA')} moments={sideA} onOpen={onOpenMoment} onAdd={onAddToMoment} />
+            <Side label={t('record.sideB')} moments={sideB} onOpen={onOpenMoment} onAdd={onAddToMoment} />
           </>
         )}
       </ScrollView>
@@ -173,6 +175,7 @@ function Side({
 
 function MomentBlock({ moment, onOpen, onAdd }: { moment: MusicMoment; onOpen: () => void; onAdd: () => void }) {
   const c = useC();
+  const { t, locale } = useT();
   const empty = momentSongCount(moment) === 0;
   const real = moment.id !== 'do-not-play';
   return (
@@ -191,14 +194,14 @@ function MomentBlock({ moment, onOpen, onAdd }: { moment: MusicMoment; onOpen: (
               {moment.title}
             </Text>
             <Text style={[Type.footnote, { color: empty ? c.ink3 : c.ink2 }]} numberOfLines={1}>
-              {momentSubtitle(moment)}
+              {momentSubtitle(moment, locale)}
             </Text>
           </View>
-          {empty ? null : <Text style={[Type.footnote, { color: c.ink3 }]}>{momentCountLabel(moment)}</Text>}
+          {empty ? null : <Text style={[Type.footnote, { color: c.ink3 }]}>{momentCountLabel(moment, locale)}</Text>}
         </Pressable>
         {empty ? (
-          <Pressable onPress={onAdd} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Add a song to ${moment.title}`}>
-            <Text style={[styles.addLink, { color: c.red }]}>Add</Text>
+          <Pressable onPress={onAdd} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('record.addSongA11y', { title: moment.title })}>
+            <Text style={[styles.addLink, { color: c.red }]}>{t('record.add')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -217,7 +220,7 @@ function MomentBlock({ moment, onOpen, onAdd }: { moment: MusicMoment; onOpen: (
 
       {moment.doNotPlay.length > 0 ? (
         <View style={{ gap: 8 }}>
-          <Text style={[Type.label, { color: c.danger, marginTop: 4 }]}>Do not play</Text>
+          <Text style={[Type.label, { color: c.danger, marginTop: 4 }]}>{t('record.doNotPlay')}</Text>
           {moment.doNotPlay.map((track) => (
             <TrackRow
               key={track.id}

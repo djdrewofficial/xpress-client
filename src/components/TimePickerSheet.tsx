@@ -3,6 +3,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { Button, Icon, Sheet, useC, useScheme } from '@/components/ui';
+import { localeTag, useT } from '@/lib/i18n';
 import { Fonts, Type } from '@/lib/theme';
 
 const ROW = 36;
@@ -17,7 +18,7 @@ const ROW = 36;
 export function TimePickerSheet({
   visible,
   initial,
-  title = 'Set time',
+  title,
   subtitle,
   onClose,
   onSave,
@@ -30,6 +31,7 @@ export function TimePickerSheet({
   onSave: (time: string | null) => void;
 }) {
   const c = useC();
+  const { t, locale } = useT();
   const scheme = useScheme();
   const [date, setDate] = useState(() => dateFromLabel(initial));
 
@@ -41,10 +43,10 @@ export function TimePickerSheet({
     <Sheet visible={visible} onClose={onClose}>
       <View style={styles.head}>
         <View style={{ flex: 1 }}>
-          <Text style={[Type.title, { color: c.ink }]}>{title}</Text>
+          <Text style={[Type.title, { color: c.ink }]}>{title ?? t('time.title')}</Text>
           {subtitle ? <Text style={[Type.footnote, { color: c.ink2, marginTop: 2 }]}>{subtitle}</Text> : null}
         </View>
-        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
+        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Icon name="close" size={22} color={c.ink3} />
         </Pressable>
       </View>
@@ -53,6 +55,7 @@ export function TimePickerSheet({
         <DateTimePicker
           mode="time"
           display="spinner"
+          locale={localeTag(locale)}
           value={date}
           minuteInterval={5}
           themeVariant={scheme}
@@ -68,10 +71,10 @@ export function TimePickerSheet({
 
       <View style={styles.actions}>
         <View style={{ flex: 1 }}>
-          <Button label="Clear time" variant="ghost" onPress={() => onSave(null)} style={{ borderColor: c.accent }} />
+          <Button label={t('time.clear')} variant="ghost" onPress={() => onSave(null)} style={{ borderColor: c.accent }} />
         </View>
         <View style={{ flex: 1.35 }}>
-          <Button label="Save time" onPress={() => onSave(formatClock(date))} />
+          <Button label={t('time.save')} onPress={() => onSave(formatClock(date))} />
         </View>
       </View>
     </Sheet>
@@ -116,12 +119,15 @@ const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '
 /** Five-row wheel. The center row is selected; tapping another row moves it there. */
 function TimeWheel({ date, onChange }: { date: Date; onChange: (d: Date) => void }) {
   const c = useC();
+  const { t } = useT();
   const { hour, minute, pm } = parts(date);
   const minuteLabel = String(minute).padStart(2, '0');
+  const am = t('time.am');
+  const pmLabel = t('time.pm');
 
   const setHour = (label: string) => onChange(apply(date, parseInt(label, 10), minute, pm));
   const setMinute = (label: string) => onChange(apply(date, hour, parseInt(label, 10), pm));
-  const setPeriod = (label: string) => onChange(apply(date, hour, minute, label === 'PM'));
+  const setPeriod = (label: string) => onChange(apply(date, hour, minute, label === pmLabel));
 
   return (
     <View style={styles.wheel}>
@@ -129,7 +135,7 @@ function TimeWheel({ date, onChange }: { date: Date; onChange: (d: Date) => void
       <View style={styles.cols}>
         <WheelColumn items={HOURS} selected={String(hour)} onSelect={setHour} />
         <WheelColumn items={MINUTES} selected={minuteLabel} onSelect={setMinute} />
-        <WheelColumn items={['AM', 'PM']} selected={pm ? 'PM' : 'AM'} onSelect={setPeriod} />
+        <WheelColumn items={[am, pmLabel]} selected={pm ? pmLabel : am} onSelect={setPeriod} />
       </View>
     </View>
   );

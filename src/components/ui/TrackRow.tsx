@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useT } from '@/lib/i18n';
 import { Fonts, Radius, Type } from '@/lib/theme';
 import { Icon } from './Icon';
 import { useC } from './useC';
@@ -28,6 +29,7 @@ export function TrackRow({
   onPress?: () => void;
 }) {
   const c = useC();
+  const { t } = useT();
   const titleColor = doNotPlay ? c.ink3 : c.ink;
   return (
     <Pressable
@@ -55,7 +57,7 @@ export function TrackRow({
         </View>
         {mustPlay && !doNotPlay ? (
           <View style={[styles.tag, { backgroundColor: c.accentTint }]}>
-            <Text style={[Type.label, { color: c.accent, letterSpacing: 0.6 }]}>Must play</Text>
+            <Text style={[Type.label, { color: c.accent, letterSpacing: 0.6 }]}>{t('row.mustPlay')}</Text>
           </View>
         ) : null}
       </View>

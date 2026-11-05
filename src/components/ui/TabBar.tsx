@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useT } from '@/lib/i18n';
 import { Type } from '@/lib/theme';
 import { Icon, type IconName } from './Icon';
 import { useC } from './useC';
@@ -32,13 +33,24 @@ export function TabBar({
   onChange?: (key: string) => void;
 }) {
   const c = useC();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const bottom = Math.max(insets.bottom, 12);
+  const labels = {
+    home: t('tab.home'),
+    timeline: t('tab.timeline'),
+    music: t('tab.music'),
+    'my-event': t('tab.my-event'),
+  } as const;
+  const items = tabs.map((tab) => {
+    const label = labels[tab.key as keyof typeof labels];
+    return label ? { ...tab, label } : tab;
+  });
   return (
     <View
       style={[styles.bar, { backgroundColor: c.surface, borderTopColor: c.line, paddingBottom: bottom }]}
       accessibilityRole="tablist">
-      {tabs.map((tab) => {
+      {items.map((tab) => {
         const selected = tab.key === active;
         const color = selected ? c.accent : c.ink3;
         return (

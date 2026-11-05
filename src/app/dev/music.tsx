@@ -1,4 +1,6 @@
 import { Redirect, useLocalSearchParams } from 'expo-router';
+
+import { useDevLocale } from '@/lib/devLocale';
 import { View } from 'react-native';
 
 import { AddMusicSheet } from '@/components/music/AddMusicSheet';
@@ -118,6 +120,7 @@ function track(id: string, title: string, artist: string): SpotifyTrack {
 }
 
 export default function DevMusicPreview() {
+  useDevLocale();
   const params = useLocalSearchParams<{ sheet?: string; scheme?: string }>();
   if (!__DEV__) return <Redirect href="/login" />;
   const scheme = params.scheme === 'dark' ? 'dark' : 'light';

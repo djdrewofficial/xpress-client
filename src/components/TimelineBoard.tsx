@@ -12,6 +12,7 @@ import {
 } from 'react-native-reorderable-list';
 
 import { CoachMark, EmojiIcon, Icon, ListCell, MomentRow, Sheet, useC } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 import { Fonts, Radius, Shadow, Space, Status, Type } from '@/lib/theme';
 
 export type TimelineMoment = {
@@ -93,6 +94,7 @@ export function TimelineBoard({
   onReorder: (chapterId: string, from: number, to: number) => void;
 }) {
   const c = useC();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const plusRef = useRef<View>(null);
   const [plusBox, setPlusBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -121,10 +123,10 @@ export function TimelineBoard({
           </Text>
         ) : null}
         <View style={styles.titleRow}>
-          <Text style={[Type.largeTitle, { color: c.ink, flex: 1 }]}>Timeline</Text>
+          <Text style={[Type.largeTitle, { color: c.ink, flex: 1 }]}>{t('timeline.title')}</Text>
           {canManage && (reordering || chapters.length > 0) ? (
             <Pressable onPress={onToggleReorder} hitSlop={8} accessibilityRole="button" testID="timeline-reorder">
-              <Text style={[Type.button, { color: c.accent }]}>{reordering ? 'Done' : 'Reorder'}</Text>
+              <Text style={[Type.button, { color: c.accent }]}>{reordering ? t('common.done') : t('timeline.reorder')}</Text>
             </Pressable>
           ) : null}
           {canManage && !reordering ? (
@@ -143,14 +145,14 @@ export function TimelineBoard({
           <View style={[styles.hint, { backgroundColor: c.surface2 }]}>
             <Icon name="drag" size={18} color={c.accent} />
             <Text style={[Type.footnote, { color: c.ink2, flex: 1 }]}>
-              Drag to change the order. Times stay with their moment.
+              {t('timeline.dragHint')}
             </Text>
           </View>
         ) : null}
 
         {empty ? (
           <Text style={[Type.body, { color: c.ink3, textAlign: 'center', marginTop: Space.xl }]}>
-            Your plan sections will appear here once your event is set up.
+            {t('timeline.empty')}
           </Text>
         ) : (
           <>
@@ -190,9 +192,9 @@ export function TimelineBoard({
 
             {archived.length > 0 ? (
               <View style={{ marginTop: Space.xl, gap: Space.sm }}>
-                <Text style={[Type.overline, { color: c.ink3, letterSpacing: 1.2 }]}>Archived · {archived.length}</Text>
+                <Text style={[Type.overline, { color: c.ink3, letterSpacing: 1.2 }]}>{t('timeline.archived', { count: archived.length })}</Text>
                 <Text style={[Type.footnote, { color: c.ink3 }]}>
-                  Archived sections are removed from your timeline and plan. Restore any of them anytime.
+                  {t('timeline.archivedHelp')}
                 </Text>
                 {archived.map((item) => (
                   <View key={item.id} style={[styles.archived, { backgroundColor: c.surface, borderColor: c.line }]}>
@@ -202,7 +204,7 @@ export function TimelineBoard({
                     </Text>
                     {canManage ? (
                       <Pressable onPress={() => onRestore(item)} hitSlop={8} accessibilityRole="button">
-                        <Text style={[Type.button, { color: c.accent }]}>Restore</Text>
+                        <Text style={[Type.button, { color: c.accent }]}>{t('common.restore')}</Text>
                       </Pressable>
                     ) : null}
                   </View>
@@ -225,12 +227,13 @@ export function TimelineBoard({
 }
 
 function PlusButton({ onPress }: { onPress: () => void }) {
+  const { t } = useT();
   return (
     <Pressable
       onPress={onPress}
       testID="timeline-plus"
       accessibilityRole="button"
-      accessibilityLabel="Add to your day"
+      accessibilityLabel={t('timeline.addDay')}
       style={({ pressed }) => [styles.plus, Shadow.button, { opacity: pressed ? 0.9 : 1 }]}>
       <Icon name="plus" size={22} color="#ffffff" />
     </Pressable>
@@ -246,6 +249,7 @@ function CoachOverlay({
   onDismiss: () => void;
   onPlus: () => void;
 }) {
+  const { t } = useT();
   const top = box ? box.y + box.height + 14 : 120;
   return (
     <View style={{ flex: 1 }} pointerEvents="box-none">
@@ -268,9 +272,9 @@ function CoachOverlay({
       <View style={[styles.coach, { top, right: 16 }]}>
         <CoachMark
           visible
-          headline="This plus is yours"
-          body="Tap it to add a moment, or upload the timeline from your planner and we will line it up for you."
-          footnote="Shows once. Find it anytime under the plus."
+          headline={t('timeline.coachTitle')}
+          body={t('timeline.coachBody')}
+          footnote={t('timeline.coachFoot')}
           onDismiss={onDismiss}
         />
       </View>
@@ -292,37 +296,38 @@ export function TimelineMenu({
   onUpload: () => void;
 }) {
   const c = useC();
+  const { t } = useT();
   return (
     <Sheet visible={visible} onClose={onClose}>
       <View style={styles.menuHead}>
         <View style={{ flex: 1 }}>
-          <Text style={[Type.overline, { color: c.red }]}>Timeline</Text>
-          <Text style={[Type.title, { color: c.ink, marginTop: 4 }]}>Add to your day</Text>
+          <Text style={[Type.overline, { color: c.red }]}>{t('timeline.title')}</Text>
+          <Text style={[Type.title, { color: c.ink, marginTop: 4 }]}>{t('timeline.addDay')}</Text>
         </View>
-        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
+        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Icon name="close" size={22} color={c.ink3} />
         </Pressable>
       </View>
       <View style={{ gap: 12 }}>
         <ListCell
           icon="list-plus"
-          title="New moment"
-          subtitle="A toast, a shoe game, a late night snack. Anything you want on the day."
+          title={t('timeline.newMoment')}
+          subtitle={t('timeline.newMomentSub')}
           subtitleLines={3}
           onPress={onNewMoment}
         />
         <ListCell
           icon="file-up"
-          title="Upload planner timeline"
-          subtitle="PDF, photo or doc from your planner. We line it up and you check it before anything changes."
+          title={t('timeline.upload')}
+          subtitle={t('timeline.uploadSub')}
           subtitleLines={3}
           onPress={busy ? undefined : onUpload}
-          trailing={busy ? <Text style={[Type.footnote, { color: c.accent }]}>Uploading…</Text> : undefined}
+          trailing={busy ? <Text style={[Type.footnote, { color: c.accent }]}>{t('timeline.uploading')}</Text> : undefined}
         />
       </View>
       <View style={styles.menuNote}>
         <Icon name="info" size={16} color={c.ink3} />
-        <Text style={[Type.footnote, { color: c.ink3, flex: 1 }]}>Your DJ sees changes as soon as you save.</Text>
+        <Text style={[Type.footnote, { color: c.ink3, flex: 1 }]}>{t('timeline.djSees')}</Text>
       </View>
     </Sheet>
   );
@@ -348,6 +353,7 @@ function MomentLine({
   onArchive: () => void;
 }) {
   const c = useC();
+  const { t } = useT();
   const drag = useReorderableDrag();
   const active = useIsActive();
   const swipe = useRef<SwipeableMethods>(null);
@@ -356,11 +362,11 @@ function MomentLine({
 
   const confirmArchive = () => {
     Alert.alert(
-      'Archive this section?',
-      `"${moment.title}" will be removed from your timeline and your plan. You can restore it anytime from the Archived list.`,
+      t('timeline.archiveTitle'),
+      t('timeline.archiveBody', { title: moment.title }),
       [
-        { text: 'Cancel', style: 'cancel', onPress: () => swipe.current?.close() },
-        { text: 'Archive', style: 'destructive', onPress: onArchive },
+        { text: t('common.cancel'), style: 'cancel', onPress: () => swipe.current?.close() },
+        { text: t('timeline.archive'), style: 'destructive', onPress: onArchive },
       ],
     );
   };
@@ -372,14 +378,14 @@ function MomentLine({
       hitSlop={6}
       style={styles.timeCol}
       accessibilityRole={editable ? 'button' : undefined}
-      accessibilityLabel={clock ? `${moment.title} time` : `Set time for ${moment.title}`}>
+      accessibilityLabel={clock ? t('timeline.timeA11y', { title: moment.title }) : t('timeline.setTimeA11y', { title: moment.title })}>
       {clock ? (
         <>
           <Text style={[styles.hm, { color: c.ink }]}>{clock.main}</Text>
           {clock.suffix ? <Text style={[styles.suffix, { color: c.ink3 }]}>{clock.suffix}</Text> : null}
         </>
       ) : moment.timeEnabled ? (
-        <Text style={[styles.setTime, { color: c.red }]}>{'Set\ntime'}</Text>
+        <Text style={[styles.setTime, { color: c.red }]}>{t('timeline.setTime')}</Text>
       ) : null}
     </Pressable>
   );
@@ -428,7 +434,7 @@ function MomentLine({
       renderRightActions={() => (
         <View style={styles.archiveAction}>
           <Icon name="trash" size={16} color="#fff" />
-          <Text style={styles.archiveTxt}>Archive</Text>
+          <Text style={styles.archiveTxt}>{t('timeline.archive')}</Text>
         </View>
       )}
       onSwipeableOpen={confirmArchive}>

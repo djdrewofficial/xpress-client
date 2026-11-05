@@ -19,6 +19,7 @@ import { MixtapeLoader } from '@/components/MixtapeLoader';
 import { ProviderLogo, type SongProvider } from '@/components/ProviderLogo';
 import { RecordVinyl } from '@/components/music/MusicRecord';
 import { classifyMusicPaste, isDoNotPlaySectionTitle, playlistProvider } from '@/components/music/model';
+import { useT, type TranslationKey } from '@/lib/i18n';
 import { Fonts, Radius, Type } from '@/lib/theme';
 import { addSong, loadSection, type SongRow } from '@/lib/planning';
 import { searchTracks, resolvePreview, type Track } from '@/lib/musicSearch';
@@ -59,12 +60,6 @@ export type AddMusicFixtures = {
 };
 
 type PreviewList = { name: string | null; url: string; provider: 'apple' | 'spotify'; tracks: SpotifyTrack[] };
-
-const SEGMENTS = [
-  { value: 'search' as const, label: 'Search' },
-  { value: 'foryou' as const, label: 'For you' },
-  { value: 'import' as const, label: 'Import' },
-];
 
 function fromTrack(t: Track): PickItem {
   return {
@@ -139,11 +134,11 @@ function initialSelection(tracks: SpotifyTrack[], existing: Set<string>, dnp: Se
   return next;
 }
 
-function playlistError(code: string): string {
-  if (code === 'bad_link') return "That doesn't look like a Spotify or Apple Music playlist link.";
-  if (code === 'not_found') return "Couldn't find that playlist — double-check the link and that it's public.";
-  if (code === 'restricted') return 'That playlist is private. Open it in Spotify or Apple Music, make it public/shared, then paste the link again.';
-  return "Couldn't read that playlist. Please try again.";
+function playlistError(code: string, say: (key: TranslationKey) => string): string {
+  if (code === 'bad_link') return say('add.badLink');
+  if (code === 'not_found') return say('add.notFound');
+  if (code === 'restricted') return say('add.restricted');
+  return say('add.readFail');
 }
 
 async function fetchDoNotPlayTitles(eventId: string): Promise<Set<string>> {
@@ -194,6 +189,7 @@ export function AddMusicSheet({
   fixtures?: AddMusicFixtures;
 }) {
   const c = useC();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const player = useAudioPlayer(null);
   const status = useAudioPlayerStatus(player);
@@ -369,12 +365,12 @@ export function AddMusicSheet({
     setPlBusy(false);
     if ('error' in res) {
       setStep('browse');
-      setPlError(playlistError(res.error));
+      setPlError(playlistError(res.error, t));
       return;
     }
     if (res.tracks.length === 0) {
       setStep('browse');
-      setPlError('That playlist has no songs.');
+      setPlError(t('add.emptyList'));
       return;
     }
     showPreview(trimmed, res.name, res.tracks);
@@ -593,15 +589,15 @@ export function AddMusicSheet({
                 <View style={[styles.handle, { backgroundColor: c.ink3 }]} />
                 <View style={styles.titleRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={[Type.title, { color: c.ink }]}>Add music</Text>
+                    <Text style={[Type.title, { color: c.ink }]}>{t('add.title')}</Text>
                     <Pressable onPress={canPick ? () => setPicking((p) => !p) : undefined} disabled={!canPick} style={styles.noOutline}>
                       <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={1}>
-                        to {sectionTitle}
+                        {t('add.to', { title: sectionTitle })}
                         {sectionLabel ? ` · ${sectionLabel}` : ''}
                       </Text>
                     </Pressable>
                   </View>
-                  <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close" style={[styles.close, { backgroundColor: c.surface2 }]}>
+                  <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel={t('common.close')} style={[styles.close, { backgroundColor: c.surface2 }]}>
                     <Icon name="close" size={16} color={c.ink2} />
                   </Pressable>
                 </View>
@@ -609,7 +605,7 @@ export function AddMusicSheet({
 
               {picking ? (
                 <ScrollView contentContainerStyle={{ padding: 20, gap: 8, paddingBottom: 40 }}>
-                  <Text style={[Type.label, { color: c.accent, marginBottom: 4 }]}>Add to</Text>
+                  <Text style={[Type.label, { color: c.accent, marginBottom: 4 }]}>{t('add.addTo')}</Text>
                   {sections.map((s) => {
                     const on = s.id === (section?.id ?? sectionId);
                     return (
@@ -625,7 +621,7 @@ export function AddMusicSheet({
                 <>
                   {tab === 'search' ? (
                     <View style={{ paddingHorizontal: 20, gap: 8 }}>
-                      <Text style={[Type.label, { color: c.accent }]}>Search</Text>
+                      <Text style={[Type.label, { color: c.accent }]}>{t('add.search')}</Text>
                       <View style={[styles.field, { backgroundColor: c.surface, borderColor: focused ? c.red : c.line }]}>
                         <Icon name="search" size={18} color={c.ink3} />
                         <TextInput
@@ -635,14 +631,14 @@ export function AddMusicSheet({
                           onChangeText={onQuery}
                           onFocus={() => setFocused(true)}
                           onBlur={() => setFocused(false)}
-                          placeholder="Search songs, or paste a link"
+                          placeholder={t('add.searchPh')}
                           placeholderTextColor={c.ink3}
                           autoCapitalize="none"
                           autoCorrect={false}
                           returnKeyType="search"
                         />
                         {query.length > 0 ? (
-                          <Pressable onPress={() => { setQuery(''); setLinkNote(null); }} hitSlop={8} accessibilityLabel="Clear search">
+                          <Pressable onPress={() => { setQuery(''); setLinkNote(null); }} hitSlop={8} accessibilityLabel={t('add.clear')}>
                             <Icon name="close" size={16} color={c.ink3} />
                           </Pressable>
                         ) : null}
@@ -651,7 +647,15 @@ export function AddMusicSheet({
                   ) : null}
 
                   <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 }}>
-                    <SegmentedControl options={SEGMENTS} value={tab} onChange={setTab} />
+                    <SegmentedControl
+                      options={[
+                        { value: 'search', label: t('add.search') },
+                        { value: 'foryou', label: t('add.forYou') },
+                        { value: 'import', label: t('add.import') },
+                      ]}
+                      value={tab}
+                      onChange={setTab}
+                    />
                   </View>
 
                   <ScrollView
@@ -698,12 +702,12 @@ export function AddMusicSheet({
                       <View style={[styles.tray, { backgroundColor: c.night }]}>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.trayCount}>
-                            {sessionCount} song{sessionCount === 1 ? '' : 's'} added
+                            {t(sessionCount === 1 ? 'add.addedOne' : 'add.addedMany', { count: sessionCount })}
                           </Text>
-                          <Text style={styles.trayTo} numberOfLines={1}>to {sectionTitle}</Text>
+                          <Text style={styles.trayTo} numberOfLines={1}>{t('add.to', { title: sectionTitle })}</Text>
                         </View>
                         <Pressable onPress={onClose} style={styles.done} accessibilityRole="button">
-                          <Text style={styles.doneLabel}>Done</Text>
+                          <Text style={styles.doneLabel}>{t('common.done')}</Text>
                         </Pressable>
                       </View>
                     </View>
@@ -738,14 +742,15 @@ function SearchResults({
   onAdd: (item: PickItem) => void;
 }) {
   const c = useC();
+  const { t } = useT();
   if (searching) return <View style={styles.pad}><ActivityIndicator color={c.accent} /></View>;
   if (query.trim().length < 2) {
-    return <Empty text="Search any song or artist. Paste an Apple Music, Spotify, or YouTube link in the same field." />;
+    return <Empty text={t('add.searchEmpty')} />;
   }
-  if (results.length === 0) return <Empty text={linkNote ?? 'No results. Try a different search.'} />;
+  if (results.length === 0) return <Empty text={linkNote ?? t('add.noResults')} />;
   return (
     <View style={{ gap: 0 }}>
-      <Text style={[Type.label, { color: c.ink3, marginBottom: 4 }]}>Songs</Text>
+      <Text style={[Type.label, { color: c.ink3, marginBottom: 4 }]}>{t('add.songs')}</Text>
       {results.map(fromTrack).map((item) => (
         <ResultRow key={item.key} item={item} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => onPlay(item)} onAdd={() => onAdd(item)} />
       ))}
@@ -773,24 +778,25 @@ function ForYou({
   onMore: () => void;
 }) {
   const c = useC();
+  const { t } = useT();
   if (fy.status === 'loading') return <MixtapeLoader eventName={eventName} />;
   if (fy.status === 'needs-profile') {
-    return <Empty text="Head to “Tell us about you” under Let's Get Started and share your story and favorite genres — then we'll fill this with songs picked just for you." />;
+    return <Empty text={t('add.needsProfile')} />;
   }
   if (fy.status === 'unconfigured' || fy.status === 'error') {
-    return <Empty text="Song picks aren't available right now. Try Search instead." />;
+    return <Empty text={t('add.unconfigured')} />;
   }
   if (fy.items.length === 0) {
     return (
       <View style={{ gap: 12 }}>
-        <Empty text="You've already added the obvious ones. Tap below for fresh ideas." />
+        <Empty text={t('add.fresh')} />
         <LoadMore loading={fyMore} onPress={onMore} />
       </View>
     );
   }
   return (
     <View style={{ gap: 0 }}>
-      {fy.basis.length > 0 ? <Text style={[Type.footnote, { color: c.ink3, fontStyle: 'italic', marginBottom: 8 }]}>Based on {fy.basis.join(', ')}</Text> : null}
+      {fy.basis.length > 0 ? <Text style={[Type.footnote, { color: c.ink3, fontStyle: 'italic', marginBottom: 8 }]}>{t('add.basedOn', { basis: fy.basis.join(', ') })}</Text> : null}
       {fy.items.map((item) => (
         <ResultRow key={item.key} item={item} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => onPlay(item)} onAdd={() => onAdd(item)} />
       ))}
@@ -815,13 +821,14 @@ function ImportStart({
   inputRef: RefObject<TextInput | null>;
 }) {
   const c = useC();
+  const { t } = useT();
   return (
     <View style={{ gap: 14 }}>
       <Text style={[Type.footnote, { color: c.ink2 }]}>
-        Paste a public playlist link. Apple Music and Spotify both work, and you'll check every song before anything is added.
+        {t('add.importHelp')}
       </Text>
-      <ProviderLine provider="apple" title="Apple Music" detail="Public playlist links" />
-      <ProviderLine provider="spotify" title="Spotify" detail="Public playlist links — fully supported" />
+      <ProviderLine provider="apple" title={t('add.apple')} detail={t('add.appleDetail')} />
+      <ProviderLine provider="spotify" title={t('add.spotify')} detail={t('add.spotifyDetail')} />
       <View style={[styles.field, { backgroundColor: c.surface, borderColor: c.line }]}>
         <Icon name="link" size={18} color={c.ink3} />
         <TextInput
@@ -829,7 +836,7 @@ function ImportStart({
           style={[styles.input, { color: c.ink }]}
           value={url}
           onChangeText={onChange}
-          placeholder="Paste an Apple Music or Spotify link"
+          placeholder={t('add.pastePh')}
           placeholderTextColor={c.ink3}
           autoCapitalize="none"
           autoCorrect={false}
@@ -837,7 +844,7 @@ function ImportStart({
           onSubmitEditing={onSubmit}
         />
       </View>
-      <Button label={busy ? 'Reading playlist…' : 'Preview playlist'} onPress={onSubmit} disabled={busy || !url.trim()} />
+      <Button label={busy ? t('add.reading') : t('add.preview')} onPress={onSubmit} disabled={busy || !url.trim()} />
       {error ? <Text style={{ color: c.danger, fontSize: 13, lineHeight: 19 }}>{error}</Text> : null}
     </View>
   );
@@ -870,9 +877,10 @@ function ResultRow({
   onAdd: () => void;
 }) {
   const c = useC();
+  const { t } = useT();
   return (
     <View style={[styles.result, { borderColor: c.line }]}>
-      <Pressable onPress={onPlay} style={styles.artWrap} accessibilityLabel={`Preview ${item.title}`}>
+      <Pressable onPress={onPlay} style={styles.artWrap} accessibilityLabel={t('add.previewA11y', { title: item.title })}>
         {item.artworkUrl ? (
           <Image source={{ uri: item.artworkUrl }} style={styles.art} />
         ) : (
@@ -948,8 +956,9 @@ function PreviewStep({
   onImport: () => void;
 }) {
   const c = useC();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
-  const addedCount = list.tracks.filter((t) => titles.has(titleKey(t.title))).length;
+  const addedCount = list.tracks.filter((track) => titles.has(titleKey(track.title))).length;
   const dnpCount = list.tracks.filter((t) => dnpTitles.has(titleKey(t.title))).length;
 
   return (
@@ -957,14 +966,14 @@ function PreviewStep({
       <View style={styles.top}>
         <View style={[styles.handle, { backgroundColor: c.ink3 }]} />
         <View style={styles.titleRow}>
-          <Pressable onPress={onBack} hitSlop={12} accessibilityLabel="Back" style={styles.back}>
+          <Pressable onPress={onBack} hitSlop={12} accessibilityLabel={t('common.back')} style={styles.back}>
             <Icon name="chev-l" size={22} color={c.ink} />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <Text style={[Type.label, { color: c.red }]}>Step 2 of 2 · Preview</Text>
-            <Text style={[Type.title, { color: c.ink }]} numberOfLines={1}>Check the playlist</Text>
+            <Text style={[Type.label, { color: c.red }]}>{t('add.step')}</Text>
+            <Text style={[Type.title, { color: c.ink }]} numberOfLines={1}>{t('add.check')}</Text>
           </View>
-          <Pressable onPress={onClose} hitSlop={12} accessibilityLabel="Close" style={[styles.close, { backgroundColor: c.surface2 }]}>
+          <Pressable onPress={onClose} hitSlop={12} accessibilityLabel={t('common.close')} style={[styles.close, { backgroundColor: c.surface2 }]}>
             <Icon name="close" size={16} color={c.ink2} />
           </Pressable>
         </View>
@@ -972,7 +981,7 @@ function PreviewStep({
 
       {picking ? (
         <ScrollView contentContainerStyle={{ padding: 20, gap: 8 }}>
-          <Text style={[Type.label, { color: c.accent, marginBottom: 4 }]}>Add to</Text>
+          <Text style={[Type.label, { color: c.accent, marginBottom: 4 }]}>{t('add.addTo')}</Text>
           {sections.map((s) => {
             const on = s.id === sectionId;
             return (
@@ -993,25 +1002,25 @@ function PreviewStep({
                 <View style={{ flex: 1, gap: 2 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <ProviderLogo provider={list.provider} size={16} />
-                    <Text style={styles.plEyebrow}>{list.provider === 'apple' ? 'Apple Music playlist' : 'Spotify playlist'}</Text>
+                    <Text style={styles.plEyebrow}>{list.provider === 'apple' ? t('add.appleList') : t('add.spotifyList')}</Text>
                   </View>
-                  <Text style={styles.plName} numberOfLines={2}>{list.name ?? 'Playlist'}</Text>
+                  <Text style={styles.plName} numberOfLines={2}>{list.name ?? t('add.playlist')}</Text>
                   <Text style={styles.plUrl} numberOfLines={1}>{list.url.replace(/^https?:\/\//, '')}</Text>
                 </View>
               </View>
               <View style={styles.plStats}>
-                <Mini value={list.tracks.length} label="Songs" />
-                <Mini value={addedCount} label="Added" />
-                <Mini value={dnpCount} label="Do not play" tone="red" />
+                <Mini value={list.tracks.length} label={t('add.songs')} />
+                <Mini value={addedCount} label={t('add.added')} />
+                <Mini value={dnpCount} label={t('record.doNotPlay')} tone="red" />
               </View>
             </LinearGradient>
 
             <View style={styles.selectRow}>
               <Text style={[Type.label, { color: c.ink3 }]}>
-                {importCount} of {list.tracks.length} selected
+                {t('add.selected', { count: importCount, total: list.tracks.length })}
               </Text>
               <Pressable onPress={onSelectAll} hitSlop={8}>
-                <Text style={[Type.label, { color: c.accent }]}>Select all</Text>
+                <Text style={[Type.label, { color: c.accent }]}>{t('add.selectAll')}</Text>
               </Pressable>
             </View>
 
@@ -1043,9 +1052,9 @@ function PreviewStep({
                     </Text>
                     <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={1}>{track.artist}</Text>
                     {dnp ? (
-                      <Text style={[Type.footnote, { color: c.danger, marginTop: 2 }]}>On your Do not play list. We will skip it.</Text>
+                      <Text style={[Type.footnote, { color: c.danger, marginTop: 2 }]}>{t('add.onDnp')}</Text>
                     ) : existing ? (
-                      <Text style={[Type.footnote, { color: c.ink3, marginTop: 2 }]}>Already on this moment</Text>
+                      <Text style={[Type.footnote, { color: c.ink3, marginTop: 2 }]}>{t('add.already')}</Text>
                     ) : null}
                   </View>
                 </Pressable>
@@ -1054,14 +1063,14 @@ function PreviewStep({
 
             <Pressable onPress={canPick ? onPick : undefined} style={[styles.addTo, { backgroundColor: c.surface, borderColor: c.line }]}>
               <View style={[styles.bubble, { backgroundColor: c.accentTint }]}><Icon name="mic" size={18} color={c.accent} /></View>
-              <Text style={{ flex: 1, color: c.ink, fontFamily: Fonts.semibold, fontSize: 15 }}>Add to</Text>
+              <Text style={{ flex: 1, color: c.ink, fontFamily: Fonts.semibold, fontSize: 15 }}>{t('add.addTo')}</Text>
               <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={1}>{sectionTitle}</Text>
               {canPick ? <Icon name="chev-r" size={18} color={c.ink3} /> : null}
             </Pressable>
           </ScrollView>
           <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: Math.max(insets.bottom, 16) }}>
             <Button
-              label={importing ? 'Importing…' : `Import ${importCount} song${importCount === 1 ? '' : 's'}`}
+              label={importing ? t('add.importing') : t(importCount === 1 ? 'add.importOne' : 'add.importMany', { count: importCount })}
               onPress={onImport}
               disabled={importing || importCount === 0}
             />
@@ -1083,9 +1092,10 @@ function Mini({ value, label, tone }: { value: number; label: string; tone?: 're
 
 function LoadMore({ loading, onPress }: { loading: boolean; onPress: () => void }) {
   const c = useC();
+  const { t } = useT();
   return (
     <Pressable onPress={onPress} disabled={loading} style={[styles.loadMore, { backgroundColor: c.surface2, borderColor: c.line }]}>
-      {loading ? <ActivityIndicator size="small" color={c.accent} /> : <Text style={{ color: c.accent, fontFamily: Fonts.bold, fontSize: 14 }}>Load more songs</Text>}
+      {loading ? <ActivityIndicator size="small" color={c.accent} /> : <Text style={{ color: c.accent, fontFamily: Fonts.bold, fontSize: 14 }}>{t('add.loadMore')}</Text>}
     </Pressable>
   );
 }

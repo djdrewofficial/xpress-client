@@ -1,3 +1,4 @@
+import { translate, type Locale } from '@/lib/i18n';
 import { onMusic, onTimeline, type EventSong, type Group, type SectionRow } from '@/lib/planning';
 
 export type RecordTrack = {
@@ -163,20 +164,20 @@ export function momentSongCount(moment: MusicMoment): number {
 }
 
 /** One-line subtitle under a moment title, matching the record layout. */
-export function momentSubtitle(moment: MusicMoment): string {
+export function momentSubtitle(moment: MusicMoment, locale: Locale = 'en'): string {
   const must = moment.tracks.filter((t) => t.mustPlay).length;
   if (moment.isOpenDancing && (must > 0 || moment.doNotPlay.length > 0)) {
-    return `${must} must play · ${moment.doNotPlay.length} do not play`;
+    return translate(locale, 'record.mustDnp', { must, dnp: moment.doNotPlay.length });
   }
   const first = moment.tracks[0];
-  if (!first) return 'No song yet';
+  if (!first) return translate(locale, 'record.noSongYet');
   const extra = moment.tracks.length - 1;
   return extra > 0 ? `${first.title} +${extra}` : first.title;
 }
 
-export function momentCountLabel(moment: MusicMoment): string {
+export function momentCountLabel(moment: MusicMoment, locale: Locale = 'en'): string {
   const n = momentSongCount(moment);
-  return `${n} song${n === 1 ? '' : 's'}`;
+  return translate(locale, n === 1 ? 'record.songCount' : 'record.songsCount', { count: n });
 }
 
 /** Where a header action lands when the couple hasn't picked a moment. */

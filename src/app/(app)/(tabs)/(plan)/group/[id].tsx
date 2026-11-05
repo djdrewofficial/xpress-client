@@ -7,6 +7,7 @@ import { GroupBody, groupSubtitle } from '@/components/plan/GroupBody';
 import { chapterStatus } from '@/components/plan/model';
 import { useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { useT } from '@/lib/i18n';
 import {
   deleteSection,
   loadOverview,
@@ -19,6 +20,7 @@ import {
 
 export default function GroupScreen() {
   const c = useC();
+  const { t, locale } = useT();
   const router = useRouter();
   const { profile } = useAuth();
   const { id, eventId, title } = useLocalSearchParams<{ id: string; eventId: string; title: string }>();
@@ -52,26 +54,26 @@ export default function GroupScreen() {
     setBusy(true);
     const ok = await reorderSections(eventId, next.map((s) => s.id));
     setBusy(false);
-    if (!ok) { Alert.alert('Could not reorder', 'Please try again.'); load(); }
+    if (!ok) { Alert.alert(t('group.reorderFail'), t('common.tryAgain')); load(); }
   };
 
   const confirmDelete = (sectionId: string) => {
     const s = sections?.find((x) => x.id === sectionId);
     if (!s) return;
     Alert.alert(
-      isStaff ? 'Delete moment?' : 'Remove moment?',
-      isStaff ? `Permanently delete "${s.title}"? This cannot be undone.` : `Remove "${s.title}" from your plan? You can restore it later.`,
+      isStaff ? t('group.deleteTitle') : t('group.removeTitle'),
+      isStaff ? t('group.deleteBody', { title: s.title }) : t('group.removeBody', { title: s.title }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: isStaff ? 'Delete' : 'Remove',
+          text: isStaff ? t('common.delete') : t('common.remove'),
           style: 'destructive',
           onPress: async () => {
             setSections((prev) => (prev ?? []).filter((x) => x.id !== s.id));
             setBusy(true);
             const ok = await deleteSection(eventId, s.id);
             setBusy(false);
-            if (!ok) Alert.alert('Could not remove', 'Please try again.');
+            if (!ok) Alert.alert(t('group.removeFail'), t('common.tryAgain'));
             load();
           },
         },
@@ -86,18 +88,18 @@ export default function GroupScreen() {
     setBusy(true);
     const ok = await restoreSection(eventId, r.id);
     setBusy(false);
-    if (!ok) Alert.alert('Could not restore', 'Please try again.');
+    if (!ok) Alert.alert(t('group.restoreFail'), t('common.tryAgain'));
     load();
   };
 
-  const status = group ? chapterStatus(group) : null;
-  const heading = group?.title ?? title ?? 'Moments';
+  const status = group ? chapterStatus(group, locale) : null;
+  const heading = group?.title ?? title ?? t('group.momentsTitle');
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <GroupBody
         title={heading}
-        subtitle={groupSubtitle(sections?.length ?? 0, status?.label ?? null)}
+        subtitle={groupSubtitle(sections?.length ?? 0, status?.label ?? null, locale)}
         onBack={() => router.back()}
         canManage={canManage}
         editing={editing}

@@ -11,12 +11,14 @@ import {
   type StaffListItem,
 } from '@/components/eventDisplay';
 import { useAuth, staffSeesAllEvents } from '@/lib/auth';
+import { useT } from '@/lib/i18n';
 import { useEvent } from '@/lib/events';
 import { blendedProgress, getStaffEvents, setupMilestones, type StaffEvent } from '@/lib/planning';
 import { supabase } from '@/lib/supabase';
 
 export default function StaffEventsScreen() {
   const router = useRouter();
+  const { t, locale } = useT();
   const { profile } = useAuth();
   const { selectEvent } = useEvent();
   const [upcoming, setUpcoming] = useState<StaffEvent[] | null>(null);
@@ -108,11 +110,11 @@ export default function StaffEventsScreen() {
   const seesAll = staffSeesAllEvents(profile);
   const source = segment === 'upcoming' ? upcoming : past;
   const items = useMemo(() => {
-    const list = (source ?? []).map((event) => toItem(event, venues, progress));
-    const filtered = list.filter((item) => staffMatches(item, query));
+    const list = (source ?? []).map((event) => toItem(event, venues, progress, t('staff.untitled')));
+    const filtered = list.filter((item) => staffMatches(item, query, locale));
     return sortStaffItems(filtered, segment);
-  }, [source, venues, progress, query, segment]);
-  const groups = useMemo(() => groupStaffRows(items), [items]);
+  }, [source, venues, progress, query, segment, locale, t]);
+  const groups = useMemo(() => groupStaffRows(items, locale), [items, locale]);
 
   const open = useCallback(
     (id: string) => {
@@ -135,23 +137,23 @@ export default function StaffEventsScreen() {
   const segmentEmpty = !loading && (source?.length ?? 0) === 0;
   const noMatches = !loading && !segmentEmpty && items.length === 0;
   const emptyTitle = noMatches
-    ? `No events match “${query.trim()}”.`
+    ? t('staff.noMatch', { query: query.trim() })
     : segment === 'past'
-      ? 'No past events.'
+      ? t('staff.noPast')
       : seesAll
-        ? 'No upcoming events.'
-        : 'No upcoming events assigned to you yet.';
+        ? t('staff.noUpcoming')
+        : t('staff.noAssigned');
   const emptyBody = noMatches
-    ? 'Try another couple, venue, or month.'
+    ? t('staff.tryAnother')
     : segment === 'past'
-      ? 'Events that have already happened will show up here.'
-      : 'When a couple is on your calendar, they show up here.';
+      ? t('staff.pastBody')
+      : t('staff.upcomingBody');
 
   return (
     <StaffEventsView
       loading={loading}
-      eyebrow={company ? `Staff · ${company}` : 'Staff'}
-      initials={initials(staffName || 'Staff')}
+      eyebrow={company ? t('staff.eyebrow', { company }) : t('common.staff')}
+      initials={initials(staffName || t('common.staff'))}
       query={query}
       onQuery={setQuery}
       segment={segment}
@@ -166,12 +168,12 @@ export default function StaffEventsScreen() {
   );
 }
 
-function toItem(event: StaffEvent, venues: Map<string, string>, progress: Map<string, PlanProgress>): StaffListItem {
+function toItem(event: StaffEvent, venues: Map<string, string>, progress: Map<string, PlanProgress>, untitled: string): StaffListItem {
   return {
     id: event.id,
     eventDate: event.event_date,
     startTime: event.start_time,
-    title: event.clientName || event.name || 'Untitled event',
+    title: event.clientName || event.name || untitled,
     venueName: event.venue_id ? venues.get(event.venue_id) ?? null : null,
     statusName: event.status?.name ?? null,
     statusColor: event.status?.color ?? null,

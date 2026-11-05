@@ -1,6 +1,7 @@
 import { Dimensions, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button, EmojiIcon, Icon, useC, type IconName } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 import { Fonts, Radius, Type } from '@/lib/theme';
 
 export const MOMENT_ICONS: IconName[] = ['cake', 'toast', 'sparkles', 'heart', 'disco', 'mic', 'music', 'rings', 'camera', 'party', 'star', 'first-dance'];
@@ -49,21 +50,22 @@ export function NewMomentForm({
   error?: string | null;
 }) {
   const c = useC();
+  const { t } = useT();
   return (
     <View style={{ gap: 16 }}>
       <View style={{ gap: 4 }}>
-        <Text style={[Type.label, { color: c.red }]}>From the plus on timeline</Text>
-        <Text style={[styles.title, { color: c.ink }]}>New moment</Text>
-        <Text style={[Type.footnote, { color: c.ink2 }]}>Add something special to your day</Text>
+        <Text style={[Type.label, { color: c.red }]}>{t('newMoment.kicker')}</Text>
+        <Text style={[styles.title, { color: c.ink }]}>{t('newMoment.title')}</Text>
+        <Text style={[Type.footnote, { color: c.ink2 }]}>{t('newMoment.sub')}</Text>
       </View>
 
       <ScrollView style={{ maxHeight: Math.max(360, Dimensions.get('window').height - 250) }} contentContainerStyle={{ gap: 16, paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
         <View style={{ gap: 8 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>Suggested</Text>
+          <Text style={[Type.label, { color: c.ink3 }]}>{t('newMoment.suggested')}</Text>
           {suggestionsLoading ? (
-            <Text style={[Type.footnote, { color: c.ink3 }]}>Loading suggestions…</Text>
+            <Text style={[Type.footnote, { color: c.ink3 }]}>{t('newMoment.loading')}</Text>
           ) : suggestions.length === 0 ? (
-            <Text style={[Type.footnote, { color: c.ink3 }]}>No suggested moments right now. Name your own below.</Text>
+            <Text style={[Type.footnote, { color: c.ink3 }]}>{t('newMoment.none')}</Text>
           ) : (
             <View style={styles.chips}>
               {suggestions.map((s) => {
@@ -83,18 +85,18 @@ export function NewMomentForm({
         </View>
 
         <View style={{ gap: 8 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>Name</Text>
+          <Text style={[Type.label, { color: c.ink3 }]}>{t('newMoment.name')}</Text>
           <TextInput
             value={name}
             onChangeText={onName}
-            placeholder="Name this moment"
+            placeholder={t('newMoment.namePh')}
             placeholderTextColor={c.ink3}
             style={StyleSheet.flatten([styles.input, { color: c.ink, borderColor: c.red, backgroundColor: c.surface }])}
           />
         </View>
 
         <View style={{ gap: 8 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>Icon</Text>
+          <Text style={[Type.label, { color: c.ink3 }]}>{t('newMoment.icon')}</Text>
           <View style={styles.chips}>
             {MOMENT_ICONS.map((n) => {
               const on = n === icon;
@@ -113,7 +115,7 @@ export function NewMomentForm({
 
         {groups.length > 0 ? (
           <View style={{ gap: 8 }}>
-            <Text style={[Type.label, { color: c.ink3 }]}>Part of</Text>
+            <Text style={[Type.label, { color: c.ink3 }]}>{t('newMoment.partOf')}</Text>
             <View style={styles.chips}>
               {groups.map((g) => {
                 const on = g.id === groupId;
@@ -134,17 +136,17 @@ export function NewMomentForm({
           <View style={[styles.iconBtn, { backgroundColor: c.accentTint, borderColor: 'transparent' }]}>
             <Icon name="clock" size={18} color={c.accent} />
           </View>
-          <Text style={[Type.callout, { color: c.ink, flex: 1 }]}>Time</Text>
-          <Text style={[Type.callout, { color: timeLabel ? c.ink : c.ink3 }]}>{timeLabel ?? 'Set time'}</Text>
+          <Text style={[Type.callout, { color: c.ink, flex: 1 }]}>{t('newMoment.time')}</Text>
+          <Text style={[Type.callout, { color: timeLabel ? c.ink : c.ink3 }]}>{timeLabel ?? t('newMoment.setTime')}</Text>
           <Icon name="chev-r" size={18} color={c.ink3} />
         </Pressable>
 
         <View style={{ gap: 8 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>Note · optional</Text>
+          <Text style={[Type.label, { color: c.ink3 }]}>{t('newMoment.note')}</Text>
           <TextInput
             value={notes}
             onChangeText={onNotes}
-            placeholder="Anything your DJ should know"
+            placeholder={t('newMoment.notePh')}
             placeholderTextColor={c.ink3}
             style={StyleSheet.flatten([styles.input, { color: c.ink, borderColor: c.line, backgroundColor: c.surface }])}
           />
@@ -153,7 +155,7 @@ export function NewMomentForm({
         {error ? <Text style={[Type.footnote, { color: c.danger }]}>{error}</Text> : null}
       </ScrollView>
 
-      <Button label={busy ? 'Adding…' : 'Add to timeline'} onPress={onSubmit} disabled={busy || !name.trim()} />
+      <Button label={busy ? t('newMoment.adding') : t('newMoment.add')} onPress={onSubmit} disabled={busy || !name.trim()} />
     </View>
   );
 }

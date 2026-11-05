@@ -2,6 +2,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, SegmentedControl, useC, type IconName } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 import { Brand, Fonts, Radius, Shadow, Type } from '@/lib/theme';
 import type { StaffMonthGroup, StaffRowModel } from '@/components/eventDisplay';
 
@@ -35,6 +36,7 @@ export function StaffEventsView({
   onOpen: (id: string) => void;
 }) {
   const c = useC();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
 
   return (
@@ -52,7 +54,7 @@ export function StaffEventsView({
             <Text style={[Type.overline, styles.eyebrow, { color: c.red }]} numberOfLines={1}>
               {eyebrow}
             </Text>
-            <Text style={[Type.largeTitle, { color: c.ink }]}>Events</Text>
+            <Text style={[Type.largeTitle, { color: c.ink }]}>{t('staff.title')}</Text>
           </View>
           <View style={[styles.avatar, { backgroundColor: Brand.purple }]}>
             <Text style={styles.avatarTxt}>{initials}</Text>
@@ -60,12 +62,12 @@ export function StaffEventsView({
         </View>
 
         <View style={{ gap: 8 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>Search</Text>
+          <Text style={[Type.label, { color: c.ink3 }]}>{t('staff.search')}</Text>
           <View style={[styles.search, { backgroundColor: c.surface, borderColor: c.line }]}>
             <Icon name="search" size={18} color={c.ink3} />
             <TextInput
               style={[styles.searchInput, { color: c.ink }]}
-              placeholder="Search couples or venues"
+              placeholder={t('staff.searchPh')}
               placeholderTextColor={c.ink3}
               value={query}
               onChangeText={onQuery}
@@ -74,7 +76,7 @@ export function StaffEventsView({
               returnKeyType="search"
             />
             {query ? (
-              <Pressable onPress={() => onQuery('')} hitSlop={8} accessibilityLabel="Clear search">
+              <Pressable onPress={() => onQuery('')} hitSlop={8} accessibilityLabel={t('staff.clear')}>
                 <Icon name="close" size={16} color={c.ink3} />
               </Pressable>
             ) : null}
@@ -83,8 +85,8 @@ export function StaffEventsView({
 
         <SegmentedControl
           options={[
-            { value: 'upcoming', label: loading ? 'Upcoming' : `Upcoming ${upcomingCount}` },
-            { value: 'past', label: 'Past' },
+            { value: 'upcoming', label: loading ? t('staff.upcoming') : t('staff.upcomingN', { count: upcomingCount }) },
+            { value: 'past', label: t('staff.past') },
           ]}
           value={segment}
           onChange={onSegment}

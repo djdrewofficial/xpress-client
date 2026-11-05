@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, CountdownHero, EmojiIcon, Icon, useC } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 import { Brand, Fonts, Gradients, Radius, Shadow, Space, Type } from '@/lib/theme';
 
 export type HomeResume = {
@@ -63,6 +64,7 @@ export function HomeBody({
   emptyMessage?: string | null;
 }) {
   const c = useC();
+  const { t, locale } = useT();
   const insets = useSafeAreaInsets();
 
   return (
@@ -90,7 +92,7 @@ export function HomeBody({
             disabled={!canSwitch}
             style={styles.nameRow}
             accessibilityRole={canSwitch ? 'button' : undefined}
-            accessibilityLabel={canSwitch ? 'Switch event' : undefined}>
+            accessibilityLabel={canSwitch ? t('home.switchEvent') : undefined}>
             <Text style={[styles.eventName, { flexShrink: 1 }]} numberOfLines={2}>
               {eventName}
             </Text>
@@ -100,7 +102,7 @@ export function HomeBody({
         <View style={{ flex: 1 }} />
         <View style={{ paddingHorizontal: 20, paddingBottom: 36 }}>
           {date ? (
-            <CountdownHero bare size="compact" date={date} dateLabel={dateLabel} venue={venue} progress={progress} />
+            <CountdownHero bare size="compact" date={date} dateLabel={dateLabel} venue={venue} progress={progress} locale={locale} />
           ) : null}
         </View>
       </View>
@@ -114,7 +116,7 @@ export function HomeBody({
           <>
             {resume ? (
               <View style={[styles.card, Shadow.card, { backgroundColor: c.surface, gap: 14 }]}>
-                <Text style={[Type.label, { color: c.red }]}>Pick up where you left off</Text>
+                <Text style={[Type.label, { color: c.red }]}>{t('home.resume')}</Text>
                 <View style={styles.resumeRow}>
                   <View style={[styles.bubble, { backgroundColor: c.accentTint }]}>
                     <EmojiIcon glyph={resume.icon} size={22} color={c.accent} fallback="mic" />
@@ -128,20 +130,20 @@ export function HomeBody({
                     </Text>
                   </View>
                 </View>
-                <Button label="Continue planning" arrow onPress={onContinue} />
+                <Button label={t('home.continue')} arrow onPress={onContinue} />
               </View>
             ) : null}
 
             <View style={styles.chapterHead}>
-              <Text style={[Type.label, { color: c.ink3 }]}>Your day by chapter</Text>
+              <Text style={[Type.label, { color: c.ink3 }]}>{t('home.chapters')}</Text>
               <Pressable onPress={onSeeAll} hitSlop={8}>
-                <Text style={[Type.label, { color: c.red }]}>See all</Text>
+                <Text style={[Type.label, { color: c.red }]}>{t('home.seeAll')}</Text>
               </Pressable>
             </View>
 
             <View style={[styles.card, Shadow.card, { backgroundColor: c.surface, paddingVertical: 4 }]}>
               {chapters.length === 0 ? (
-                <Text style={[Type.footnote, { color: c.ink3, padding: 16 }]}>Your DJ is setting up your plan.</Text>
+                <Text style={[Type.footnote, { color: c.ink3, padding: 16 }]}>{t('home.djSettingUp')}</Text>
               ) : (
                 chapters.map((ch, i) => (
                   <Pressable
@@ -158,7 +160,7 @@ export function HomeBody({
                         {ch.title}
                       </Text>
                       <Text style={[Type.footnote, { color: c.ink3 }]}>
-                        {ch.moments} {ch.moments === 1 ? 'moment' : 'moments'}
+                        {ch.moments} {ch.moments === 1 ? t('home.moment') : t('home.moments')}
                       </Text>
                     </View>
                     {ch.status ? (

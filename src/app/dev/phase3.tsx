@@ -10,6 +10,9 @@ import { NewMomentForm, type Suggestion } from '@/components/plan/NewMomentForm'
 import { TabBar, ThemeSchemeOverride, useC } from '@/components/ui';
 import type { IconName } from '@/components/ui';
 import type { QuestionRow } from '@/lib/planning';
+import { formatEventEyebrow } from '@/lib/eventDate';
+import { useT } from '@/lib/i18n';
+import { useDevLocale } from '@/lib/devLocale';
 import { Fonts } from '@/lib/theme';
 
 /**
@@ -20,6 +23,7 @@ const SHOTS = ['home', 'home-dark', 'group', 'questions', 'songs', 'dancing', 'n
 
 export default function Phase3Preview() {
   const c = useC();
+  useDevLocale();
   const { shot } = useLocalSearchParams<{ shot?: string }>();
   if (!__DEV__) return <Redirect href="/login" />;
   const which = Array.isArray(shot) ? shot[0] : shot;
@@ -70,22 +74,23 @@ function Frame({ tab, children }: { tab: string; children: ReactNode }) {
 }
 
 function SampleHome() {
+  const { t, locale } = useT();
   return (
     <HomeBody
-      greeting="GOOD EVENING, SAMPLE"
+      greeting={`${t('home.greetEvening')}, SAMPLE`}
       eventName="Sample & Couple"
       date="2027-06-13"
-      dateLabel="SAT · JUNE 13, 2027"
+      dateLabel={formatEventEyebrow('2027-06-13', locale)}
       venue="Sample Venue"
       progress={43}
       canSwitch
       onSwitch={() => {}}
-      resume={{ icon: 'mic', title: 'Grand Entrance', meta: '3 questions left · Reception, 5:30 PM' }}
+      resume={{ icon: 'mic', title: 'Grand Entrance', meta: `${t('home.questionsLeft', { count: 3 })} · Reception, 5:30 PM` }}
       onContinue={() => {}}
       chapters={[
-        { id: '1', index: 1, title: 'Ceremony', moments: 4, status: 'Done', done: true },
-        { id: '2', index: 2, title: 'Cocktail hour', moments: 3, status: '3 of 5', done: false },
-        { id: '3', index: 3, title: 'Reception', moments: 9, status: '2 of 8', done: false },
+        { id: '1', index: 1, title: 'Ceremony', moments: 4, status: t('home.done'), done: true },
+        { id: '2', index: 2, title: 'Cocktail hour', moments: 3, status: t('home.of', { answered: 3, total: 5 }), done: false },
+        { id: '3', index: 3, title: 'Reception', moments: 9, status: t('home.of', { answered: 2, total: 8 }), done: false },
       ]}
       onChapter={() => {}}
       onSeeAll={() => {}}
@@ -121,6 +126,7 @@ const AVOID: MomentSong[] = [
 ];
 
 function SampleMoment({ initial, dancing }: { initial: MomentTab; dancing?: boolean }) {
+  const { t } = useT();
   const [tab, setTab] = useState<MomentTab>(initial);
   const [answers, setAnswers] = useState<Record<string, string>>({
     q1: 'Mr. & Mrs. Sample',
@@ -132,9 +138,9 @@ function SampleMoment({ initial, dancing }: { initial: MomentTab; dancing?: bool
   const songs = dancing ? FLOOR : SONGS;
   return (
     <MomentBody
-      backLabel="Timeline"
+      backLabel={t('tab.timeline')}
       onBack={() => {}}
-      eyebrow={dancing ? 'MOMENT 12  ·  8:00 PM' : 'MOMENT 04  ·  5:30 PM'}
+      eyebrow={dancing ? `${t('moment.eyebrowN', { n: '12' })}  ·  8:00 PM` : `${t('moment.eyebrowN', { n: '04' })}  ·  5:30 PM`}
       title={dancing ? 'Open Dancing' : 'Grand Entrance'}
       icon={dancing ? 'disco' : 'mic'}
       tab={tab}

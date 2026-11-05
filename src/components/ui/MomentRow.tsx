@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useT } from '@/lib/i18n';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
 import { Icon, type IconName } from './Icon';
 import { useC } from './useC';
@@ -49,6 +50,7 @@ export function MomentRow({
   delayLongPress?: number;
 }) {
   const c = useC();
+  const { t } = useT();
   const clock = splitTime(time);
   return (
     <Pressable
@@ -70,7 +72,7 @@ export function MomentRow({
               {clock.suffix ? <Text style={[Type.label, { color: c.ink3, letterSpacing: 0.6 }]}>{clock.suffix}</Text> : null}
             </>
           ) : (
-            <Text style={[Type.footnote, { color: c.ink3, textAlign: 'center' }]}>Set time</Text>
+            <Text style={[Type.footnote, { color: c.ink3, textAlign: 'center' }]}>{t('row.setTime')}</Text>
           )}
         </View>
       ) : null}
@@ -95,7 +97,7 @@ export function MomentRow({
           delayLongPress={delayLongPress}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel="Drag to reorder"
+          accessibilityLabel={t('row.drag')}
           style={[styles.handleHit, dragging && { backgroundColor: c.redTint }]}>
           <Icon name="drag" size={18} color={dragging ? c.red : c.ink3} />
         </Pressable>
@@ -107,11 +109,12 @@ export function MomentRow({
 
 function Badge({ badge }: { badge: string }) {
   const c = useC();
+  const { t } = useT();
   if (badge === 'dj-note') {
     return (
       <View style={[styles.badge, { backgroundColor: c.accentTint }]}>
         <Icon name="dj-note" size={12} color={c.accent} />
-        <Text style={[styles.badgeText, { color: c.accent }]}>DJ note</Text>
+        <Text style={[styles.badgeText, { color: c.accent }]}>{t('row.djNote')}</Text>
       </View>
     );
   }
@@ -119,7 +122,7 @@ function Badge({ badge }: { badge: string }) {
     return (
       <View style={[styles.badge, { backgroundColor: c.accentTint }]}>
         <Icon name="check" size={12} color={c.success} />
-        <Text style={[styles.badgeText, { color: c.success }]}>Done</Text>
+        <Text style={[styles.badgeText, { color: c.success }]}>{t('home.done')}</Text>
       </View>
     );
   }
