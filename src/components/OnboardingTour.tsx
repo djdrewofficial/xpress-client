@@ -1,19 +1,23 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { Brand, Fonts, Radius, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
+import { useEvent } from '@/lib/events';
+import { loadOverview, setMustPlay, type SectionRow, type SongRow } from '@/lib/planning';
+import { SongPicker } from '@/components/SongPicker';
 
 /* First-run walkthrough. Full-screen, swipeable slides that explain the app —
    each slide has an icon, a short explanation, and (where helpful) a little
    mock control + arrow pointing to where the feature lives. Shown once; the
    caller persists "seen" and can re-open it from a help button. */
 
-type Slide = { icon: string; title: string; body: string; mock?: { label: string; caption: string } };
+type Slide = { icon: string; title: string; body: string; mock?: { label: string; caption: string }; kind?: 'song' };
 
 export function OnboardingTour({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { profile } = useAuth();
+  const { event } = useEvent();
   const { width } = useWindowDimensions();
   const ref = useRef<ScrollView>(null);
   const [i, setI] = useState(0);
@@ -22,6 +26,34 @@ export function OnboardingTour({ visible, onClose }: { visible: boolean; onClose
   const isGuest = profile?.accountType === 'event_guest';
   const canManage = profile?.accountType === 'staff' || profile?.accountType === 'client';
   const name = profile?.firstName ? `, ${profile.firstName}` : '';
+
+  // The "make one real choice" step: resolve a music section to add their first
+  // song to (prefer First Dance) and track what they created for the payoff slide.
+  const [starter, setStarter] = useState<SectionRow | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [addedSong, setAddedSong] = useState<SongRow | null>(null);
+
+  useEffect(() => {
+    if (!visible || !event || !canManage) { setStarter(null); return; }
+    let cancelled = false;
+    loadOverview(event.id)
+      .then((ov) => {
+        if (cancelled) return;
+        // Target the open dance-floor playlist ("Dancing Playlist" / "Open Dancing
+        // Music"), not the processional or a single-song spotlight moment.
+        const musicable = ov.sections.filter((s) => s.songs_enabled && !s.locked);
+        const target =
+          musicable.find((s) => /dancing playlist/i.test(s.title)) ??
+          musicable.find((s) => /open dancing/i.test(s.title)) ??
+          musicable.find((s) => /dance ?floor/i.test(s.title)) ??
+          musicable.find((s) => /\bdancing\b/i.test(s.title)) ??
+          musicable[0] ??
+          null;
+        setStarter(target);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [visible, event, canManage]);
 
   const slides: Slide[] = [
     {
@@ -70,11 +102,27 @@ export function OnboardingTour({ visible, onClose }: { visible: boolean; onClose
           } as Slide,
         ]
       : []),
-    {
-      icon: '🎉',
-      title: "You're all set!",
-      body: 'That\'s the tour. You can reopen it anytime from the “?” button on your Home screen. Let\'s make it amazing!',
-    },
+    ...(canManage && event && starter
+      ? [
+          {
+            kind: 'song',
+            icon: '🎵',
+            title: 'Make it real',
+            body: 'Add one song that has to be on your dance floor — the track that’ll pack it out. We’ll drop it on your Dancing Playlist and mark it must-play so your DJ never misses it.',
+          } as Slide,
+        ]
+      : []),
+    addedSong
+      ? {
+          icon: '🎉',
+          title: 'You just added your first song 🎉',
+          body: `“${addedSong.title}” is on your must-play list. This is going to be YOURS.`,
+        }
+      : {
+          icon: '🎉',
+          title: "You're all set!",
+          body: 'That\'s the tour. You can reopen it anytime from the “?” button on your Home screen. Let\'s make it amazing!',
+        },
   ];
 
   const last = i >= slides.length - 1;
@@ -83,6 +131,19 @@ export function OnboardingTour({ visible, onClose }: { visible: boolean; onClose
     setI(n);
   };
   const next = () => (last ? onClose() : goTo(i + 1));
+
+  // A song they actually added persists immediately via addSong (inside SongPicker);
+  // we mark it must-play, then glide to the celebration slide as the payoff.
+  const onSongAdded = useCallback(
+    async (row: SongRow) => {
+      setAddedSong(row);
+      try { await setMustPlay(row.id, true); } catch {}
+      setPickerOpen(false);
+      goTo(slides.length - 1);
+    },
+    // slides.length is stable for this render; goTo is a stable closure over refs/state setters
+    [goTo, slides.length],
+  );
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -123,6 +184,22 @@ export function OnboardingTour({ visible, onClose }: { visible: boolean; onClose
                       <Text style={styles.mockCaption}>{s.mock.caption}</Text>
                     </View>
                   )}
+
+                  {s.kind === 'song' && (
+                    <View style={styles.songWrap}>
+                      {addedSong && (
+                        <View style={styles.addedPill}>
+                          <Text style={styles.addedPillTxt} numberOfLines={1}>✓  {addedSong.title}</Text>
+                        </View>
+                      )}
+                      <Pressable onPress={() => setPickerOpen(true)} style={styles.songBtn}>
+                        <Text style={styles.songBtnTxt}>{addedSong ? 'Add another song' : '＋  Add your song'}</Text>
+                      </Pressable>
+                      {starter && (
+                        <Text style={styles.songHint}>Saved to “{starter.title}” · marked must-play</Text>
+                      )}
+                    </View>
+                  )}
                 </View>
               ))}
             </ScrollView>
@@ -145,6 +222,20 @@ export function OnboardingTour({ visible, onClose }: { visible: boolean; onClose
             <Text style={styles.nextTxt}>{last ? 'Get started' : 'Next'}</Text>
           </Pressable>
         </View>
+
+        {event && starter && (
+          <SongPicker
+            visible={pickerOpen}
+            onClose={() => setPickerOpen(false)}
+            mode="search"
+            eventId={event.id}
+            eventName={event.name}
+            sectionId={starter.id}
+            sectionTitle={starter.title}
+            existingTitles={new Set()}
+            onAdded={onSongAdded}
+          />
+        )}
       </View>
     </Modal>
   );
@@ -163,6 +254,12 @@ const styles = StyleSheet.create({
   mockPillTxt: { color: Brand.purple, fontWeight: '800', fontSize: 15 },
   arrow: { color: 'rgba(255,255,255,0.9)', fontSize: 24, fontWeight: '800', marginTop: 6 },
   mockCaption: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600', marginTop: 2 },
+  songWrap: { alignItems: 'center', marginTop: Space.xl, gap: Space.md },
+  songBtn: { backgroundColor: '#fff', borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 32 },
+  songBtnTxt: { color: Brand.purple, fontWeight: '800', fontSize: 16 },
+  addedPill: { maxWidth: 280, backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: Radius.pill, paddingVertical: 9, paddingHorizontal: 16 },
+  addedPillTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  songHint: { color: 'rgba(255,255,255,0.7)', fontSize: 12.5, fontWeight: '600' },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 7, paddingBottom: Space.md },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.35)' },
   dotActive: { width: 22, backgroundColor: '#fff' },

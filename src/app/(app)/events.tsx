@@ -54,7 +54,7 @@ export default function StaffEventsScreen() {
 
   const open = useCallback(
     (e: StaffEvent) => {
-      selectEvent({ id: e.id, name: e.name, event_date: e.event_date, cover_photo_url: e.cover_photo_url });
+      selectEvent({ id: e.id, name: e.name, event_date: e.event_date, cover_photo_url: e.cover_photo_url, venue_id: e.venue_id, package_id: e.package_id });
       router.push('/(tabs)/(plan)');
     },
     [selectEvent, router],
