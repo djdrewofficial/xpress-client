@@ -14,12 +14,15 @@ export function ListCell({
   icon,
   title,
   subtitle,
+  subtitleLines = 1,
   onPress,
   trailing,
 }: {
   icon?: IconName;
   title: string;
   subtitle?: string;
+  /** Timeline plus-menu rows need the two-line subtitle. Default stays one line. */
+  subtitleLines?: number;
   onPress?: () => void;
   trailing?: ReactNode;
 }) {
@@ -42,7 +45,7 @@ export function ListCell({
           {title}
         </Text>
         {subtitle ? (
-          <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={1}>
+          <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={subtitleLines}>
             {subtitle}
           </Text>
         ) : null}

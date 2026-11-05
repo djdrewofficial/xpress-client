@@ -1,72 +1,146 @@
-import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
-import {
-  ScrollViewContainer,
-  NestedReorderableList,
-  useReorderableDrag,
-  useIsActive,
-  reorderItems,
-  type ReorderableListReorderEvent,
-} from 'react-native-reorderable-list';
-import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { reorderItems, type ReorderableListReorderEvent } from 'react-native-reorderable-list';
 
-import { EmojiIcon, Icon, useC } from '@/components/ui';
-import { Backdrop } from '@/components/Backdrop';
-import { AppHeader } from '@/components/AppHeader';
-import { TimePickerSheet } from '@/components/TimePickerSheet';
+import { useC } from '@/components/ui';
 import { AddSectionSheet } from '@/components/AddSectionSheet';
-import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
+import { TimePickerSheet } from '@/components/TimePickerSheet';
+import { TimelineBoard, type TimelineArchived, type TimelineChapter, type TimelineMoment } from '@/components/TimelineBoard';
+import { Brand } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
-import { loadOverview, reorderSections, deleteSection, restoreSection, setSectionTime, onTimeline, type SectionRow, type RemovedSection } from '@/lib/planning';
-import { getPlannerTimeline, pickAndUploadPlannerTimeline, type PlannerTimelineFile, type PlannerSource } from '@/lib/eventFiles';
+import { pickAndUploadPlannerTimeline, type PlannerSource } from '@/lib/eventFiles';
+import {
+  deleteSection,
+  loadOverview,
+  onTimeline,
+  reorderSections,
+  restoreSection,
+  setSectionTime,
+  type SectionRow,
+} from '@/lib/planning';
 
-type TLGroup = { id: string; title: string; icon: string | null; on: SectionRow[] };
+const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const;
+const MONTHS = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'] as const;
+
+const tipKey = (uid: string) => `xpress.timeline.plusTip.${uid}`;
+
+/** "SAT · JUNE 13, 2027" from an event date. Null when the event has no date. */
+export function formatTimelineDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const [y, m, d] = iso.slice(0, 10).split('-').map((n) => parseInt(n, 10));
+  if (!y || !m || !d) return null;
+  const dt = new Date(y, m - 1, d);
+  return `${DAYS[dt.getDay()]} · ${MONTHS[m - 1]} ${d}, ${y}`;
+}
+
+function toMoment(s: SectionRow): TimelineMoment {
+  const badge = s.questionCount > 0
+    ? s.answeredCount >= s.questionCount
+      ? 'done'
+      : `${s.answeredCount}/${s.questionCount}`
+    : undefined;
+  const meta = s.songs_enabled || s.songCount > 0
+    ? s.songCount === 0
+      ? 'No songs'
+      : s.songCount === 1
+        ? '1 song'
+        : `${s.songCount} songs`
+    : undefined;
+  return {
+    id: s.id,
+    title: s.title,
+    icon: s.icon,
+    timeLabel: s.time_label,
+    timeEnabled: s.time_enabled,
+    locked: s.locked,
+    meta,
+    badge,
+  };
+}
+
+function momentOrdinal(chapters: TimelineChapter[], id: string): string | null {
+  let n = 0;
+  for (const chapter of chapters) {
+    for (const moment of chapter.moments) {
+      n += 1;
+      if (moment.id === id) return `Moment ${String(n).padStart(2, '0')}`;
+    }
+  }
+  return null;
+}
 
 export default function TimelineScreen() {
   const c = useC();
-  const { profile } = useAuth();
-  const { eventId, loading: eventLoading } = useEvent();
-  const [groups, setGroups] = useState<TLGroup[]>([]);
-  const [archived, setArchived] = useState<RemovedSection[]>([]);
+  const router = useRouter();
+  const { profile, session } = useAuth();
+  const uid = session?.user.id ?? null;
+  const { event, eventId, loading: eventLoading } = useEvent();
+  const [chapters, setChapters] = useState<TimelineChapter[]>([]);
+  const [addTargets, setAddTargets] = useState<{ id: string; title: string }[]>([]);
+  const [archived, setArchived] = useState<TimelineArchived[]>([]);
   const [loading, setLoading] = useState(true);
-  const [timeEditing, setTimeEditing] = useState<SectionRow | null>(null);
-  const [pt, setPt] = useState<PlannerTimelineFile>(null);
-  const [ptLoading, setPtLoading] = useState(false);
+  const [timeEditing, setTimeEditing] = useState<TimelineMoment | null>(null);
+  const [reordering, setReordering] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [coach, setCoach] = useState(false);
   const [ptBusy, setPtBusy] = useState(false);
   const [addingGroup, setAddingGroup] = useState<{ id: string; title: string } | null>(null);
 
   const canManage = profile?.accountType === 'staff' || profile?.accountType === 'client';
 
   const load = useCallback(async () => {
-    if (!eventId) { setGroups([]); setArchived([]); setLoading(false); return; }
-
-    // Render as soon as the overview (fast, direct-to-Supabase) is in.
+    if (!eventId) {
+      setChapters([]);
+      setAddTargets([]);
+      setArchived([]);
+      setLoading(false);
+      return;
+    }
     const ov = await loadOverview(eventId);
-    // Only sections staff have kept on the timeline (info sections are hidden by staff).
-    const g: TLGroup[] = ov.groups
-      .map((grp) => ({ id: grp.id, title: grp.title, icon: grp.icon, on: grp.sections.filter(onTimeline) }))
-      .filter((grp) => grp.on.length > 0);
-    setGroups(g);
+    setChapters(
+      ov.groups
+        .map((grp) => ({
+          id: grp.id,
+          title: grp.title,
+          moments: grp.sections.filter(onTimeline).map(toMoment),
+        }))
+        .filter((grp) => grp.moments.length > 0),
+    );
+    setAddTargets(ov.groups.map((grp) => ({ id: grp.id, title: grp.title })));
     setArchived(ov.removed);
     setLoading(false);
-
-    // The planner file only fills the "Official Planner Timeline" card and comes
-    // from a slower XOS endpoint (serverless cold starts). Fetch it in the
-    // background so it never gates the whole page.
-    setPtLoading(true);
-    getPlannerTimeline(eventId).then(setPt).catch(() => {}).finally(() => setPtLoading(false));
   }, [eventId]);
+
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const saveTime = useCallback(async (section: SectionRow, time: string | null) => {
+  // First visit, per signed-in user. Guests have no plus, so they never see it.
+  useEffect(() => {
+    if (!uid || !canManage) return;
+    let cancelled = false;
+    AsyncStorage.getItem(tipKey(uid))
+      .then((v) => { if (!cancelled && !v) setCoach(true); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [uid, canManage]);
+
+  const dismissCoach = useCallback(() => {
+    setCoach(false);
+    if (uid) AsyncStorage.setItem(tipKey(uid), '1').catch(() => {});
+  }, [uid]);
+
+  const saveTime = useCallback(async (moment: TimelineMoment, time: string | null) => {
     if (!eventId) return;
     setTimeEditing(null);
-    setGroups((gs) => gs.map((g) => ({ ...g, on: g.on.map((s) => (s.id === section.id ? { ...s, time_label: time } : s)) })));
-    if (!(await setSectionTime(eventId, section.id, time))) {
+    setChapters((cs) => cs.map((chapter) => ({
+      ...chapter,
+      moments: chapter.moments.map((m) => (m.id === moment.id ? { ...m, timeLabel: time } : m)),
+    })));
+    if (!(await setSectionTime(eventId, moment.id, time))) {
       Alert.alert("Couldn't update the time", 'Please try again.');
-      load(); // resync to the server's truth
+      load();
     }
   }, [eventId, load]);
 
@@ -75,7 +149,10 @@ export default function TimelineScreen() {
     setPtBusy(true);
     try {
       const res = await pickAndUploadPlannerTimeline(eventId, src);
-      if (res) { await load(); Alert.alert('Uploaded', `We saved "${res.name}" and shared it with your Xpress team.`); }
+      if (res) {
+        await load();
+        Alert.alert('Uploaded', `We saved "${res.name}" and shared it with your Xpress team.`);
+      }
     } catch (e) {
       Alert.alert('Upload failed', e instanceof Error ? e.message : 'Please try again.');
     } finally {
@@ -83,7 +160,6 @@ export default function TimelineScreen() {
     }
   }, [eventId, load]);
 
-  // Let the couple choose where their timeline comes from — their photos or Files.
   const uploadPlanner = useCallback(() => {
     Alert.alert('Add your timeline', 'Where is it saved?', [
       { text: 'Photo Library', onPress: () => runUpload('gallery') },
@@ -92,149 +168,105 @@ export default function TimelineScreen() {
     ]);
   }, [runUpload]);
 
-  const reorderInGroup = useCallback(async (groupId: string, { from, to }: ReorderableListReorderEvent) => {
+  const openMenu = useCallback(() => {
+    if (coach) dismissCoach();
+    setMenuOpen(true);
+  }, [coach, dismissCoach]);
+
+  const startUpload = useCallback(() => {
+    setMenuOpen(false);
+    // Let the sheet modal dismiss before the source alert, or iOS drops the alert.
+    setTimeout(uploadPlanner, 350);
+  }, [uploadPlanner]);
+
+  const startNew = useCallback(() => {
+    setMenuOpen(false);
+    if (addTargets.length === 0) {
+      Alert.alert('Nothing to add to yet', 'Your event chapters will show up once your plan is set up.');
+      return;
+    }
+    if (addTargets.length === 1) {
+      setAddingGroup(addTargets[0]);
+      return;
+    }
+    setTimeout(() => {
+      Alert.alert('Which part of the day?', 'Pick where this moment belongs.', [
+        ...addTargets.map((g) => ({ text: g.title, onPress: () => setAddingGroup(g) })),
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }, 350);
+  }, [addTargets]);
+
+  const reorderInChapter = useCallback(async (chapterId: string, { from, to }: ReorderableListReorderEvent) => {
     if (!eventId) return;
-    // Compute the new order OUTSIDE the state updater (updaters must be pure —
-    // React may run them twice), then fire the write once.
-    const g = groups.find((x) => x.id === groupId);
-    if (!g) return;
-    const on = reorderItems(g.on, from, to);
-    setGroups((gs) => gs.map((x) => (x.id === groupId ? { ...x, on } : x)));
-    if (!(await reorderSections(eventId, on.map((s) => s.id)))) {
+    const chapter = chapters.find((c) => c.id === chapterId);
+    if (!chapter) return;
+    const moments = reorderItems(chapter.moments, from, to);
+    setChapters((cs) => cs.map((c) => (c.id === chapterId ? { ...c, moments } : c)));
+    if (!(await reorderSections(eventId, moments.map((m) => m.id)))) {
       Alert.alert("Couldn't save the new order", 'Please try again.');
       load();
     }
-  }, [eventId, groups, load]);
+  }, [eventId, chapters, load]);
 
-  // Swipe to archive: removes the section from the couple's timeline AND their
-  // plan (host soft-delete). Recoverable from the Archived list below.
-  const archive = useCallback(async (groupId: string, s: SectionRow) => {
+  const archive = useCallback(async (chapterId: string, moment: TimelineMoment) => {
     if (!eventId) return;
-    setGroups((prev) => prev
-      .map((g) => (g.id === groupId ? { ...g, on: g.on.filter((x) => x.id !== s.id) } : g))
-      .filter((g) => g.on.length > 0));
-    setArchived((prev) => [{ id: s.id, title: s.title, icon: s.icon }, ...prev]);
-    if (!(await deleteSection(eventId, s.id))) {
+    setChapters((prev) => prev
+      .map((chapter) => (chapter.id === chapterId
+        ? { ...chapter, moments: chapter.moments.filter((m) => m.id !== moment.id) }
+        : chapter))
+      .filter((chapter) => chapter.moments.length > 0));
+    setArchived((prev) => [{ id: moment.id, title: moment.title, icon: moment.icon }, ...prev]);
+    if (!(await deleteSection(eventId, moment.id))) {
       Alert.alert("Couldn't archive that section", 'Please try again.');
-      load(); // resync — restores it to the timeline and drops the bogus archived row
+      load();
     }
   }, [eventId, load]);
 
-  const restore = useCallback(async (r: RemovedSection) => {
+  const restore = useCallback(async (item: TimelineArchived) => {
     if (!eventId) return;
-    setArchived((prev) => prev.filter((x) => x.id !== r.id));
-    await restoreSection(eventId, r.id);
-    load(); // re-fetch so it lands back in its correct category + order slot
+    setArchived((prev) => prev.filter((x) => x.id !== item.id));
+    await restoreSection(eventId, item.id);
+    load();
   }, [eventId, load]);
 
-  if (loading || eventLoading) return <View style={[styles.center, { backgroundColor: c.bg }]}><ActivityIndicator color={Brand.purple} /></View>;
+  if (loading || eventLoading) {
+    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg }}><ActivityIndicator color={Brand.purple} /></View>;
+  }
 
-  const hasAny = groups.length > 0 || archived.length > 0;
+  const ordinal = timeEditing ? momentOrdinal(chapters, timeEditing.id) : null;
 
   return (
     <View style={{ flex: 1 }}>
-      <Backdrop />
-      <AppHeader />
-      <View style={{ flex: 1 }}>
-        {!hasAny ? (
-          <View style={{ padding: Space.lg }}>
-            <Text style={[styles.title, { color: c.text }]}>Timeline</Text>
-            <Text style={{ color: c.textTertiary, textAlign: 'center', marginTop: Space.xl }}>
-              Your plan sections will appear here once your event is set up.
-            </Text>
-          </View>
-        ) : (
-          <ScrollViewContainer contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl * 4 }}>
-            <View style={{ marginBottom: Space.lg }}>
-              <Text style={[styles.title, { color: c.text }]}>Timeline</Text>
-              <Text style={{ color: c.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 2 }}>
-                The flow of your night, by category. Press &amp; hold to drag a moment into place, or swipe left to archive one.
-              </Text>
-            </View>
-
-            {/* Official timeline from the planner — optional */}
-            <View style={[styles.planner, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
-              <Text style={[styles.offLab, { color: c.textTertiary }]}>OFFICIAL PLANNER TIMELINE</Text>
-              {ptLoading && !pt ? (
-                <ActivityIndicator color={Brand.purple} style={{ marginVertical: Space.md, alignSelf: 'flex-start' }} />
-              ) : pt ? (
-                <>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                    <Icon name="check" size={16} color={c.success} />
-                    <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', flex: 1 }} numberOfLines={1}>{pt.name}</Text>
-                  </View>
-                  <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 2, marginBottom: Space.md }}>Shared with your Xpress team. You can replace it anytime.</Text>
-                  <Pressable onPress={uploadPlanner} disabled={ptBusy} style={[styles.plannerBtn, { borderColor: Brand.purple }]}>
-                    {ptBusy ? <ActivityIndicator color={Brand.purple} /> : <Text style={{ color: Brand.purpleLight, fontWeight: '700' }}>Replace file</Text>}
-                  </Pressable>
-                </>
-              ) : (
-                <>
-                  <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 4, marginBottom: Space.md, lineHeight: 19 }}>
-                    Have a timeline from your wedding planner? Upload it (PDF or photo) and we&apos;ll work from it. No planner or don&apos;t have it yet? No worries — we&apos;ll coordinate with them directly.
-                  </Text>
-                  <Pressable onPress={uploadPlanner} disabled={ptBusy} style={[styles.plannerBtn, { backgroundColor: Brand.purple, borderColor: Brand.purple }]}>
-                    {ptBusy ? <ActivityIndicator color="#fff" /> : (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Icon name="upload" size={16} color="#fff" />
-                        <Text style={{ color: '#fff', fontWeight: '800' }}>Upload timeline</Text>
-                      </View>
-                    )}
-                  </Pressable>
-                </>
-              )}
-            </View>
-
-            {groups.map((g) => (
-              <View key={g.id} style={{ marginBottom: Space.lg }}>
-                <View style={styles.catHead}>
-                  {g.icon ? <EmojiIcon glyph={g.icon} size={16} color={Brand.purpleLight} /> : null}
-                  <Text style={[styles.catTitle, { color: Brand.purpleLight }]}>{g.title.toUpperCase()}</Text>
-                  <View style={{ flex: 1 }} />
-                  <Text style={{ color: c.textTertiary, fontSize: 12, fontWeight: '600' }}>{g.on.length}</Text>
-                  {canManage ? (
-                    <Pressable onPress={() => setAddingGroup({ id: g.id, title: g.title })} hitSlop={8} style={[styles.addChip, { borderColor: Brand.purple }]}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                        <Icon name="plus" size={12} color={Brand.purpleLight} />
-                        <Text style={{ color: Brand.purpleLight, fontSize: 12, fontWeight: '800' }}>Add</Text>
-                      </View>
-                    </Pressable>
-                  ) : null}
-                </View>
-                <NestedReorderableList
-                  data={g.on}
-                  keyExtractor={(s) => s.id}
-                  onReorder={(e) => reorderInGroup(g.id, e)}
-                  contentContainerStyle={{ gap: Space.sm }}
-                  renderItem={({ item }) => <Row section={item} canManage={canManage} onArchive={() => archive(g.id, item)} onEditTime={() => setTimeEditing(item)} c={c} />}
-                />
-              </View>
-            ))}
-
-            {archived.length > 0 && (
-              <View style={{ marginTop: Space.md, gap: Space.sm }}>
-                <Text style={[styles.offLab, { color: c.textTertiary }]}>ARCHIVED · {archived.length}</Text>
-                <Text style={{ color: c.textTertiary, fontSize: 12, lineHeight: 17, marginBottom: 2 }}>
-                  Archived sections are removed from your timeline and plan. Restore any of them anytime.
-                </Text>
-                {archived.map((r) => (
-                  <View key={r.id} style={[styles.offRow, { backgroundColor: c.cardAlt, borderColor: c.border }]}>
-                    <EmojiIcon glyph={r.icon} size={18} color={c.ink3} />
-                    <Text style={{ flex: 1, color: c.textSecondary, fontSize: 15, textDecorationLine: 'line-through' }} numberOfLines={1}>{r.title}</Text>
-                    <Pressable onPress={() => restore(r)} hitSlop={8} style={[styles.addBtn, { borderColor: Brand.purple }]}>
-                      <Text style={{ color: Brand.purpleLight, fontWeight: '700', fontSize: 13 }}>Restore</Text>
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            )}
-          </ScrollViewContainer>
-        )}
-      </View>
+      <TimelineBoard
+        dateLabel={formatTimelineDate(event?.event_date)}
+        chapters={chapters}
+        archived={archived}
+        canManage={canManage}
+        reordering={reordering}
+        coach={coach}
+        menuOpen={menuOpen}
+        uploadBusy={ptBusy}
+        onToggleReorder={() => setReordering((v) => !v)}
+        onPressPlus={openMenu}
+        onDismissCoach={dismissCoach}
+        onCloseMenu={() => setMenuOpen(false)}
+        onNewMoment={startNew}
+        onUpload={startUpload}
+        onPressMoment={(moment) => {
+          if (!eventId) return;
+          router.push({ pathname: '/section/[id]', params: { id: moment.id, eventId } });
+        }}
+        onPressTime={setTimeEditing}
+        onArchive={archive}
+        onRestore={restore}
+        onReorder={(chapterId, from, to) => reorderInChapter(chapterId, { from, to })}
+      />
       <TimePickerSheet
         visible={timeEditing !== null}
-        initial={timeEditing?.time_label ?? null}
-        title={timeEditing ? `${timeEditing.title} time` : 'Set time'}
+        initial={timeEditing?.timeLabel ?? null}
+        title="Set time"
+        subtitle={timeEditing ? [timeEditing.title, ordinal].filter(Boolean).join(' · ') : undefined}
         onClose={() => setTimeEditing(null)}
         onSave={(time) => { if (timeEditing) saveTime(timeEditing, time); }}
       />
@@ -249,87 +281,3 @@ export default function TimelineScreen() {
     </View>
   );
 }
-
-function Row({ section, canManage, onArchive, onEditTime, c }: { section: SectionRow; canManage: boolean; onArchive: () => void; onEditTime: () => void; c: ReturnType<typeof useC> }) {
-  const drag = useReorderableDrag();
-  const active = useIsActive();
-  const swipe = useRef<SwipeableMethods>(null);
-
-  const meta = [
-    section.questionCount > 0 ? `${section.answeredCount}/${section.questionCount} answered` : null,
-    section.songCount > 0 ? `${section.songCount} ${section.songCount === 1 ? 'song' : 'songs'}` : null,
-  ].filter(Boolean).join('  ·  ');
-
-  const confirmArchive = () => {
-    Alert.alert(
-      'Archive this section?',
-      `"${section.title}" will be removed from your timeline and your plan. You can restore it anytime from the Archived list.`,
-      [
-        { text: 'Cancel', style: 'cancel', onPress: () => swipe.current?.close() },
-        { text: 'Archive', style: 'destructive', onPress: onArchive },
-      ],
-    );
-  };
-
-  // Time can be edited only by managers (staff/host); guests see it read-only.
-  const timeEl = section.time_enabled && !section.locked && canManage ? (
-    <Pressable onPress={onEditTime} hitSlop={6} style={[styles.timePill, section.time_label ? { backgroundColor: Brand.purple } : { borderWidth: 1, borderColor: Brand.purple }]}>
-      <Text style={{ color: section.time_label ? '#fff' : Brand.purpleLight, fontWeight: '700', fontSize: 13 }}>
-        {section.time_label ?? '+ Time'}
-      </Text>
-    </Pressable>
-  ) : section.time_label ? (
-    <Text style={{ color: c.textSecondary, fontWeight: '700', fontSize: 13 }}>{section.time_label}</Text>
-  ) : null;
-
-  const inner = (
-    <Pressable
-      onLongPress={canManage ? drag : undefined}
-      delayLongPress={180}
-      style={[styles.row, Shadow.card, { backgroundColor: c.card, borderColor: active ? Brand.purple : c.border, opacity: active ? 0.95 : 1 }]}>
-      {canManage ? <Icon name="drag" size={20} color={c.ink3} /> : null}
-      <EmojiIcon glyph={section.icon} size={22} fallback="music" />
-      <View style={{ flex: 1 }}>
-        <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }} numberOfLines={1}>{section.title}</Text>
-        {meta ? <Text style={{ color: c.textTertiary, fontSize: 12, marginTop: 1 }}>{meta}</Text> : null}
-      </View>
-      {timeEl}
-    </Pressable>
-  );
-
-  // Guests can't reorder or archive — no drag handle, no swipe-to-archive.
-  if (!canManage) return inner;
-
-  return (
-    <ReanimatedSwipeable
-      ref={swipe}
-      friction={2}
-      rightThreshold={60}
-      renderRightActions={() => (
-        <View style={[styles.archiveAction, { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }]}>
-          <Icon name="trash" size={16} color="#fff" />
-          <Text style={styles.archiveTxt}>Archive</Text>
-        </View>
-      )}
-      onSwipeableOpen={confirmArchive}>
-      {inner}
-    </ReanimatedSwipeable>
-  );
-}
-
-const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 30, fontFamily: Fonts.display },
-  catHead: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, marginBottom: Space.sm },
-  catTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 1.2 },
-  addChip: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 3, paddingHorizontal: 10, marginLeft: 8 },
-  offLab: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: Space.md, borderRadius: Radius.lg, borderWidth: 1, padding: Space.md },
-  archiveAction: { flex: 1, backgroundColor: '#e0584f', borderRadius: Radius.lg, justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: Space.lg },
-  archiveTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  offRow: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, borderWidth: 1, borderRadius: Radius.md, paddingVertical: 10, paddingHorizontal: Space.md },
-  addBtn: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 6, paddingHorizontal: 14 },
-  timePill: { borderRadius: Radius.pill, paddingVertical: 6, paddingHorizontal: 12 },
-  planner: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: Space.lg, marginBottom: Space.lg },
-  plannerBtn: { borderWidth: 1, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center' },
-});
