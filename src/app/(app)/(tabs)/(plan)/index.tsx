@@ -1,35 +1,32 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Image } from 'expo-image';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 
-import { EmojiIcon, Icon, Ring, useC, useScheme } from '@/components/ui';
-import { Backdrop } from '@/components/Backdrop';
-import { Countdown } from '@/components/Countdown';
 import { OnboardingTour } from '@/components/OnboardingTour';
-import { AppHeader } from '@/components/AppHeader';
-import { Logo } from '@/components/Logo';
-import { pickCoverImage, uploadCoverPhoto } from '@/lib/coverPhoto';
-import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
+import { EventSwitcher } from '@/components/EventSwitcher';
+import { HomeBody } from '@/components/plan/HomeBody';
+import { chapterStatus, greeting, heroDateLabel } from '@/components/plan/model';
+import { useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
-import { blendedProgress, loadOverview, setupMilestones, type Group, type Overview } from '@/lib/planning';
+import { blendedProgress, loadOverview, setupMilestones, type Group, type Overview, type SectionRow } from '@/lib/planning';
+import { supabase } from '@/lib/supabase';
 
 const TOUR_KEY = 'onboarding_seen_v1';
 
-export default function PlanScreen() {
+export default function HomeScreen() {
   const c = useC();
   const router = useRouter();
-  const { profile, signOut } = useAuth();
-  const { event, reload: reloadEvents, loading: eventLoading } = useEvent();
+  const { profile } = useAuth();
+  const { event, events, loading: eventLoading } = useEvent();
   const [overview, setOverview] = useState<Overview | null>(null);
+  const [venue, setVenue] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [showTour, setShowTour] = useState(false);
+  const [switcher, setSwitcher] = useState(false);
   const tourChecked = useRef(false);
 
   // Couples finish Welcome in OnboardingGate, which marks this seen.
@@ -50,232 +47,121 @@ export default function PlanScreen() {
     setLoading(false);
   }, [event]);
 
-  // refetch progress every time the screen regains focus (e.g. after answering)
   useFocusEffect(useCallback(() => { load(); }, [load]));
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
-  const onChangePhoto = useCallback(async () => {
-    if (!event) return;
-    try {
-      const asset = await pickCoverImage();
-      if (!asset) return;
-      setUploading(true);
-      await uploadCoverPhoto(event.id, asset);
-      await reloadEvents(); // refresh the cover in the shared event (re-runs load via focus)
-    } catch (e) {
-      Alert.alert('Could not update photo', e instanceof Error ? e.message : 'Please try again.');
-    } finally {
-      setUploading(false);
-    }
-  }, [event, reloadEvents]);
+  useEffect(() => {
+    let cancelled = false;
+    if (!event?.venue_id) { setVenue(null); return; }
+    supabase.from('venues').select('name').eq('id', event.venue_id).maybeSingle().then(({ data }) => {
+      if (!cancelled) setVenue((data as { name?: string } | null)?.name ?? null);
+    });
+    return () => { cancelled = true; };
+  }, [event?.venue_id]);
 
-  if (loading || eventLoading) return <View style={[styles.center, { backgroundColor: c.bg }]}><ActivityIndicator color={Brand.purple} /></View>;
+  if (loading || eventLoading) {
+    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg }}><ActivityIndicator color={c.accent} /></View>;
+  }
 
-  const answered = overview?.answeredQuestions ?? 0;
-  const totalQ = overview?.totalQuestions ?? 0;
-  // Endowed progress: credit booking milestones the DJ already did so a fresh plan
-  // opens with honest momentum (~15–25%) instead of a demoralizing 0%.
+  const isStaff = profile?.accountType === 'staff';
+  const canSwitch = isStaff || events.length > 1;
   const milestones = event ? setupMilestones(event) : [];
-  const pct = event ? blendedProgress(milestones, answered, totalQ) : 0;
-  const doneShorts = milestones.filter((m) => m.done && m.key !== 'account').map((m) => m.short);
-  const seedLine = doneShorts.length
-    ? `You're already ${pct}% there — ${doneShorts.join(', ')}`
-    : `You're already ${pct}% there`;
-  const cheer = pct >= 80 ? "You're almost there!" : answered > 0 ? 'Looking great so far' : "You're already on your way";
-  const dateLabel = event?.event_date
-    ? new Date(event.event_date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })
-    : null;
-  const nextUp = overview?.sections.find((s) => s.questionCount > 0 && s.answeredCount < s.questionCount);
+  const pct = event ? blendedProgress(milestones, overview?.answeredQuestions ?? 0, overview?.totalQuestions ?? 0) : 0;
+
+  const next = nextMoment(overview);
+  const resume = next
+    ? {
+        icon: next.section.icon,
+        title: next.section.title,
+        meta: resumeMeta(next.section, next.group.title),
+      }
+    : overview && overview.sections[0]
+      ? {
+          icon: overview.sections[0].icon,
+          title: overview.sections[0].title,
+          meta: overview.groups.find((g) => g.sections.some((s) => s.id === overview.sections[0].id))?.title ?? 'Your plan',
+        }
+      : null;
+
+  const openSection = (section: SectionRow, from: string) => {
+    if (!event) return;
+    router.push({ pathname: '/section/[id]', params: { id: section.id, eventId: event.id, from } });
+  };
 
   return (
-    <View style={{ flex: 1 }}>
-      <Backdrop />
-      <AppHeader />
-      <View style={{ flex: 1 }}>
-        <ScrollView
-          contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl * 3, gap: Space.lg }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Brand.purple} />}>
-          {!event ? (
-            <>
-              <View style={styles.topRow}>
-                <Logo variant="full" height={30} />
-                <Pressable onPress={signOut}><Text style={{ color: c.textTertiary, fontSize: 13 }}>Sign out</Text></Pressable>
-              </View>
-              <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
-                <Text style={{ color: c.textSecondary }}>No event is linked to your account yet. Your DJ will set this up shortly.</Text>
-              </View>
-            </>
-          ) : (
-            <>
-              <View style={[styles.hero, Shadow.card]}>
-                {event.cover_photo_url ? (
-                  <Image source={{ uri: event.cover_photo_url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
-                ) : (
-                  <LinearGradient colors={[Brand.purple, '#6a4fb8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-                )}
-                <LinearGradient
-                  colors={event.cover_photo_url
-                    ? ['rgba(18,10,38,0.45)', 'rgba(18,10,38,0.20)', 'rgba(8,4,20,0.88)']
-                    : ['rgba(0,0,0,0.04)', 'rgba(0,0,0,0.18)']}
-                  style={StyleSheet.absoluteFill}
-                />
-
-                <View style={styles.heroTopRow}>
-                  <View style={{ flex: 1 }} />
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.md }}>
-                    <Pressable onPress={() => setShowTour(true)} hitSlop={8} style={styles.camBtn}>
-                      <Icon name="help" size={18} color="#fff" />
-                    </Pressable>
-                    <Pressable onPress={onChangePhoto} disabled={uploading} hitSlop={8} style={styles.camBtn}>
-                      {uploading ? <ActivityIndicator color="#fff" size="small" /> : <Icon name="camera" size={16} color="#fff" />}
-                    </Pressable>
-                    <Pressable onPress={signOut} hitSlop={8}>
-                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '600' }}>Sign out</Text>
-                    </Pressable>
-                  </View>
-                </View>
-
-                <View style={{ flex: 1, minHeight: Space.xl }} />
-
-                <Text style={styles.heroWelcome}>Welcome back{profile?.firstName ? `, ${profile.firstName}` : ''}</Text>
-                {dateLabel && <Text style={styles.heroDate}>{dateLabel.toUpperCase()}</Text>}
-                <Text style={styles.heroTitle}>{event.name || 'Your Event'}</Text>
-                {event.event_date && <Countdown date={event.event_date} />}
-                <View style={styles.heroProgRow}>
-                  <Ring pct={pct} size={78} stroke={7} color="#fff" track="rgba(255,255,255,0.28)" />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.heroCheer}>{cheer}</Text>
-                    <Text style={styles.heroSub}>{answered > 0 ? `${answered} of ${totalQ} questions answered` : seedLine}</Text>
-                  </View>
-                </View>
-
-                {!event.cover_photo_url && (
-                  <Pressable onPress={onChangePhoto} disabled={uploading} style={[styles.addPhotoHint, { flexDirection: 'row', alignItems: 'center', gap: 6 }]} hitSlop={6}>
-                    <Icon name="camera" size={14} color="#fff" />
-                    <Text style={styles.addPhotoHintText}>Add a photo of you two</Text>
-                  </Pressable>
-                )}
-              </View>
-
-              {nextUp && (
-                <View>
-                  <Text style={[styles.lab, { color: c.textTertiary }]}>PICK UP WHERE YOU LEFT OFF</Text>
-                  <Pressable onPress={() => router.push({ pathname: '/section/[id]', params: { id: nextUp.id, eventId: event.id } })}>
-                    <View style={[styles.card, Shadow.card, { backgroundColor: c.card, borderColor: c.border, flexDirection: 'row', alignItems: 'center', gap: Space.md }]}>
-                      <EmojiIcon glyph={nextUp.icon} size={26} fallback="music" />
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.contTitle, { color: c.text }]}>{nextUp.title}</Text>
-                        <Text style={{ color: c.textSecondary, fontSize: 13 }}>{nextUp.answeredCount}/{nextUp.questionCount} answered</Text>
-                      </View>
-                      <View style={styles.cta}><Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>Continue</Text></View>
-                    </View>
-                  </Pressable>
-                </View>
-              )}
-
-              <View style={{ gap: Space.md }}>
-                <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR PLAN</Text>
-                {overview?.groups.map((g, i) => (
-                  <CategoryCard
-                    key={g.id}
-                    group={g}
-                    index={i}
-                    onPress={() => router.push({ pathname: '/group/[id]', params: { id: g.id, eventId: event.id, title: g.title } })}
-                  />
-                ))}
-              </View>
-            </>
-          )}
-        </ScrollView>
-      </View>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <StatusBar style="light" />
+      {!event ? (
+        <HomeBody
+          greeting={greeting(profile?.firstName)}
+          eventName="Your event"
+          progress={0}
+          canSwitch={false}
+          onSwitch={() => {}}
+          resume={null}
+          onContinue={() => {}}
+          chapters={[]}
+          onChapter={() => {}}
+          onSeeAll={() => {}}
+          emptyMessage="No event is linked to your account yet. Your DJ will set this up shortly."
+        />
+      ) : (
+        <HomeBody
+          greeting={greeting(profile?.firstName)}
+          eventName={event.name || 'Your Event'}
+          coverUrl={event.cover_photo_url}
+          date={event.event_date}
+          dateLabel={event.event_date ? heroDateLabel(event.event_date) : undefined}
+          venue={venue}
+          progress={pct}
+          canSwitch={canSwitch}
+          onSwitch={() => { if (isStaff) router.push('/events'); else setSwitcher(true); }}
+          resume={resume}
+          onContinue={() => {
+            if (!next && overview?.sections[0]) {
+              const g = overview.groups.find((x) => x.sections.some((s) => s.id === overview.sections[0].id));
+              openSection(overview.sections[0], g?.title ?? 'Home');
+              return;
+            }
+            if (next) openSection(next.section, next.group.title);
+          }}
+          chapters={(overview?.groups ?? []).map((g, i) => {
+            const status = chapterStatus(g);
+            return {
+              id: g.id,
+              index: i + 1,
+              title: g.title,
+              moments: g.sections.length,
+              status: status?.label ?? null,
+              done: status?.done ?? false,
+            };
+          })}
+          onChapter={(id) => {
+            const g = overview?.groups.find((x) => x.id === id);
+            router.push({ pathname: '/group/[id]', params: { id, eventId: event.id, title: g?.title ?? '' } });
+          }}
+          onSeeAll={() => router.navigate('/timeline')}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+        />
+      )}
       <OnboardingTour visible={showTour} onClose={closeTour} />
+      {events.length > 1 ? <EventSwitcher visible={switcher} onClose={() => setSwitcher(false)} /> : null}
     </View>
   );
 }
 
-function CategoryCard({ group, index, onPress }: { group: Group; index: number; onPress: () => void }) {
-  const c = useC();
-  const dark = useScheme() === 'dark';
-  const glassFill = dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.5)';
-  const glassBorder = dark ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.7)';
-  const pct = group.totalQuestions > 0
-    ? Math.round((group.answeredQuestions / group.totalQuestions) * 100)
-    : group.songCount > 0 ? 100 : 0;
-  const done = pct >= 100;
-  const meta = [
-    `${group.sections.length} ${group.sections.length === 1 ? 'section' : 'sections'}`,
-    group.songCount > 0 ? `${group.songCount} ${group.songCount === 1 ? 'song' : 'songs'}` : null,
-  ].filter(Boolean).join('  ·  ');
-
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.985 : 1 }] }]}>
-      <View style={[styles.catShadow, Shadow.card]}>
-        <BlurView intensity={dark ? 36 : 60} tint={dark ? 'dark' : 'light'} style={[styles.cat, { borderColor: glassBorder }]}>
-          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: glassFill }]} />
-          <View style={styles.catHead}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            {done ? <Icon name="check" size={13} color={Brand.red} /> : null}
-            <Text style={[styles.catEyebrow, { color: done ? Brand.red : Brand.purpleLight }]}>
-              {done ? 'COMPLETE' : `STEP ${index + 1}`}
-            </Text>
-          </View>
-          <View style={{ flex: 1 }} />
-          <Text style={[styles.catPct, { color: c.textTertiary }]}>{pct}%</Text>
-        </View>
-
-        <View style={styles.catTitleRow}>
-          <Text style={[styles.catTitle, { color: c.text }]} numberOfLines={2}>{group.title}</Text>
-          <View style={[styles.catChevron, { backgroundColor: Brand.purple + '14' }]}>
-            <Icon name="chev-r" size={18} color={Brand.purpleLight} />
-          </View>
-        </View>
-        <Text style={[styles.catMeta, { color: c.textTertiary }]}>{meta}</Text>
-
-        <View style={[styles.catBarTrack, { backgroundColor: c.cardAlt }]}>
-          {pct > 0 && (
-            <LinearGradient
-              colors={[Brand.purple, Brand.purpleLight]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[styles.catBarFill, { width: `${Math.max(3, pct)}%` }]}
-            />
-          )}
-          </View>
-        </BlurView>
-      </View>
-    </Pressable>
-  );
+function nextMoment(overview: Overview | null): { section: SectionRow; group: Group } | null {
+  if (!overview) return null;
+  for (const group of overview.groups) {
+    const section = group.sections.find((s) => s.questionCount > 0 && s.answeredCount < s.questionCount);
+    if (section) return { section, group };
+  }
+  return null;
 }
 
-const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  card: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: Space.lg },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  hi: { fontSize: 15 },
-  hero: { borderRadius: Radius.xl, padding: Space.xl, overflow: 'hidden', minHeight: 320 },
-  heroTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  camBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
-  heroWelcome: { color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '600', marginBottom: 4 },
-  addPhotoHint: { marginTop: Space.md, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 14, paddingVertical: 9, borderRadius: Radius.pill },
-  addPhotoHintText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  heroDate: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
-  heroTitle: { color: '#fff', fontSize: 32, fontFamily: Fonts.display, marginTop: 4 },
-  heroProgRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md, marginTop: Space.lg },
-  heroCheer: { color: '#fff', fontSize: 17, fontWeight: '800' },
-  heroSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 2 },
-  lab: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: Space.sm },
-  contTitle: { fontSize: 16, fontWeight: '600' },
-  cta: { backgroundColor: Brand.purple, borderRadius: Radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
-
-  catShadow: { borderRadius: Radius.xl },
-  cat: { borderRadius: Radius.xl, borderWidth: StyleSheet.hairlineWidth, padding: Space.xl, gap: 6, overflow: 'hidden' },
-  catHead: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
-  catEyebrow: { fontSize: 13, fontWeight: '800', letterSpacing: 1.4 },
-  catPct: { fontSize: 13, fontWeight: '700' },
-  catTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, marginTop: 2 },
-  catTitle: { flex: 1, fontSize: 26, fontFamily: Fonts.display, letterSpacing: -0.3 },
-  catChevron: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  catMeta: { fontSize: 13, fontWeight: '500', marginBottom: Space.sm },
-  catBarTrack: { height: 7, borderRadius: 4, overflow: 'hidden' },
-  catBarFill: { height: 7, borderRadius: 4 },
-});
+function resumeMeta(section: SectionRow, chapter: string): string {
+  const left = Math.max(0, section.questionCount - section.answeredCount);
+  const q = left === 1 ? '1 question left' : `${left} questions left`;
+  return section.time_label ? `${q} · ${chapter}, ${section.time_label}` : `${q} · ${chapter}`;
+}

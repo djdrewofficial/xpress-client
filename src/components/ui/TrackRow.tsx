@@ -8,7 +8,7 @@ import { useC } from './useC';
  * P2/Track row.
  * - default: index, title, artist. Optional Must play tag (accent tint pill).
  * - with note: DJ note block under the track (`note` string).
- * - do not play: `ban` icon, muted title. Only used inside Open Dancing.
+ * - do not play: `ban` icon, muted crossed-out title. Only used inside Open Dancing.
  */
 export function TrackRow({
   index,
@@ -42,7 +42,9 @@ export function TrackRow({
           <Icon name="music" size={20} color={c.ink3} />
         )}
         <View style={{ flex: 1 }}>
-          <Text style={[styles.title, { color: titleColor }]} numberOfLines={1}>
+          <Text
+            style={[styles.title, { color: titleColor, textDecorationLine: doNotPlay ? 'line-through' : 'none' }]}
+            numberOfLines={1}>
             {title}
           </Text>
           {artist ? (
