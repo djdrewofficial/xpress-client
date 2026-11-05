@@ -30,13 +30,8 @@ import {
   OFFICE_PHONE,
   type AccountData,
 } from '@/lib/account';
-import {
-  readLanguage,
-  readMarketingTexts,
-  writeLanguage,
-  writeMarketingTexts,
-  type AppLanguage,
-} from '@/lib/language';
+import { readMarketingTexts, writeMarketingTexts } from '@/lib/language';
+import { useT } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 
 const PRIVACY_URL = 'https://xos.xpressdjs.com/app-privacy';
@@ -59,7 +54,7 @@ export default function AccountScreen() {
   const [accountName, setAccountName] = useState(profile?.firstName || 'Your account');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [language, setLanguage] = useState<AppLanguage>('en');
+  const { locale, setLocale } = useT();
   const [marketing, setMarketing] = useState(false);
 
   const [showInvite, setShowInvite] = useState(false);
@@ -71,7 +66,6 @@ export default function AccountScreen() {
   const [deletePhase, setDeletePhase] = useState<'confirm' | 'working' | 'done' | 'error'>('confirm');
 
   useEffect(() => {
-    readLanguage().then(setLanguage);
     readMarketingTexts().then(setMarketing);
   }, []);
 
@@ -108,11 +102,6 @@ export default function AccountScreen() {
     await load();
     setRefreshing(false);
   }, [load]);
-
-  const onLanguage = useCallback((next: AppLanguage) => {
-    setLanguage(next);
-    writeLanguage(next).catch(() => {});
-  }, []);
 
   const onMarketing = useCallback((on: boolean) => {
     setMarketing(on);
@@ -208,8 +197,8 @@ export default function AccountScreen() {
           setDeleteOpen(true);
         }}
         deleting={deletePhase === 'working'}
-        language={language}
-        onLanguage={onLanguage}
+        language={locale}
+        onLanguage={setLocale}
         marketing={marketing}
         onMarketing={onMarketing}
       />

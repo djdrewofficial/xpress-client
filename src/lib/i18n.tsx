@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type PropsWithChildren } from 'react';
 
 import { useAuth } from '@/lib/auth';
-import { readClientLanguage, readInitialLocale, saveLocale } from '@/lib/preferences';
+import { readClientLanguage, readInitialLocale, readLanguagePref, saveLocale } from '@/lib/preferences';
 
 /**
  * Tiny dictionaries for this phase (sign-in, welcome, music, first song).
@@ -246,7 +246,13 @@ export function LocaleProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (!clientId || touched.current) return;
     let cancelled = false;
-    readClientLanguage(clientId)
+    // The device key wins once Welcome or Settings has written it. The client
+    // column only fills in when that key is still empty.
+    readLanguagePref()
+      .then(async (stored) => {
+        if (stored || cancelled || touched.current) return null;
+        return readClientLanguage(clientId);
+      })
       .then((value) => {
         if (!cancelled && value && !touched.current) setLocaleState(value);
       })

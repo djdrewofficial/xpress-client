@@ -6,10 +6,13 @@ import { supabase } from '@/lib/supabase';
 /**
  * Language and legal acceptance.
  *
- * Language is stored on the device (AsyncStorage) and, when a session exists,
- * on the auth user (`user_metadata.locale`) — that jsonb bag already exists,
- * so this does not add a column. If `clients.language` is already a column,
- * we read and write it too; a missing column is ignored.
+ * Language uses one device key, `xpress.language`, with values `en` | `es`.
+ * Welcome and My Event Settings both go through the i18n helper, which calls
+ * these readers and writers. When a session exists we also mirror the value on
+ * the auth user (`user_metadata.locale`) — that jsonb bag already exists, so
+ * this does not add a column. If `clients.language` is already a column, we
+ * read and write it too; a missing column is ignored. Older `xpress.locale`
+ * keys are copied once into `xpress.language` and then removed.
  *
  * Legal acceptance is local only (`xpress.legalAcceptedAt.<uid>`). A durable
  * server record needs a migration Drew runs by hand, for example:
@@ -17,8 +20,10 @@ import { supabase } from '@/lib/supabase';
  * This app does not write that column.
  */
 
-const DEVICE_LOCALE_KEY = 'xpress.locale';
-const userLocaleKey = (uid: string) => `xpress.locale.${uid}`;
+/** The only language preference key. Values are exactly `en` | `es`. Do not rename. */
+export const LANGUAGE_PREF_KEY = 'xpress.language';
+const LEGACY_LOCALE_KEY = 'xpress.locale';
+const legacyUserLocaleKey = (uid: string) => `xpress.locale.${uid}`;
 const legalKey = (uid: string) => `xpress.legalAcceptedAt.${uid}`;
 
 const WELCOME_KEY = (uid: string) => `onboarding_welcome_v2.${uid}`;
@@ -34,15 +39,29 @@ export function normalizeLocale(value: unknown): Locale | null {
   return null;
 }
 
-export async function readInitialLocale(uid: string | null, metadata: unknown): Promise<Locale> {
-  const fromAccount = normalizeLocale(metadata);
-  if (fromAccount) return fromAccount;
-  if (uid) {
-    const user = normalizeLocale(await AsyncStorage.getItem(userLocaleKey(uid)).catch(() => null));
-    if (user) return user;
+/** Device preference only. Null when the couple has not chosen a language yet. */
+export async function readLanguagePref(): Promise<Locale | null> {
+  const current = normalizeLocale(await AsyncStorage.getItem(LANGUAGE_PREF_KEY).catch(() => null));
+  if (current) return current;
+  return null;
+}
+
+async function migrateLegacyLanguage(uid: string | null): Promise<Locale | null> {
+  const keys = [LEGACY_LOCALE_KEY, uid ? legacyUserLocaleKey(uid) : null].filter((key): key is string => !!key);
+  for (const key of keys) {
+    const legacy = normalizeLocale(await AsyncStorage.getItem(key).catch(() => null));
+    if (!legacy) continue;
+    await AsyncStorage.setItem(LANGUAGE_PREF_KEY, legacy).catch(() => {});
+    await AsyncStorage.multiRemove(keys).catch(() => {});
+    return legacy;
   }
-  const device = normalizeLocale(await AsyncStorage.getItem(DEVICE_LOCALE_KEY).catch(() => null));
-  return device ?? 'en';
+  return null;
+}
+
+export async function readInitialLocale(uid: string | null, metadata: unknown): Promise<Locale> {
+  const device = (await readLanguagePref()) ?? (await migrateLegacyLanguage(uid));
+  if (device) return device;
+  return normalizeLocale(metadata) ?? 'en';
 }
 
 async function writeClientLanguage(clientId: string, locale: Locale) {
@@ -58,9 +77,9 @@ export async function readClientLanguage(clientId: string): Promise<Locale | nul
 }
 
 export async function saveLocale(locale: Locale, opts: { uid?: string | null; clientId?: string | null }) {
-  const writes: Promise<unknown>[] = [AsyncStorage.setItem(DEVICE_LOCALE_KEY, locale)];
-  if (opts.uid) writes.push(AsyncStorage.setItem(userLocaleKey(opts.uid), locale));
-  await Promise.all(writes);
+  await AsyncStorage.setItem(LANGUAGE_PREF_KEY, locale);
+  const legacy = [LEGACY_LOCALE_KEY, opts.uid ? legacyUserLocaleKey(opts.uid) : null].filter((key): key is string => !!key);
+  await AsyncStorage.multiRemove(legacy).catch(() => {});
   if (opts.uid) {
     await supabase.auth.updateUser({ data: { locale } }).catch(() => {});
   }

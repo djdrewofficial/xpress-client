@@ -4,7 +4,7 @@ import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-au
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { PhotoBoothSection } from '@/components/PhotoBoothSection';
-import { SongPicker } from '@/components/SongPicker';
+import { SongPicker } from '@/components/music/AddMusicSheet';
 import { VendorTeam } from '@/components/VendorTeam';
 import { MomentBody, type MomentSong, type MomentTab } from '@/components/plan/MomentBody';
 import { findDanceFloor, isDanceFloorSection, isDoNotPlaySection, momentEyebrow, momentNumber } from '@/components/plan/model';
