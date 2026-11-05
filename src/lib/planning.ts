@@ -192,26 +192,37 @@ type StaffEventRow = {
   status: { name: string; color: string | null; text_color: string | null } | null;
 };
 
-/** Upcoming events a staff member can open. Admins/sales see all; plain employees
-    see only events they're assigned to (event_staff). No financials/contracts here. */
-export async function getStaffEvents(opts: { employeeId: string | null; seesAll: boolean }): Promise<StaffEvent[]> {
+/** Events a staff member can open. Admins/sales see all; plain employees see only
+    events they're assigned to (event_staff). `upcoming` includes undated events.
+    No financials/contracts here. */
+export async function getStaffEvents(opts: {
+  employeeId: string | null;
+  seesAll: boolean;
+  when?: 'upcoming' | 'past';
+}): Promise<StaffEvent[]> {
   const cols =
     'id, name, event_date, start_time, cover_photo_url, venue_id, package_id, client:clients(first_name, last_name), status:event_statuses(name, color, text_color)';
   const today = new Date().toISOString().slice(0, 10);
-  let query = supabase
-    .from('events')
-    .select(opts.seesAll ? cols : `${cols}, event_staff!inner(employee_id)`)
-    .is('archived_at', null)
-    .gte('event_date', today)
-    .order('event_date', { ascending: true });
-  if (!opts.seesAll) query = query.eq('event_staff.employee_id', opts.employeeId ?? '');
+  const when = opts.when ?? 'upcoming';
+  const select = opts.seesAll ? cols : `${cols}, event_staff!inner(employee_id)`;
 
-  const { data } = await query;
-  const rows = (data ?? []) as unknown as StaffEventRow[];
+  const run = (mode: 'upcoming' | 'past' | 'dated') => {
+    let query = supabase.from('events').select(select).is('archived_at', null);
+    if (!opts.seesAll) query = query.eq('event_staff.employee_id', opts.employeeId ?? '');
+    if (mode === 'past') query = query.lt('event_date', today).order('event_date', { ascending: false });
+    else if (mode === 'dated') query = query.gte('event_date', today).order('event_date', { ascending: true });
+    else query = query.or(`event_date.gte.${today},event_date.is.null`).order('event_date', { ascending: true });
+    return query;
+  };
+
+  const first = await run(when);
+  // If the upcoming OR-filter is rejected, dated events still load.
+  const result = first.error && when === 'upcoming' ? await run('dated') : first;
+  const rows = (result.data ?? []) as unknown as StaffEventRow[];
   const seen = new Set<string>();
   const out: StaffEvent[] = [];
   for (const r of rows) {
-    if (seen.has(r.id)) continue; // event_staff!inner can duplicate an event across roles
+    if (!r?.id || seen.has(r.id)) continue; // event_staff!inner can duplicate an event across roles
     seen.add(r.id);
     out.push({
       id: r.id,
