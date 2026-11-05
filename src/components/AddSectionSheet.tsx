@@ -1,210 +1,145 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { EmojiIcon, GradientButton, Icon, useC } from '@/components/ui';
-import { Brand, Radius, Space } from '@/lib/theme';
+import { Sheet } from '@/components/ui';
+import { resolveIcon } from '@/components/ui/iconForEmoji';
+import type { IconName } from '@/components/ui';
+import { TimePickerSheet } from '@/components/TimePickerSheet';
 import {
-  getAddableSections,
-  addSectionFromTemplate,
   addCustomSection,
+  addSectionFromTemplate,
+  getAddableSections,
+  loadOverview,
+  setSectionTime,
   type AddableSection,
-  type NewSong,
 } from '@/lib/planning';
-import { searchTracks, type Track } from '@/lib/musicSearch';
+import { MOMENT_ICONS, NewMomentForm, type Suggestion } from '@/components/plan/NewMomentForm';
 
-/* Couple adds a section to a group — either a common one staff flagged (Bouquet
-   Toss, Chair Game…) or a fully custom one (name + notes + up to 3 songs). */
-
-type Mode = 'menu' | 'custom';
+/* New moment — suggested rows come from the event's XOS template sections
+   flagged client_addable (the existing addable-sections API). Custom moments
+   keep a name, icon, chapter, time, and an optional DJ note. Songs are added
+   later from the moment's Add music sheet. */
 
 export function AddSectionSheet({
   visible,
   eventId,
   groupId,
-  groupTitle,
   onClose,
   onAdded,
 }: {
   visible: boolean;
   eventId: string;
   groupId: string;
+  /** Kept so existing callers (a chapter already chosen) still compile. */
   groupTitle?: string;
   onClose: () => void;
   onAdded: () => void;
 }) {
-  const c = useC();
-  const [mode, setMode] = useState<Mode>('menu');
-  const [addable, setAddable] = useState<AddableSection[] | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
+  const [selected, setSelected] = useState<AddableSection | null>(null);
+  const [name, setName] = useState('');
+  const [icon, setIcon] = useState<IconName>('sparkles');
+  const [groups, setGroups] = useState<{ id: string; title: string }[]>([]);
+  const [partOf, setPartOf] = useState(groupId);
+  const [knownIds, setKnownIds] = useState<Set<string>>(new Set());
+  const [time, setTime] = useState<string | null>(null);
+  const [pickingTime, setPickingTime] = useState(false);
+  const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // custom builder
-  const [name, setName] = useState('');
-  const [notes, setNotes] = useState('');
-  const [songs, setSongs] = useState<NewSong[]>([]);
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Track[]>([]);
-  const [searching, setSearching] = useState(false);
-
   useEffect(() => {
     if (!visible) return;
-    setMode('menu');
-    setError(null);
+    setSelected(null);
     setName('');
+    setIcon('sparkles');
+    setPartOf(groupId);
+    setTime(null);
     setNotes('');
-    setSongs([]);
-    setQuery('');
-    setResults([]);
-    setAddable(null);
-    getAddableSections(eventId).then(setAddable).catch(() => setAddable([]));
-  }, [visible, eventId]);
-
-  useEffect(() => {
-    if (mode !== 'custom') return;
-    const q = query.trim();
-    if (q.length < 2) { setResults([]); return; }
-    let cancelled = false;
-    setSearching(true);
-    const t = setTimeout(async () => {
-      const r = await searchTracks(q);
-      if (!cancelled) { setResults(r); setSearching(false); }
-    }, 350);
-    return () => { cancelled = true; clearTimeout(t); };
-  }, [query, mode]);
-
-  const pickTemplate = async (t: AddableSection) => {
-    setBusy(true);
     setError(null);
-    const ok = await addSectionFromTemplate(eventId, groupId, t.templateSectionId);
-    setBusy(false);
-    if (ok) { onAdded(); onClose(); } else setError('Could not add that section. Please try again.');
+    setSuggestions(null);
+    setGroups([]);
+    getAddableSections(eventId)
+      .then((rows) => setSuggestions(rows.map((r) => ({ id: r.templateSectionId, title: r.title, icon: r.icon }))))
+      .catch(() => setSuggestions([]));
+    loadOverview(eventId)
+      .then((ov) => {
+        setGroups(ov.groups.map((g) => ({ id: g.id, title: g.title })));
+        setKnownIds(new Set(ov.sections.map((s) => s.id)));
+        if (!groupId && ov.groups[0]) setPartOf(ov.groups[0].id);
+      })
+      .catch(() => {});
+  }, [visible, eventId, groupId]);
+
+  const pickSuggestion = (s: Suggestion) => {
+    const full: AddableSection = { templateSectionId: s.id, title: s.title, icon: s.icon };
+    setSelected(full);
+    setName(s.title);
+    setIcon(resolveIcon(s.icon) ?? 'sparkles');
+    setError(null);
   };
 
-  const addSongToDraft = (t: Track) => {
-    if (songs.length >= 3) return;
-    if (songs.some((s) => s.provider_id === t.providerId)) return;
-    setSongs((prev) => [
-      ...prev,
-      {
-        title: t.title,
-        artist: t.artist,
-        album: t.album ?? null,
-        artwork_url: t.artworkUrl ?? null,
-        preview_url: t.previewUrl ?? null,
-        external_url: t.externalUrl ?? null,
-        provider: t.provider,
-        provider_id: t.providerId,
-      },
-    ]);
-    setQuery('');
-    setResults([]);
+  const onName = (v: string) => {
+    setName(v);
+    if (selected && v.trim() !== selected.title) setSelected(null);
   };
 
-  const saveCustom = async () => {
+  const submit = async () => {
     const title = name.trim();
-    if (!title) { setError('Give your section a name.'); return; }
+    const gid = partOf || groupId;
+    if (!title) { setError('Give your moment a name.'); return; }
+    if (!gid) { setError('Choose which part of the day this belongs to.'); return; }
     setBusy(true);
     setError(null);
-    const ok = await addCustomSection(eventId, groupId, { title, notes: notes.trim() || undefined, songs });
+    const fromTemplate = selected != null && title === selected.title;
+    const ok = fromTemplate
+      ? await addSectionFromTemplate(eventId, gid, selected.templateSectionId)
+      : await addCustomSection(eventId, gid, { title, notes: notes.trim() || undefined, icon });
+    if (!ok) {
+      setBusy(false);
+      setError('Could not add that moment. Please try again.');
+      return;
+    }
+    if (time) {
+      const ov = await loadOverview(eventId).catch(() => null);
+      const created = ov?.sections.find((s) => !knownIds.has(s.id) && s.title === (fromTemplate ? selected.title : title));
+      if (created) await setSectionTime(eventId, created.id, time);
+    }
     setBusy(false);
-    if (ok) { onAdded(); onClose(); } else setError('Could not add the section. Please try again.');
+    onAdded();
+    onClose();
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: c.bg }}>
-        <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-          <View style={[styles.hdr, { borderColor: c.border }]}>
-            <Pressable onPress={mode === 'custom' ? () => setMode('menu') : onClose} hitSlop={10} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-              {mode === 'custom' ? <Icon name="chev-l" size={18} color={Brand.purpleLight} /> : null}
-              <Text style={{ color: Brand.purpleLight, fontSize: 16, fontWeight: '600' }}>{mode === 'custom' ? 'Back' : 'Cancel'}</Text>
-            </Pressable>
-            <Text style={{ color: c.text, fontSize: 16, fontWeight: '700' }}>{mode === 'custom' ? 'Custom section' : 'Add a section'}</Text>
-            <View style={{ width: 54 }} />
-          </View>
-
-          <ScrollView contentContainerStyle={{ padding: Space.lg, gap: Space.md, paddingBottom: Space.xxl * 2 }} keyboardShouldPersistTaps="handled">
-            {groupTitle ? <Text style={{ color: c.textTertiary, fontSize: 13 }}>Adding to {groupTitle}</Text> : null}
-
-            {mode === 'menu' ? (
-              <>
-                {addable === null ? (
-                  <ActivityIndicator color={Brand.purple} style={{ marginTop: Space.xl }} />
-                ) : addable.length === 0 ? (
-                  <Text style={{ color: c.textTertiary, fontSize: 14 }}>No suggested sections right now — you can still create a custom one below.</Text>
-                ) : (
-                  <>
-                    <Text style={[styles.lab, { color: c.textTertiary }]}>SUGGESTED</Text>
-                    {addable.map((t) => (
-                      <Pressable key={t.templateSectionId} disabled={busy} onPress={() => pickTemplate(t)} style={[styles.row, { backgroundColor: c.card, borderColor: c.border }]}>
-                        <EmojiIcon glyph={t.icon} size={22} color={c.ink} />
-                        <Text style={{ flex: 1, color: c.text, fontSize: 16, fontWeight: '600' }}>{t.title}</Text>
-                        <Icon name="plus" size={20} color={Brand.purpleLight} />
-                      </Pressable>
-                    ))}
-                  </>
-                )}
-                <Pressable disabled={busy} onPress={() => setMode('custom')} style={[styles.customBtn, { borderColor: Brand.purple }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Icon name="plus" size={16} color={Brand.purpleLight} />
-                    <Text style={{ color: Brand.purpleLight, fontWeight: '800', fontSize: 15 }}>Create a custom section</Text>
-                  </View>
-                </Pressable>
-                {error ? <Text style={styles.err}>{error}</Text> : null}
-              </>
-            ) : (
-              <>
-                <TextInput style={[styles.input, { backgroundColor: c.cardAlt, color: c.text }]} placeholder="Section name (e.g. Bouquet Toss)" placeholderTextColor={c.textTertiary} value={name} onChangeText={setName} autoFocus />
-                <TextInput style={[styles.input, { backgroundColor: c.cardAlt, color: c.text, minHeight: 72, textAlignVertical: 'top' }]} placeholder="Notes for your DJ (optional)" placeholderTextColor={c.textTertiary} value={notes} onChangeText={setNotes} multiline />
-
-                <Text style={[styles.lab, { color: c.textTertiary, marginTop: Space.sm }]}>SONGS · {songs.length}/3</Text>
-                {songs.map((s, i) => (
-                  <View key={`${s.provider_id}-${i}`} style={[styles.songRow, { backgroundColor: c.cardAlt }]}>
-                    {s.artwork_url ? <Image source={{ uri: s.artwork_url }} style={styles.art} /> : <View style={[styles.art, { backgroundColor: c.border }]} />}
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{s.title}</Text>
-                      {s.artist ? <Text style={{ color: c.textTertiary, fontSize: 12 }} numberOfLines={1}>{s.artist}</Text> : null}
-                    </View>
-                    <Pressable hitSlop={8} onPress={() => setSongs((prev) => prev.filter((_, j) => j !== i))} accessibilityLabel="Remove song"><Icon name="close" size={18} color={c.ink3} /></Pressable>
-                  </View>
-                ))}
-
-                {songs.length < 3 ? (
-                  <>
-                    <TextInput style={[styles.input, { backgroundColor: c.cardAlt, color: c.text }]} placeholder="Search a song to add…" placeholderTextColor={c.textTertiary} value={query} onChangeText={setQuery} autoCapitalize="none" />
-                    {searching ? <ActivityIndicator color={Brand.purple} /> : null}
-                    {results.slice(0, 6).map((t) => (
-                      <Pressable key={`${t.provider}-${t.providerId}`} onPress={() => addSongToDraft(t)} style={[styles.songRow, { backgroundColor: c.card, borderColor: c.border, borderWidth: 1 }]}>
-                        {t.artworkUrl ? <Image source={{ uri: t.artworkUrl }} style={styles.art} /> : <View style={[styles.art, { backgroundColor: c.border }]} />}
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{t.title}</Text>
-                          <Text style={{ color: c.textTertiary, fontSize: 12 }} numberOfLines={1}>{t.artist}</Text>
-                        </View>
-                        <Icon name="plus" size={20} color={Brand.purpleLight} />
-                      </Pressable>
-                    ))}
-                  </>
-                ) : null}
-
-                {error ? <Text style={styles.err}>{error}</Text> : null}
-                <GradientButton label={busy ? 'Adding…' : 'Add section'} onPress={saveCustom} disabled={busy} style={{ marginTop: Space.md }} />
-              </>
-            )}
-          </ScrollView>
-        </SafeAreaView>
-      </View>
-    </Modal>
+    <>
+      <Sheet visible={visible} onClose={onClose}>
+        <NewMomentForm
+          suggestions={suggestions ?? []}
+          suggestionsLoading={suggestions === null}
+          selectedId={selected?.templateSectionId ?? null}
+          onSelectSuggestion={pickSuggestion}
+          name={name}
+          onName={onName}
+          icon={MOMENT_ICONS.includes(icon) ? icon : 'sparkles'}
+          onIcon={setIcon}
+          groups={groups}
+          groupId={partOf}
+          onGroup={setPartOf}
+          timeLabel={time}
+          onPickTime={() => setPickingTime(true)}
+          notes={notes}
+          onNotes={setNotes}
+          onSubmit={submit}
+          busy={busy}
+          error={error}
+        />
+      </Sheet>
+      <TimePickerSheet
+        visible={pickingTime}
+        initial={time}
+        title="Time"
+        onClose={() => setPickingTime(false)}
+        onSave={(t) => { setTime(t); setPickingTime(false); }}
+      />
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  hdr: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Space.lg, paddingVertical: Space.md, borderBottomWidth: StyleSheet.hairlineWidth },
-  lab: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: Space.md, borderRadius: Radius.lg, borderWidth: 1, padding: Space.md },
-  customBtn: { borderWidth: 1.5, borderRadius: Radius.lg, borderStyle: 'dashed', paddingVertical: 14, alignItems: 'center', marginTop: Space.sm },
-  input: { letterSpacing: 0, borderRadius: Radius.md, paddingHorizontal: Space.lg, paddingVertical: 14, fontSize: 16 },
-  songRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md, borderRadius: Radius.md, padding: Space.sm },
-  art: { width: 40, height: 40, borderRadius: 6 },
-  err: { color: '#dc2626', fontSize: 14, textAlign: 'center' },
-});

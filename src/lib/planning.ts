@@ -98,6 +98,8 @@ export type QuestionRow = {
   answer: string | null;
   condition_question_id: string | null;
   condition_values: string[];
+  /** When the answer row was last written. Absent until the couple answers. */
+  updated_at?: string | null;
 };
 
 export type SongRow = {
@@ -109,6 +111,7 @@ export type SongRow = {
   must_play: boolean;
   do_not_play: boolean;
   note: string | null;
+  provider?: string | null;
 };
 
 /** Events this client/guest can plan. */
@@ -351,16 +354,16 @@ export const addSectionFromTemplate = (eventId: string, groupId: string, templat
 export const addCustomSection = (
   eventId: string,
   groupId: string,
-  custom: { title: string; notes?: string; songs?: NewSong[] },
+  custom: { title: string; notes?: string; icon?: string | null; songs?: NewSong[] },
 ): Promise<boolean> => sectionAction({ action: 'add', eventId, groupId, custom });
 
 export async function loadSection(eventId: string, sectionId: string): Promise<{ questions: QuestionRow[]; songs: SongRow[] }> {
   const [{ data: questions }, { data: answers }, { data: songs }] = await Promise.all([
     supabase.from('planning_questions').select('*').eq('section_id', sectionId).order('sort_order'),
-    supabase.from('planning_question_answers').select('question_id, answer').eq('event_id', eventId),
+    supabase.from('planning_question_answers').select('question_id, answer, updated_at').eq('event_id', eventId),
     supabase.from('planning_songs').select('*').eq('section_id', sectionId).order('sort_order'),
   ]);
-  const ansMap = new Map((answers ?? []).map((a) => [a.question_id, a.answer]));
+  const ansMap = new Map((answers ?? []).map((a) => [a.question_id, a]));
   return {
     questions: (questions ?? []).map((q) => ({
       id: q.id,
@@ -368,9 +371,10 @@ export async function loadSection(eventId: string, sectionId: string): Promise<{
       help_text: q.help_text,
       answer_type: q.answer_type,
       options: Array.isArray(q.options) ? q.options : [],
-      answer: ansMap.get(q.id) ?? null,
+      answer: ansMap.get(q.id)?.answer ?? null,
       condition_question_id: q.condition_question_id ?? null,
       condition_values: Array.isArray(q.condition_values) ? q.condition_values : [],
+      updated_at: ansMap.get(q.id)?.updated_at ?? null,
     })),
     songs: (songs ?? []).map((s) => ({
       id: s.id,
@@ -381,6 +385,7 @@ export async function loadSection(eventId: string, sectionId: string): Promise<{
       must_play: !!s.must_play,
       do_not_play: !!s.do_not_play,
       note: s.note ?? null,
+      provider: s.provider ?? null,
     })),
   };
 }
@@ -467,6 +472,7 @@ export async function addSong(
     must_play: !!data.must_play,
     do_not_play: !!data.do_not_play,
     note: data.note ?? null,
+    provider: data.provider ?? null,
   };
 }
 

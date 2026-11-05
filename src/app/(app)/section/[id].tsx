@@ -1,60 +1,117 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
-import { Image } from 'expo-image';
-import { useLocalSearchParams } from 'expo-router';
+import { ActivityIndicator, Alert, View } from 'react-native';
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { Bar, EmojiIcon, Icon, useC } from '@/components/ui';
-import { Backdrop } from '@/components/Backdrop';
-import { AppHeader } from '@/components/AppHeader';
-import { Encourager } from '@/components/Encourager';
-import { SongPicker } from '@/components/SongPicker';
-import { SectionSongs } from '@/components/SectionSongs';
-import { VendorTeam } from '@/components/VendorTeam';
 import { PhotoBoothSection } from '@/components/PhotoBoothSection';
-import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
+import { SongPicker } from '@/components/SongPicker';
+import { VendorTeam } from '@/components/VendorTeam';
+import { MomentBody, type MomentSong, type MomentTab } from '@/components/plan/MomentBody';
+import { findDanceFloor, isDanceFloorSection, isDoNotPlaySection, momentEyebrow, momentNumber } from '@/components/plan/model';
+import { useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { loadSection, saveAnswer, questionVisible, type QuestionRow, type SongRow } from '@/lib/planning';
+import { resolvePreview } from '@/lib/musicSearch';
+import {
+  loadOverview,
+  loadSection,
+  removeSong,
+  saveAnswer,
+  setDoNotPlay,
+  setMustPlay,
+  setSectionTime,
+  updateSongNote,
+  type QuestionRow,
+  type SectionRow,
+  type SongRow,
+} from '@/lib/planning';
 import { supabase } from '@/lib/supabase';
+import { TimePickerSheet } from '@/components/TimePickerSheet';
+
+type Meta = {
+  title: string;
+  icon: string | null;
+  intro: string | null;
+  songs_enabled: boolean;
+  ai_picks_enabled: boolean;
+  module: string | null;
+  time_label: string | null;
+  time_enabled: boolean;
+  locked: boolean;
+};
 
 export default function SectionScreen() {
   const c = useC();
-  const { session } = useAuth();
-  const { id, eventId } = useLocalSearchParams<{ id: string; eventId: string }>();
-  const [meta, setMeta] = useState<{ title: string; icon: string | null; intro: string | null; songs_enabled: boolean; ai_picks_enabled: boolean; module: string | null } | null>(null);
+  const router = useRouter();
+  const { session, profile } = useAuth();
+  const { id, eventId, from } = useLocalSearchParams<{ id: string; eventId: string; from?: string }>();
+  const backLabel = (Array.isArray(from) ? from[0] : from) || 'Timeline';
+
+  const [meta, setMeta] = useState<Meta | null>(null);
   const [eventName, setEventName] = useState('');
-  const [picker, setPicker] = useState<'foryou' | 'search' | null>(null);
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [songs, setSongs] = useState<SongRow[]>([]);
+  const [externalAvoid, setExternalAvoid] = useState<SongRow[]>([]);
+  const [avoidSectionId, setAvoidSectionId] = useState<string | null>(null);
+  const [dance, setDance] = useState<SectionRow | null>(null);
+  const [momentNo, setMomentNo] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [songsExpanded, setSongsExpanded] = useState(false);
+  const [tab, setTab] = useState<MomentTab>('questions');
+  const [picker, setPicker] = useState<null | { mode: 'foryou' | 'search'; target: 'section' | 'avoid' }>(null);
+  const [pickingTime, setPickingTime] = useState(false);
+
+  const player = useAudioPlayer(null);
+  const status = useAudioPlayerStatus(player);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+
+  useEffect(() => { setAudioModeAsync({ playsInSilentMode: true }).catch(() => {}); }, []);
+  useEffect(() => () => { try { player.pause(); } catch { /* released */ } }, [player]);
+  useEffect(() => { if (status.didJustFinish) setPlayingId(null); }, [status.didJustFinish]);
 
   const load = useCallback(async () => {
     if (!id || !eventId) return;
-    const [{ data: m }, { data: ev }, sec] = await Promise.all([
+    const [{ data: m }, { data: ev }, sec, ov] = await Promise.all([
       supabase.from('planning_sections').select('*').eq('id', id).maybeSingle(),
       supabase.from('events').select('name').eq('id', eventId).maybeSingle(),
       loadSection(eventId, id),
+      loadOverview(eventId),
     ]);
-    setMeta({
-      title: m?.title ?? 'Section',
+    const nextMeta: Meta = {
+      title: m?.title ?? 'Moment',
       icon: m?.icon ?? null,
       intro: m?.intro ?? null,
       songs_enabled: m?.songs_enabled ?? false,
       ai_picks_enabled: m?.ai_picks_enabled ?? false,
       module: m?.module ?? null,
-    });
+      time_label: m?.time_label ?? null,
+      time_enabled: m?.time_enabled ?? false,
+      locked: m?.locked ?? false,
+    };
+    setMeta(nextMeta);
     setEventName(ev?.name ?? '');
     setQuestions(sec.questions);
     setSongs(sec.songs);
     const a: Record<string, string> = {};
     for (const q of sec.questions) a[q.id] = q.answer ?? '';
     setAnswers(a);
+    setMomentNo(momentNumber(ov.sections, id));
+    setDance(findDanceFloor(ov.sections));
+    const avoid = ov.sections.find((s) => isDoNotPlaySection(s) && s.id !== id) ?? null;
+    setAvoidSectionId(avoid?.id ?? (isDoNotPlaySection(nextMeta) ? id : null));
+    if (isDanceFloorSection(nextMeta) && avoid) {
+      const extra = await loadSection(eventId, avoid.id);
+      setExternalAvoid(extra.songs);
+    } else {
+      setExternalAvoid([]);
+    }
     setLoading(false);
   }, [id, eventId]);
 
   useEffect(() => { load(); }, [load]);
+
+  const canManage = profile?.accountType === 'staff' || profile?.accountType === 'client';
+  const danceFloor = meta ? isDanceFloorSection(meta) : false;
+  const avoidList = meta ? isDoNotPlaySection(meta) : false;
 
   function setLocal(qid: string, v: string) {
     setAnswers((prev) => ({ ...prev, [qid]: v }));
@@ -62,8 +119,6 @@ export default function SectionScreen() {
   async function persist(qid: string, v: string) {
     if (!session?.user.id) return;
     const ok = await saveAnswer(eventId, qid, v, session.user.id);
-    // Don't roll back the text (would wipe what they typed) — just warn; the
-    // field re-saves on the next blur/selection so they can retry.
     if (!ok) Alert.alert("Couldn't save", "That answer didn't save — check your connection and try again.");
   }
   function pick(qid: string, v: string) {
@@ -71,273 +126,152 @@ export default function SectionScreen() {
     persist(qid, v);
   }
 
-  if (loading) {
-    return <View style={[styles.center, { backgroundColor: c.bg }]}><ActivityIndicator color={Brand.purple} /></View>;
+  const failed = () => Alert.alert("Couldn't save", 'Please check your connection and try again.');
+
+  const onToggleMust = async (song: MomentSong) => {
+    const current = songs.find((s) => s.id === song.id);
+    if (!current) return;
+    const v = !current.must_play;
+    setSongs((prev) => prev.map((s) => (s.id === song.id ? { ...s, must_play: v, do_not_play: v ? false : s.do_not_play } : s)));
+    if (!(await setMustPlay(song.id, v))) {
+      setSongs((prev) => prev.map((s) => (s.id === song.id ? current : s)));
+      failed();
+    }
+  };
+
+  const onRemove = async (song: MomentSong) => {
+    const inSection = songs.some((s) => s.id === song.id);
+    if (inSection) setSongs((prev) => prev.filter((s) => s.id !== song.id));
+    else setExternalAvoid((prev) => prev.filter((s) => s.id !== song.id));
+    if (!(await removeSong(song.id))) {
+      failed();
+      load();
+    }
+  };
+
+  const onSaveNote = async (song: MomentSong, note: string) => {
+    const apply = (rows: SongRow[]) => rows.map((s) => (s.id === song.id ? { ...s, note: note.trim() || null } : s));
+    setSongs(apply);
+    setExternalAvoid(apply);
+    if (!(await updateSongNote(song.id, note))) { failed(); load(); }
+  };
+
+  const onPlay = async (song: MomentSong) => {
+    if (playingId === song.id) { try { player.pause(); } catch { /* noop */ } setPlayingId(null); return; }
+    const row = [...songs, ...externalAvoid].find((s) => s.id === song.id);
+    let url = song.previewUrl ?? row?.preview_url ?? null;
+    if (!url) url = await resolvePreview(song.title, song.artist ?? '');
+    if (!url) { setPlayingId(null); return; }
+    try { player.replace({ uri: url }); player.seekTo(0); player.play(); setPlayingId(song.id); } catch { setPlayingId(null); }
+  };
+
+  const saveTime = async (time: string | null) => {
+    setPickingTime(false);
+    if (!meta) return;
+    setMeta({ ...meta, time_label: time });
+    if (!(await setSectionTime(eventId, id, time))) {
+      Alert.alert("Couldn't update the time", 'Please try again.');
+      load();
+    }
+  };
+
+  if (loading || !meta) {
+    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg }}><ActivityIndicator color={c.accent} /></View>;
   }
 
-  const visible = questions.filter((q) => questionVisible(q, answers));
-  const answeredCount = visible.filter((q) => (answers[q.id] ?? '').trim() !== '').length;
-  const pct = visible.length > 0 ? Math.round((answeredCount / visible.length) * 100) : 0;
-  const isDoNotPlay = /do ?not play|don'?t play|dont play/i.test(meta?.title ?? '');
+  const special = meta.module === 'photobooth'
+    ? <PhotoBoothSection eventId={eventId} />
+    : meta.module === 'vendors'
+      ? <VendorTeam eventId={eventId} />
+      : null;
+
+  const momentSongs = songs.map(toMoment);
+  const avoidSongs = externalAvoid.map(toMoment);
+  const songTotal = danceFloor ? momentSongs.filter((s) => !s.doNotPlay).length + dedupeCount(momentSongs.filter((s) => s.doNotPlay), avoidSongs) : songs.length;
+  const pickerSectionId = picker?.target === 'avoid' ? (avoidSectionId ?? id) : id;
 
   return (
-    <View style={{ flex: 1 }}>
-      <Backdrop />
-      <AppHeader back />
-      <View style={{ flex: 1 }}>
-        <KeyboardAwareScrollView
-          contentContainerStyle={{ padding: Space.lg, paddingBottom: Space.xxl * 2, gap: Space.lg }}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-          bottomOffset={Space.xl}
-        >
-          <View style={{ gap: Space.md }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.sm }}>
-              {meta?.icon ? <EmojiIcon glyph={meta.icon} size={26} /> : null}
-              <Text style={[styles.title, { color: c.text, flex: 1 }]}>{meta?.title}</Text>
-            </View>
-            {meta?.intro ? <Text style={{ color: c.textSecondary, fontSize: 14, lineHeight: 20 }}>{meta.intro}</Text> : null}
-            {visible.length > 0 && (
-              <View style={{ gap: 6, marginTop: 2 }}>
-                <Bar pct={pct} height={6} track={c.cardAlt} />
-                <Text style={{ color: c.textTertiary, fontSize: 12, fontWeight: '600' }}>
-                  {answeredCount === visible.length ? 'All answered' : `${answeredCount} of ${visible.length} answered`}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {meta?.module === 'photobooth' ? (
-            <PhotoBoothSection eventId={eventId} />
-          ) : meta?.module === 'vendors' ? (
-            <VendorTeam eventId={eventId} />
-          ) : (
-            <>
-              {/* Questions first — never buried under a long playlist. */}
-              {visible.length > 0 && (
-                <View style={{ gap: Space.md }}>
-                  {songs.length > 0 && <Text style={[styles.lab, { color: c.textTertiary }]}>QUESTIONS</Text>}
-                  {visible.map((q, i) => (
-                    <QuestionField
-                      key={q.id}
-                      q={q}
-                      index={i + 1}
-                      value={answers[q.id] ?? ''}
-                      onChange={(v) => setLocal(q.id, v)}
-                      onPersist={(v) => persist(q.id, v)}
-                      onPick={(v) => pick(q.id, v)}
-                    />
-                  ))}
-                </View>
-              )}
-
-              {/* Music */}
-              {meta?.songs_enabled && (
-                <View style={{ flexDirection: 'row', gap: Space.sm }}>
-                  {meta.ai_picks_enabled && (
-                    <Pressable onPress={() => setPicker('foryou')} style={({ pressed }) => [styles.actionBtn, { backgroundColor: Brand.purple, opacity: pressed ? 0.9 : 1 }]}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Icon name="sparkles" size={16} color="#fff" />
-                        <Text style={styles.actionTxt}>For You</Text>
-                      </View>
-                    </Pressable>
-                  )}
-                  <Pressable onPress={() => setPicker('search')} style={({ pressed }) => [styles.actionBtn, { backgroundColor: c.cardAlt, borderWidth: 1, borderColor: c.border, opacity: pressed ? 0.9 : 1 }]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Icon name="plus" size={16} color={c.ink} />
-                      <Text style={[styles.actionTxt, { color: c.text }]}>Add music</Text>
-                    </View>
-                  </Pressable>
-                </View>
-              )}
-
-              {songs.length > 0 && (
-                <View style={{ gap: Space.sm }}>
-                  <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR SONGS · {songs.length}</Text>
-                  <SectionSongs
-                    songs={songsExpanded ? songs : songs.slice(0, 4)}
-                    setSongs={setSongs}
-                    allowMustPlay={!isDoNotPlay}
-                    allowDoNotPlay={isDoNotPlay}
-                  />
-                  {songs.length > 4 && (
-                    <Pressable onPress={() => setSongsExpanded((o) => !o)} style={[styles.showAll, { borderColor: Brand.purple, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }]}>
-                      <Text style={{ color: Brand.purple, fontWeight: '800', fontSize: 14 }}>
-                        {songsExpanded ? 'Show fewer' : `Show all ${songs.length} songs`}
-                      </Text>
-                      <Icon name="chev-d" size={16} color={Brand.purple} style={songsExpanded ? { transform: [{ rotate: '180deg' }] } : undefined} />
-                    </Pressable>
-                  )}
-                </View>
-              )}
-            </>
-          )}
-
-          <Encourager />
-        </KeyboardAwareScrollView>
-
-        {meta && (
-          <SongPicker
-            visible={picker !== null}
-            mode={picker ?? 'search'}
-            onClose={() => setPicker(null)}
-            eventId={eventId}
-            eventName={eventName}
-            sectionId={id}
-            sectionTitle={meta.title}
-            existingTitles={new Set(songs.map((s) => s.title.toLowerCase()))}
-            onAdded={(row) => setSongs((prev) => (prev.some((s) => s.id === row.id) ? prev : [...prev, row]))}
-            onReload={load}
-          />
-        )}
-      </View>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <MomentBody
+        backLabel={backLabel}
+        onBack={() => router.back()}
+        eyebrow={momentEyebrow(momentNo, meta.time_label)}
+        onEyebrow={canManage && meta.time_enabled && !meta.locked ? () => setPickingTime(true) : undefined}
+        title={meta.title}
+        icon={meta.icon}
+        intro={meta.intro}
+        tab={tab}
+        onTab={setTab}
+        questions={questions}
+        answers={answers}
+        onChange={setLocal}
+        onPersist={persist}
+        onPick={pick}
+        songs={momentSongs}
+        doNotPlaySongs={danceFloor ? avoidSongs : []}
+        isDanceFloor={danceFloor}
+        isAvoidList={avoidList}
+        danceTitle={!danceFloor && !avoidList && dance ? dance.title : null}
+        onOpenDance={dance && dance.id !== id ? () => router.push({ pathname: '/section/[id]', params: { id: dance.id, eventId, from: backLabel } }) : undefined}
+        songCount={songTotal}
+        songsEnabled={meta.songs_enabled}
+        aiPicks={meta.ai_picks_enabled}
+        onAddMusic={() => setPicker({ mode: 'search', target: 'section' })}
+        onForYou={() => setPicker({ mode: 'foryou', target: 'section' })}
+        onAddDoNotPlay={() => setPicker({ mode: 'search', target: 'avoid' })}
+        onToggleMust={onToggleMust}
+        onRemove={onRemove}
+        onSaveNote={onSaveNote}
+        onPlay={onPlay}
+        playingId={playingId}
+        special={special}
+      />
+      <SongPicker
+        visible={picker !== null}
+        mode={picker?.mode ?? 'search'}
+        onClose={() => setPicker(null)}
+        eventId={eventId}
+        eventName={eventName}
+        sectionId={pickerSectionId}
+        sectionTitle={picker?.target === 'avoid' ? 'Do not play' : meta.title}
+        existingTitles={new Set([...songs, ...externalAvoid].map((s) => s.title.toLowerCase()))}
+        onAdded={(row) => {
+          if (picker?.target === 'avoid') {
+            const flagged = { ...row, do_not_play: true, must_play: false };
+            void setDoNotPlay(row.id, true);
+            if (pickerSectionId === id) setSongs((prev) => prev.some((s) => s.id === row.id) ? prev : [...prev, flagged]);
+            else setExternalAvoid((prev) => prev.some((s) => s.id === row.id) ? prev : [...prev, flagged]);
+          } else {
+            setSongs((prev) => (prev.some((s) => s.id === row.id) ? prev : [...prev, row]));
+          }
+        }}
+        onReload={load}
+      />
+      <TimePickerSheet
+        visible={pickingTime}
+        initial={meta.time_label}
+        title={`${meta.title} time`}
+        onClose={() => setPickingTime(false)}
+        onSave={saveTime}
+      />
     </View>
   );
 }
 
-function QuestionField({
-  q,
-  index,
-  value,
-  onChange,
-  onPersist,
-  onPick,
-}: {
-  q: QuestionRow;
-  index: number;
-  value: string;
-  onChange: (v: string) => void;
-  onPersist: (v: string) => void;
-  onPick: (v: string) => void;
-}) {
-  const c = useC();
-  const answered = value.trim() !== '';
-  const opts = q.options.map((o) => (typeof o === 'string' ? o : o.label));
-  // Hierarchical options: a parent reveals its children once selected.
-  const entries = q.options.map((o) =>
-    typeof o === 'string' ? { label: o, children: [] as string[] } : { label: o.label, children: Array.isArray(o.children) ? o.children : [] },
-  );
-  const hasTree = entries.some((e) => e.children.length > 0);
-  const selSet = new Set(value ? value.split('|').filter(Boolean) : []);
-  const setMulti = (next: Set<string>) => onPick(Array.from(next).join('|'));
-  const toggleVal = (v: string) => {
-    const next = new Set(selSet);
-    if (next.has(v)) next.delete(v); else next.add(v);
-    setMulti(next);
+function toMoment(s: SongRow): MomentSong {
+  return {
+    id: s.id,
+    title: s.title,
+    artist: s.artist,
+    mustPlay: s.must_play,
+    doNotPlay: s.do_not_play,
+    note: s.note,
+    provider: s.provider,
+    previewUrl: s.preview_url,
   };
-  const toggleParent = (e: { label: string; children: string[] }) => {
-    const next = new Set(selSet);
-    if (next.has(e.label)) { next.delete(e.label); e.children.forEach((ch) => next.delete(ch)); }
-    else next.add(e.label);
-    setMulti(next);
-  };
-
-  return (
-    <View style={[styles.qCard, Shadow.card, { backgroundColor: c.card, borderColor: answered ? Brand.purple + '55' : c.border }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: Space.sm }}>
-        <View style={[styles.qNum, { backgroundColor: answered ? Brand.purple : c.cardAlt }]}>
-          {answered ? <Icon name="check" size={12} color="#fff" /> : <Text style={{ color: c.textTertiary, fontSize: 12, fontWeight: '800' }}>{index}</Text>}
-        </View>
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text style={{ color: c.text, fontSize: 15, fontWeight: '600', lineHeight: 21 }}>{q.prompt}</Text>
-          {q.help_text ? <Text style={{ color: c.textTertiary, fontSize: 12, lineHeight: 17 }}>{q.help_text}</Text> : null}
-        </View>
-      </View>
-
-      <View style={{ marginTop: Space.md }}>
-        {q.answer_type === 'long' || q.answer_type === 'short' ? (
-          <TextInput
-            style={[styles.input, { backgroundColor: c.cardAlt, color: c.text, borderColor: c.border }, q.answer_type === 'long' && { minHeight: 88, paddingTop: 12, textAlignVertical: 'top' }]}
-            value={value}
-            onChangeText={onChange}
-            onBlur={() => onPersist(value)}
-            multiline={q.answer_type === 'long'}
-            placeholder="Type your answer…"
-            placeholderTextColor={c.textTertiary}
-          />
-        ) : q.answer_type === 'yesno' ? (
-          <View style={{ flexDirection: 'row', gap: Space.sm }}>
-            {['Yes', 'No'].map((o) => <Chip key={o} label={o} active={value === o} onPress={() => onPick(o)} grow />)}
-          </View>
-        ) : q.answer_type === 'scale' ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {Array.from({ length: 10 }, (_, i) => String(i + 1)).map((n) => <Chip key={n} label={n} active={value === n} onPress={() => onPick(n)} square />)}
-          </View>
-        ) : q.answer_type === 'image_select' ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm }}>
-            {q.options.map((o, i) => {
-              const label = typeof o === 'string' ? o : o.label;
-              const image = typeof o === 'string' ? null : o.image;
-              const active = value === label;
-              return (
-                <Pressable key={i} onPress={() => onPick(label)} style={[styles.imgOpt, { borderColor: active ? Brand.purple : c.border }]}>
-                  {image ? <Image source={{ uri: image }} style={{ width: 96, height: 96 }} /> : <View style={{ width: 96, height: 96, backgroundColor: c.cardAlt }} />}
-                  <Text style={{ color: active ? Brand.purpleLight : c.textSecondary, fontSize: 12, padding: 6, fontWeight: '600' }} numberOfLines={1}>{label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        ) : q.answer_type === 'multiselect' && hasTree ? (
-          <View style={{ gap: Space.sm }}>
-            {entries.map((e) => {
-              const sel = selSet.has(e.label);
-              return (
-                <View key={e.label} style={{ gap: 6 }}>
-                  <Chip label={e.label} active={sel} onPress={() => toggleParent(e)} />
-                  {sel && e.children.length > 0 && (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingLeft: Space.md }}>
-                      {e.children.map((ch) => <Chip key={ch} label={ch} active={selSet.has(ch)} onPress={() => toggleVal(ch)} />)}
-                    </View>
-                  )}
-                </View>
-              );
-            })}
-          </View>
-        ) : (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm }}>
-            {opts.map((o) => {
-              const selected = q.answer_type === 'multiselect' ? selSet.has(o) : value === o;
-              return (
-                <Chip key={o} label={o} active={selected} onPress={() => (q.answer_type === 'multiselect' ? toggleVal(o) : onPick(o))} />
-              );
-            })}
-          </View>
-        )}
-      </View>
-    </View>
-  );
 }
 
-function Chip({ label, active, onPress, square, grow }: { label: string; active: boolean; onPress: () => void; square?: boolean; grow?: boolean }) {
-  const c = useC();
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        styles.chip,
-        square && { minWidth: 44, paddingHorizontal: 0, alignItems: 'center' },
-        grow && { flex: 1, alignItems: 'center' },
-        active ? { backgroundColor: Brand.purple, borderColor: Brand.purple } : { borderColor: c.border, backgroundColor: c.cardAlt },
-      ]}>
-      <Text style={{ color: active ? '#fff' : c.text, fontWeight: '600', fontSize: 14 }}>{label}</Text>
-    </Pressable>
-  );
+function dedupeCount(a: MomentSong[], b: MomentSong[]) {
+  const ids = new Set(a.map((s) => s.id));
+  return a.length + b.filter((s) => !ids.has(s.id)).length;
 }
-
-const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Space.lg, paddingVertical: Space.md },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  countPill: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: Radius.pill },
-  title: { fontSize: 28, fontFamily: Fonts.display, letterSpacing: -0.3 },
-  lab: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  songRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: Space.sm },
-  qCard: { borderRadius: Radius.lg, borderWidth: 1, padding: Space.lg },
-  qNum: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
-  actionBtn: { flex: 1, borderRadius: Radius.pill, paddingVertical: 13, alignItems: 'center', justifyContent: 'center' },
-  actionTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  input: { letterSpacing: 0, borderWidth: 1, borderRadius: Radius.md, paddingHorizontal: Space.md, paddingVertical: 12, fontSize: 16 },
-  chip: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 18 },
-  imgOpt: { width: 96, borderWidth: 2, borderRadius: Radius.md, overflow: 'hidden' },
-  showAll: { borderWidth: 2, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center', backgroundColor: Brand.purple + '12', marginTop: 2 },
-});
