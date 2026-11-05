@@ -3,24 +3,26 @@ import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { useC } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 import { Brand, Space } from '@/lib/theme';
 
 /* A spinning 2000s CD with rotating, slightly-cheeky status lines — shown while
    the For You picks are being put together (it can take a moment). */
 export function MixtapeLoader({ eventName }: { eventName?: string }) {
   const c = useC();
+  const { t } = useT();
   const spin = useRef(new Animated.Value(0)).current;
   const [i, setI] = useState(0);
 
   const messages = [
-    `Burning the ${eventName?.trim() || 'Wedding'} mixtape…`,
-    'Digging through the crates…',
-    'Looking for the right records…',
-    'Taping the CD player shut again…',
-    'Rewinding the tape with a pencil…',
-    'Blowing the dust off the jewel case…',
-    'Reading the liner notes…',
-    'Skipping the scratched track…',
+    t('mix.burning', { name: eventName?.trim() || t('mix.wedding') }),
+    t('mix.crates'),
+    t('mix.records'),
+    t('mix.cd'),
+    t('mix.tape'),
+    t('mix.dust'),
+    t('mix.liner'),
+    t('mix.skip'),
   ];
 
   useEffect(() => {

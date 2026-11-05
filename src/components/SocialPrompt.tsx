@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { useC } from '@/components/ui';
+import { Icon, useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { Brand, Fonts, Radius, Space } from '@/lib/theme';
 import { getSocialPromptState, saveSocialHandles, type SocialPromptState } from '@/lib/social';
@@ -53,7 +53,7 @@ export function SocialPrompt() {
         <View style={[styles.card, { backgroundColor: c.bg, borderColor: c.border }]}>
           {step === 1 ? (
             <>
-              <Text style={styles.emoji}>📸</Text>
+              <Icon name="camera" size={40} color={c.accent} />
               <Text style={[styles.title, { color: c.text }]}>Let&apos;s connect!</Text>
               <Text style={[styles.sub, { color: c.textSecondary }]}>
                 Share your Instagram &amp; TikTok so we can tag you and feature your big day.
@@ -73,7 +73,7 @@ export function SocialPrompt() {
             </>
           ) : (
             <>
-              <Text style={styles.emoji}>✨</Text>
+              <Icon name="sparkles" size={40} color={c.accent} />
               <Text style={[styles.title, { color: c.text }]}>Follow along!</Text>
               <Text style={[styles.sub, { color: c.textSecondary }]}>
                 Follow us for inspo, real weddings, and behind-the-scenes.
@@ -82,12 +82,14 @@ export function SocialPrompt() {
               <View style={styles.fields}>
                 {state.company_instagram ? (
                   <Pressable onPress={() => Linking.openURL(state.company_instagram!)} style={[styles.followBtn, { backgroundColor: '#E1306C' }]}>
-                    <Text style={styles.followTxt}>📷  Follow on Instagram</Text>
+                    <Icon name="camera" size={18} color="#fff" />
+                    <Text style={styles.followTxt}>Follow on Instagram</Text>
                   </Pressable>
                 ) : null}
                 {state.company_tiktok ? (
                   <Pressable onPress={() => Linking.openURL(state.company_tiktok!)} style={[styles.followBtn, { backgroundColor: '#111' }]}>
-                    <Text style={styles.followTxt}>🎵  Follow on TikTok</Text>
+                    <Icon name="music" size={18} color="#fff" />
+                    <Text style={styles.followTxt}>Follow on TikTok</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -127,7 +129,6 @@ function Field({ label, value, onChange, c }: { label: string; value: string; on
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: '#000000bb', alignItems: 'center', justifyContent: 'center', padding: Space.lg },
   card: { width: '100%', maxWidth: 420, borderRadius: Radius.xl, borderWidth: 1, padding: Space.xl, alignItems: 'center' },
-  emoji: { fontSize: 40 },
   title: { fontSize: 25, fontFamily: Fonts.display, marginTop: Space.sm },
   sub: { fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 4 },
   fields: { width: '100%', gap: Space.md, marginTop: Space.lg },
@@ -137,6 +138,6 @@ const styles = StyleSheet.create({
   primary: { width: '100%', borderRadius: Radius.pill, paddingVertical: 15, alignItems: 'center', marginTop: Space.lg },
   primaryTxt: { color: '#fff', fontWeight: '800', fontSize: 16 },
   skip: { marginTop: Space.md, padding: 8 },
-  followBtn: { width: '100%', borderRadius: Radius.md, paddingVertical: 15, alignItems: 'center' },
+  followBtn: { width: '100%', borderRadius: Radius.md, paddingVertical: 15, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
   followTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
 });

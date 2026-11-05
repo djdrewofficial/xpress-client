@@ -3,7 +3,7 @@ import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-nativ
 import { Image } from 'expo-image';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 
-import { useC } from '@/components/ui';
+import { Icon, PlayPauseIcon, useC, type IconName } from '@/components/ui';
 import { Brand, Radius, Space } from '@/lib/theme';
 import { resolvePreview } from '@/lib/musicSearch';
 import { removeSong, setDoNotPlay, setMustPlay, updateSongNote, type SongRow } from '@/lib/planning';
@@ -87,15 +87,15 @@ export function SectionSongs({
               {s.artwork_url ? (
                 <Image source={{ uri: s.artwork_url }} style={styles.art} />
               ) : (
-                <View style={[styles.art, { backgroundColor: c.cardAlt, alignItems: 'center', justifyContent: 'center' }]}><Text>🎵</Text></View>
+                <View style={[styles.art, { backgroundColor: c.cardAlt, alignItems: 'center', justifyContent: 'center' }]}><Icon name="music" size={20} color={c.ink3} /></View>
               )}
-              <View style={styles.playOverlay}><Text style={{ color: '#fff', fontSize: 15 }}>{playingId === s.id ? '⏸' : '▶'}</Text></View>
+              <View style={styles.playOverlay}><PlayPauseIcon playing={playingId === s.id} size={16} color="#fff" /></View>
             </Pressable>
             <View style={{ flex: 1 }}>
               <Text style={{ color: c.text, fontWeight: '600', fontSize: 14, textDecorationLine: s.do_not_play ? 'line-through' : 'none' }} numberOfLines={1}>{s.title}</Text>
               <Text style={{ color: c.textSecondary, fontSize: 13 }} numberOfLines={1}>{s.artist}</Text>
             </View>
-            <Pressable onPress={() => onRemove(s)} hitSlop={10} style={{ padding: 4 }}><Text style={{ color: c.textTertiary, fontSize: 16 }}>✕</Text></Pressable>
+            <Pressable onPress={() => onRemove(s)} hitSlop={10} style={{ padding: 4 }} accessibilityLabel="Remove song"><Icon name="close" size={16} color={c.ink3} /></Pressable>
           </View>
 
           {s.note && editing !== s.id ? (
@@ -122,9 +122,9 @@ export function SectionSongs({
             </View>
           ) : (
             <View style={styles.chips}>
-              {allowMustPlay && <Toggle label="⭐ Must play" active={s.must_play} color={GOLD} onPress={() => onMust(s)} c={c} />}
-              {allowDoNotPlay && <Toggle label="🚫 Do not play" active={s.do_not_play} color={RED} onPress={() => onDnp(s)} c={c} />}
-              <Toggle label={s.note ? '📝 Edit note' : '📝 Note'} active={false} color={Brand.purple} onPress={() => openNote(s)} c={c} />
+              {allowMustPlay && <Toggle icon="star" label="Must play" active={s.must_play} color={GOLD} onPress={() => onMust(s)} c={c} />}
+              {allowDoNotPlay && <Toggle icon="ban" label="Do not play" active={s.do_not_play} color={RED} onPress={() => onDnp(s)} c={c} />}
+              <Toggle icon="note" label={s.note ? 'Edit note' : 'Note'} active={false} color={Brand.purple} onPress={() => openNote(s)} c={c} />
             </View>
           )}
         </View>
@@ -133,11 +133,12 @@ export function SectionSongs({
   );
 }
 
-function Toggle({ label, active, color, onPress, c }: { label: string; active: boolean; color: string; onPress: () => void; c: ReturnType<typeof useC> }) {
+function Toggle({ icon, label, active, color, onPress, c }: { icon: IconName; label: string; active: boolean; color: string; onPress: () => void; c: ReturnType<typeof useC> }) {
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.chip, active ? { backgroundColor: color + '22', borderColor: color } : { backgroundColor: c.cardAlt, borderColor: c.border }]}>
+      style={[styles.chip, { flexDirection: 'row', alignItems: 'center', gap: 4 }, active ? { backgroundColor: color + '22', borderColor: color } : { backgroundColor: c.cardAlt, borderColor: c.border }]}>
+      <Icon name={icon} size={13} color={active ? color : c.ink3} />
       <Text style={{ color: active ? color : c.textSecondary, fontSize: 12.5, fontWeight: '700' }}>{label}</Text>
     </Pressable>
   );

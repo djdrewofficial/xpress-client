@@ -1,108 +1,181 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
-import { useC } from '@/components/ui';
-import { Brand, Radius, Space } from '@/lib/theme';
+import { Button, Icon, Sheet, useC, useScheme } from '@/components/ui';
+import { localeTag, useT } from '@/lib/i18n';
+import { Fonts, Type } from '@/lib/theme';
 
-const HOURS = Array.from({ length: 12 }, (_, i) => i + 1);
-const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);
-const pad = (n: number) => String(n).padStart(2, '0');
+const ROW = 36;
 
-function parseTime(s: string | null): { hour: number; minute: number; pm: boolean } {
-  const m = (s ?? '').match(/(\d{1,2}):(\d{2})\s*(am|pm)/i);
-  if (m) {
-    const h = Math.min(12, Math.max(1, parseInt(m[1], 10)));
-    const min = Math.min(55, Math.max(0, Math.round(parseInt(m[2], 10) / 5) * 5));
-    return { hour: h, minute: min, pm: m[3].toLowerCase() === 'pm' };
-  }
-  return { hour: 5, minute: 0, pm: true };
-}
-
-export function format(hour: number, minute: number, pm: boolean): string {
-  return `${hour}:${pad(minute)} ${pm ? 'PM' : 'AM'}`;
-}
-
-export function TimePickerSheet({ visible, initial, title, onClose, onSave }: {
+/**
+ * Small sheet for a moment's time.
+ * iOS shows the native UIDatePicker wheel (`display="spinner"`).
+ * Android's community picker opens a second dialog instead of an inline wheel,
+ * and web has no native wheel, so those platforms get the same sheet with a
+ * tappable wheel that writes the same "h:mm AM/PM" label.
+ */
+export function TimePickerSheet({
+  visible,
+  initial,
+  title,
+  subtitle,
+  onClose,
+  onSave,
+}: {
   visible: boolean;
   initial: string | null;
   title?: string;
+  subtitle?: string;
   onClose: () => void;
   onSave: (time: string | null) => void;
 }) {
   const c = useC();
-  const [hour, setHour] = useState(5);
-  const [minute, setMinute] = useState(0);
-  const [pm, setPm] = useState(true);
+  const { t, locale } = useT();
+  const scheme = useScheme();
+  const [date, setDate] = useState(() => dateFromLabel(initial));
 
   useEffect(() => {
-    if (!visible) return;
-    const p = parseTime(initial);
-    setHour(p.hour); setMinute(p.minute); setPm(p.pm);
+    if (visible) setDate(dateFromLabel(initial));
   }, [visible, initial]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={{ flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' }} onPress={onClose}>
-        <Pressable style={{ backgroundColor: c.bg, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl }} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.head}>
-            <Pressable onPress={onClose}><Text style={{ color: c.textSecondary, fontSize: 15 }}>Cancel</Text></Pressable>
-            <Text style={{ color: c.text, fontWeight: '800', fontSize: 16 }}>{title ?? 'Set time'}</Text>
-            <Pressable onPress={() => onSave(format(hour, minute, pm))}><Text style={{ color: Brand.purple, fontWeight: '800', fontSize: 15 }}>Save</Text></Pressable>
-          </View>
-
-          <View style={{ padding: Space.lg, gap: Space.lg }}>
-            <Text style={[styles.preview, { color: c.text }]}>{format(hour, minute, pm)}</Text>
-
-            <Field label="HOUR" c={c}>
-              {HOURS.map((h) => <Chip key={h} label={String(h)} active={h === hour} onPress={() => setHour(h)} />)}
-            </Field>
-            <Field label="MINUTE" c={c}>
-              {MINUTES.map((m) => <Chip key={m} label={pad(m)} active={m === minute} onPress={() => setMinute(m)} />)}
-            </Field>
-            <View style={{ flexDirection: 'row', gap: Space.sm }}>
-              <Chip label="AM" active={!pm} onPress={() => setPm(false)} grow />
-              <Chip label="PM" active={pm} onPress={() => setPm(true)} grow />
-            </View>
-
-            <Pressable onPress={() => onSave(null)} style={[styles.clear, { borderColor: c.border }]}>
-              <Text style={{ color: c.textSecondary, fontWeight: '600' }}>Clear time</Text>
-            </Pressable>
-          </View>
+    <Sheet visible={visible} onClose={onClose}>
+      <View style={styles.head}>
+        <View style={{ flex: 1 }}>
+          <Text style={[Type.title, { color: c.ink }]}>{title ?? t('time.title')}</Text>
+          {subtitle ? <Text style={[Type.footnote, { color: c.ink2, marginTop: 2 }]}>{subtitle}</Text> : null}
+        </View>
+        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
+          <Icon name="close" size={22} color={c.ink3} />
         </Pressable>
-      </Pressable>
-    </Modal>
+      </View>
+
+      {Platform.OS === 'ios' ? (
+        <DateTimePicker
+          mode="time"
+          display="spinner"
+          locale={localeTag(locale)}
+          value={date}
+          minuteInterval={5}
+          themeVariant={scheme}
+          textColor={c.ink}
+          onChange={(_event, next) => {
+            if (next) setDate(next);
+          }}
+          style={{ height: 216 }}
+        />
+      ) : (
+        <TimeWheel date={date} onChange={setDate} />
+      )}
+
+      <View style={styles.actions}>
+        <View style={{ flex: 1 }}>
+          <Button label={t('time.clear')} variant="ghost" onPress={() => onSave(null)} style={{ borderColor: c.accent }} />
+        </View>
+        <View style={{ flex: 1.35 }}>
+          <Button label={t('time.save')} onPress={() => onSave(formatClock(date))} />
+        </View>
+      </View>
+    </Sheet>
   );
 }
 
-function Field({ label, c, children }: { label: string; c: ReturnType<typeof useC>; children: React.ReactNode }) {
+export function formatClock(d: Date): string {
+  const { hour, minute, pm } = parts(d);
+  return `${hour}:${String(minute).padStart(2, '0')} ${pm ? 'PM' : 'AM'}`;
+}
+
+function dateFromLabel(s: string | null): Date {
+  const d = new Date();
+  const m = (s ?? '').match(/(\d{1,2}):(\d{2})\s*(am|pm)/i);
+  if (!m) {
+    d.setHours(17, 30, 0, 0);
+    return d;
+  }
+  return apply(d, parseInt(m[1], 10), parseInt(m[2], 10), m[3].toLowerCase() === 'pm');
+}
+
+function parts(d: Date): { hour: number; minute: number; pm: boolean } {
+  const pm = d.getHours() >= 12;
+  let hour = d.getHours() % 12;
+  if (hour === 0) hour = 12;
+  const minute = ((Math.round(d.getMinutes() / 5) * 5) % 60 + 60) % 60;
+  return { hour, minute, pm };
+}
+
+function apply(base: Date, hour: number, minute: number, pm: boolean): Date {
+  const d = new Date(base);
+  let h = hour % 12;
+  if (pm) h += 12;
+  const snapped = ((Math.round(minute / 5) * 5) % 60 + 60) % 60;
+  d.setHours(h, snapped, 0, 0);
+  return d;
+}
+
+const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1));
+const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+
+/** Five-row wheel. The center row is selected; tapping another row moves it there. */
+function TimeWheel({ date, onChange }: { date: Date; onChange: (d: Date) => void }) {
+  const c = useC();
+  const { t } = useT();
+  const { hour, minute, pm } = parts(date);
+  const minuteLabel = String(minute).padStart(2, '0');
+  const am = t('time.am');
+  const pmLabel = t('time.pm');
+
+  const setHour = (label: string) => onChange(apply(date, parseInt(label, 10), minute, pm));
+  const setMinute = (label: string) => onChange(apply(date, hour, parseInt(label, 10), pm));
+  const setPeriod = (label: string) => onChange(apply(date, hour, minute, label === pmLabel));
+
   return (
-    <View style={{ gap: 6 }}>
-      <Text style={{ color: c.textTertiary, fontSize: 11, fontWeight: '700', letterSpacing: 0.8 }}>{label}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingRight: Space.lg }}>
-        {children}
-      </ScrollView>
+    <View style={styles.wheel}>
+      <View pointerEvents="none" style={[styles.selection, { backgroundColor: c.surface2 }]} />
+      <View style={styles.cols}>
+        <WheelColumn items={HOURS} selected={String(hour)} onSelect={setHour} />
+        <WheelColumn items={MINUTES} selected={minuteLabel} onSelect={setMinute} />
+        <WheelColumn items={[am, pmLabel]} selected={pm ? pmLabel : am} onSelect={setPeriod} />
+      </View>
     </View>
   );
 }
 
-function Chip({ label, active, onPress, grow }: { label: string; active: boolean; onPress: () => void; grow?: boolean }) {
+function WheelColumn({ items, selected, onSelect }: { items: string[]; selected: string; onSelect: (label: string) => void }) {
   const c = useC();
+  const index = Math.max(0, items.indexOf(selected));
+  const rows = [-2, -1, 0, 1, 2].map((offset) => {
+    const label = items[index + offset];
+    return { offset, label: label ?? '' };
+  });
   return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        styles.chip,
-        grow && { flex: 1, alignItems: 'center' },
-        active ? { backgroundColor: Brand.purple, borderColor: Brand.purple } : { backgroundColor: c.cardAlt, borderColor: c.border },
-      ]}>
-      <Text style={{ color: active ? '#fff' : c.text, fontWeight: '700', fontSize: 15 }}>{label}</Text>
-    </Pressable>
+    <View style={styles.col}>
+      {rows.map((row) =>
+        row.label ? (
+          <Pressable key={row.offset} onPress={() => onSelect(row.label)} style={styles.cell} accessibilityRole="button">
+            <Text
+              style={{
+                fontFamily: row.offset === 0 ? Fonts.bold : Fonts.medium,
+                fontSize: row.offset === 0 ? 22 : 18,
+                color: row.offset === 0 ? c.ink : c.ink3,
+              }}>
+              {row.label}
+            </Text>
+          </Pressable>
+        ) : (
+          <View key={row.offset} style={styles.cell} />
+        ),
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Space.lg, paddingVertical: Space.md, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(128,128,128,0.2)' },
-  preview: { fontSize: 30, fontWeight: '800', textAlign: 'center' },
-  chip: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 16, minWidth: 46, alignItems: 'center' },
-  clear: { borderWidth: 1, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center', marginTop: 2 },
+  head: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 8 },
+  wheel: { height: ROW * 5, justifyContent: 'center', marginVertical: 8 },
+  selection: { position: 'absolute', left: 0, right: 0, height: ROW, borderRadius: 12 },
+  cols: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  col: { width: 72, alignItems: 'center' },
+  cell: { height: ROW, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },
+  actions: { flexDirection: 'row', gap: 12, marginTop: 8 },
 });

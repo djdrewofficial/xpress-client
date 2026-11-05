@@ -56,6 +56,8 @@ export type SectionRow = {
   questionCount: number;
   answeredCount: number;
   songCount: number;
+  /** A song on this moment already has a note. */
+  hasNotes: boolean;
 };
 
 /** Whether a section shows on the couple's client Timeline view (honours the
@@ -73,6 +75,7 @@ export type Group = {
   title: string;
   icon: string | null;
   sections: SectionRow[];
+  intro: string | null;
   totalQuestions: number;
   answeredQuestions: number;
   songCount: number;
@@ -98,6 +101,8 @@ export type QuestionRow = {
   answer: string | null;
   condition_question_id: string | null;
   condition_values: string[];
+  /** When the answer row was last written. Absent until the couple answers. */
+  updated_at?: string | null;
 };
 
 export type SongRow = {
@@ -109,7 +114,34 @@ export type SongRow = {
   must_play: boolean;
   do_not_play: boolean;
   note: string | null;
+  provider?: string | null;
 };
+
+export type EventSong = SongRow & { section_id: string };
+
+function toSongRow(s: {
+  id: string;
+  title: string;
+  artist?: string | null;
+  artwork_url?: string | null;
+  preview_url?: string | null;
+  must_play?: boolean | null;
+  do_not_play?: boolean | null;
+  note?: string | null;
+  provider?: string | null;
+}): SongRow {
+  return {
+    id: s.id,
+    title: s.title,
+    artist: s.artist ?? null,
+    artwork_url: s.artwork_url ?? null,
+    preview_url: s.preview_url ?? null,
+    must_play: !!s.must_play,
+    do_not_play: !!s.do_not_play,
+    note: s.note ?? null,
+    provider: s.provider ?? null,
+  };
+}
 
 /** Events this client/guest can plan. */
 export async function getMyEvents(account: { clientId: string | null; eventGuestId: string | null }): Promise<EventLite[]> {
@@ -148,6 +180,8 @@ export type StaffEvent = {
   venue_id: string | null;
   package_id: string | null;
   clientName: string | null;
+  /** Assigned people, e.g. "DJ Drew · MC Alex". Null when the roster isn't available. */
+  staffLine: string | null;
   status: { name: string; color: string | null; textColor: string | null } | null;
 };
 
@@ -163,26 +197,37 @@ type StaffEventRow = {
   status: { name: string; color: string | null; text_color: string | null } | null;
 };
 
-/** Upcoming events a staff member can open. Admins/sales see all; plain employees
-    see only events they're assigned to (event_staff). No financials/contracts here. */
-export async function getStaffEvents(opts: { employeeId: string | null; seesAll: boolean }): Promise<StaffEvent[]> {
+/** Events a staff member can open. Admins/sales see all; plain employees see only
+    events they're assigned to (event_staff). `upcoming` includes undated events.
+    No financials/contracts here. */
+export async function getStaffEvents(opts: {
+  employeeId: string | null;
+  seesAll: boolean;
+  when?: 'upcoming' | 'past';
+}): Promise<StaffEvent[]> {
   const cols =
     'id, name, event_date, start_time, cover_photo_url, venue_id, package_id, client:clients(first_name, last_name), status:event_statuses(name, color, text_color)';
   const today = new Date().toISOString().slice(0, 10);
-  let query = supabase
-    .from('events')
-    .select(opts.seesAll ? cols : `${cols}, event_staff!inner(employee_id)`)
-    .is('archived_at', null)
-    .gte('event_date', today)
-    .order('event_date', { ascending: true });
-  if (!opts.seesAll) query = query.eq('event_staff.employee_id', opts.employeeId ?? '');
+  const when = opts.when ?? 'upcoming';
+  const select = opts.seesAll ? cols : `${cols}, event_staff!inner(employee_id)`;
 
-  const { data } = await query;
-  const rows = (data ?? []) as unknown as StaffEventRow[];
+  const run = (mode: 'upcoming' | 'past' | 'dated') => {
+    let query = supabase.from('events').select(select).is('archived_at', null);
+    if (!opts.seesAll) query = query.eq('event_staff.employee_id', opts.employeeId ?? '');
+    if (mode === 'past') query = query.lt('event_date', today).order('event_date', { ascending: false });
+    else if (mode === 'dated') query = query.gte('event_date', today).order('event_date', { ascending: true });
+    else query = query.or(`event_date.gte.${today},event_date.is.null`).order('event_date', { ascending: true });
+    return query;
+  };
+
+  const first = await run(when);
+  // If the upcoming OR-filter is rejected, dated events still load.
+  const result = first.error && when === 'upcoming' ? await run('dated') : first;
+  const rows = (result.data ?? []) as unknown as StaffEventRow[];
   const seen = new Set<string>();
   const out: StaffEvent[] = [];
   for (const r of rows) {
-    if (seen.has(r.id)) continue; // event_staff!inner can duplicate an event across roles
+    if (!r?.id || seen.has(r.id)) continue; // event_staff!inner can duplicate an event across roles
     seen.add(r.id);
     out.push({
       id: r.id,
@@ -193,10 +238,64 @@ export async function getStaffEvents(opts: { employeeId: string | null; seesAll:
       venue_id: r.venue_id,
       package_id: r.package_id,
       clientName: r.client ? [r.client.first_name, r.client.last_name].filter(Boolean).join(' ') || null : null,
+      staffLine: null,
       status: r.status ? { name: r.status.name, color: r.status.color, textColor: r.status.text_color } : null,
     });
   }
+  const staff = await loadEventStaff(out.map((event) => event.id));
+  for (const event of out) event.staffLine = staff.get(event.id) ?? null;
   return out;
+}
+
+/** Names and roles from event_staff. Empty map if that read isn't allowed. */
+async function loadEventStaff(eventIds: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, { role: string | null; name: string }[]>();
+  if (!eventIds.length) return new Map();
+  try {
+    for (let i = 0; i < eventIds.length; i += 80) {
+      const part = eventIds.slice(i, i + 80);
+      const { data, error } = await supabase
+        .from('event_staff')
+        .select('event_id, role, employee:employees(first_name, last_name)')
+        .in('event_id', part);
+      if (error || !data) continue;
+      for (const row of data as unknown as {
+        event_id: string;
+        role: string | null;
+        employee: { first_name: string | null; last_name: string | null } | { first_name: string | null; last_name: string | null }[] | null;
+      }[]) {
+        const employee = Array.isArray(row.employee) ? row.employee[0] : row.employee;
+        const name = [employee?.first_name, employee?.last_name].filter(Boolean).join(' ').trim();
+        const role = row.role?.trim() || null;
+        if (!name && !role) continue;
+        const list = map.get(row.event_id) ?? [];
+        list.push({ role, name });
+        map.set(row.event_id, list);
+      }
+    }
+  } catch {
+    return new Map();
+  }
+  const lines = new Map<string, string>();
+  for (const [eventId, people] of map) {
+    const line = formatStaffLine(people);
+    if (line) lines.set(eventId, line);
+  }
+  return lines;
+}
+
+function formatStaffLine(people: { role: string | null; name: string }[]): string | null {
+  const rank = (role: string | null) => {
+    const key = (role ?? '').toLowerCase();
+    if (key === 'dj') return 0;
+    if (key === 'mc') return 1;
+    return 2;
+  };
+  const parts = [...people]
+    .sort((a, b) => rank(a.role) - rank(b.role) || (a.role ?? '').localeCompare(b.role ?? ''))
+    .map((person) => (person.role && person.name ? `${person.role} ${person.name}` : person.name || person.role || ''))
+    .filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
 }
 
 /** Section list + progress for the home screen. */
@@ -205,7 +304,7 @@ export async function loadOverview(eventId: string): Promise<Overview> {
     supabase.from('planning_sections').select('*').eq('event_id', eventId).order('sort_order'),
     supabase.from('planning_questions').select('id, section_id').eq('event_id', eventId),
     supabase.from('planning_question_answers').select('question_id, answer').eq('event_id', eventId),
-    supabase.from('planning_songs').select('id, section_id').eq('event_id', eventId),
+    supabase.from('planning_songs').select('id, section_id, note').eq('event_id', eventId),
   ]);
 
   const answered = new Set((answers ?? []).filter((a) => (a.answer ?? '').trim() !== '').map((a) => a.question_id));
@@ -216,7 +315,11 @@ export async function loadOverview(eventId: string): Promise<Overview> {
     qBySection.set(q.section_id, list);
   }
   const songBySection = new Map<string, number>();
-  for (const s of songs ?? []) songBySection.set(s.section_id, (songBySection.get(s.section_id) ?? 0) + 1);
+  const notesBySection = new Set<string>();
+  for (const s of songs ?? []) {
+    songBySection.set(s.section_id, (songBySection.get(s.section_id) ?? 0) + 1);
+    if ((s.note ?? '').trim()) notesBySection.add(s.section_id);
+  }
 
   let totalQuestions = 0;
   let answeredQuestions = 0;
@@ -227,7 +330,7 @@ export async function loadOverview(eventId: string): Promise<Overview> {
 
   const ensureGroup = (): Group => {
     if (!current) {
-      current = { id: 'start', title: 'Your plan', icon: '✨', sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0, aiPicks: false };
+      current = { id: 'start', title: 'Your plan', icon: '✨', intro: null, sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0, aiPicks: false };
       groups.push(current);
     }
     return current;
@@ -240,7 +343,7 @@ export async function loadOverview(eventId: string): Promise<Overview> {
       continue;
     }
     if (s.section_type === 'headline') {
-      current = { id: s.id, title: s.title, icon: s.icon, sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0, aiPicks: false };
+      current = { id: s.id, title: s.title, icon: s.icon, intro: s.intro ?? null, sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0, aiPicks: false };
       groups.push(current);
       continue;
     }
@@ -252,6 +355,7 @@ export async function loadOverview(eventId: string): Promise<Overview> {
       questionCount: qs.length,
       answeredCount: ans,
       songCount,
+      hasNotes: notesBySection.has(s.id),
     };
     flat.push(row);
     totalQuestions += qs.length;
@@ -351,16 +455,16 @@ export const addSectionFromTemplate = (eventId: string, groupId: string, templat
 export const addCustomSection = (
   eventId: string,
   groupId: string,
-  custom: { title: string; notes?: string; songs?: NewSong[] },
+  custom: { title: string; notes?: string; icon?: string | null; songs?: NewSong[] },
 ): Promise<boolean> => sectionAction({ action: 'add', eventId, groupId, custom });
 
 export async function loadSection(eventId: string, sectionId: string): Promise<{ questions: QuestionRow[]; songs: SongRow[] }> {
   const [{ data: questions }, { data: answers }, { data: songs }] = await Promise.all([
     supabase.from('planning_questions').select('*').eq('section_id', sectionId).order('sort_order'),
-    supabase.from('planning_question_answers').select('question_id, answer').eq('event_id', eventId),
+    supabase.from('planning_question_answers').select('question_id, answer, updated_at').eq('event_id', eventId),
     supabase.from('planning_songs').select('*').eq('section_id', sectionId).order('sort_order'),
   ]);
-  const ansMap = new Map((answers ?? []).map((a) => [a.question_id, a.answer]));
+  const ansMap = new Map((answers ?? []).map((a) => [a.question_id, a]));
   return {
     questions: (questions ?? []).map((q) => ({
       id: q.id,
@@ -368,21 +472,23 @@ export async function loadSection(eventId: string, sectionId: string): Promise<{
       help_text: q.help_text,
       answer_type: q.answer_type,
       options: Array.isArray(q.options) ? q.options : [],
-      answer: ansMap.get(q.id) ?? null,
+      answer: ansMap.get(q.id)?.answer ?? null,
       condition_question_id: q.condition_question_id ?? null,
       condition_values: Array.isArray(q.condition_values) ? q.condition_values : [],
+      updated_at: ansMap.get(q.id)?.updated_at ?? null,
     })),
-    songs: (songs ?? []).map((s) => ({
-      id: s.id,
-      title: s.title,
-      artist: s.artist ?? null,
-      artwork_url: s.artwork_url ?? null,
-      preview_url: s.preview_url ?? null,
-      must_play: !!s.must_play,
-      do_not_play: !!s.do_not_play,
-      note: s.note ?? null,
-    })),
+    songs: (songs ?? []).map((s) => toSongRow(s)),
   };
+}
+
+/** Every song on the event, in playlist order. Powers the Music record. */
+export async function loadEventSongs(eventId: string): Promise<EventSong[]> {
+  const { data } = await supabase
+    .from('planning_songs')
+    .select('id, section_id, title, artist, artwork_url, preview_url, must_play, do_not_play, note, provider, sort_order')
+    .eq('event_id', eventId)
+    .order('sort_order');
+  return (data ?? []).map((s) => ({ ...toSongRow(s), section_id: s.section_id }));
 }
 
 /** Toggle "must play" (clears "do not play" when on). Returns false if the write
@@ -458,16 +564,7 @@ export async function addSong(
     .single();
   if (error) throw error;
   if (!data) return null;
-  return {
-    id: data.id,
-    title: data.title,
-    artist: data.artist ?? null,
-    artwork_url: data.artwork_url ?? null,
-    preview_url: data.preview_url ?? null,
-    must_play: !!data.must_play,
-    do_not_play: !!data.do_not_play,
-    note: data.note ?? null,
-  };
+  return toSongRow(data);
 }
 
 export function questionVisible(q: QuestionRow, answers: Record<string, string>): boolean {

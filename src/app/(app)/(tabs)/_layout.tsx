@@ -1,18 +1,39 @@
 import { Redirect, Tabs } from 'expo-router';
-import { StyleSheet, Text, useColorScheme } from 'react-native';
-import { BlurView } from 'expo-blur';
+import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
-import { Brand } from '@/lib/theme';
-import { useC } from '@/components/ui';
+import { TabBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
 
-// Plan is the home base — land there by default even though it sits in the center.
+// Home is the landing tab. Route groups stay put so /timeline, /music, /you, and /group/[id] deep links don't move.
 export const unstable_settings = { initialRouteName: '(plan)' };
 
+const TAB_KEY: Record<string, string> = {
+  '(plan)': 'home',
+  timeline: 'timeline',
+  music: 'music',
+  you: 'my-event',
+};
+
+function PlannerTabBar({ state, navigation }: BottomTabBarProps) {
+  const route = state.routes[state.index];
+  const active = TAB_KEY[route?.name] ?? 'home';
+  return (
+    <TabBar
+      active={active}
+      onChange={(key) => {
+        const name = Object.keys(TAB_KEY).find((k) => TAB_KEY[k] === key);
+        if (!name) return;
+        const target = state.routes.find((r) => r.name === name);
+        if (!target) return;
+        const event = navigation.emit({ type: 'tabPress', target: target.key, canPreventDefault: true });
+        if (!event.defaultPrevented) navigation.navigate(target.name, target.params);
+      }}
+    />
+  );
+}
+
 export default function TabsLayout() {
-  const c = useC();
-  const scheme = useColorScheme();
   const { profile } = useAuth();
   const { eventId, loading } = useEvent();
 
@@ -21,34 +42,16 @@ export default function TabsLayout() {
   if (profile?.accountType === 'staff' && !loading && !eventId) {
     return <Redirect href="/events" />;
   }
-  const icon = (glyph: string) =>
-    function TabIcon({ focused }: { focused: boolean }) {
-      return <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>{glyph}</Text>;
-    };
 
   return (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: Brand.purple,
-        tabBarInactiveTintColor: c.textTertiary,
-        // Liquid glass: a floating, frosted bar that content scrolls beneath.
-        tabBarStyle: {
-          position: 'absolute',
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: c.border,
-          backgroundColor: 'transparent',
-          elevation: 0,
-        },
-        tabBarBackground: () => (
-          <BlurView intensity={60} tint={scheme === 'dark' ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
-        ),
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
-      }}>
-      <Tabs.Screen name="music" options={{ title: 'Music', tabBarIcon: icon('🎵') }} />
-      <Tabs.Screen name="(plan)" options={{ title: 'Plan', tabBarIcon: icon('📋') }} />
-      <Tabs.Screen name="timeline" options={{ title: 'Timeline', tabBarIcon: icon('🗓️') }} />
-      <Tabs.Screen name="you" options={{ title: 'My Event', tabBarIcon: icon('💍') }} />
+      safeAreaInsets={{ bottom: 0 }}
+      tabBar={(props) => <PlannerTabBar {...props} />}
+      screenOptions={{ headerShown: false }}>
+      <Tabs.Screen name="(plan)" options={{ title: 'Home' }} />
+      <Tabs.Screen name="timeline" options={{ title: 'Timeline' }} />
+      <Tabs.Screen name="music" options={{ title: 'Music' }} />
+      <Tabs.Screen name="you" options={{ title: 'My Event' }} />
     </Tabs>
   );
 }

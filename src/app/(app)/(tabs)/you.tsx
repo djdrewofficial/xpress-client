@@ -1,273 +1,442 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
-import { useC } from '@/components/ui';
-import { Backdrop } from '@/components/Backdrop';
-import { AppHeader } from '@/components/AppHeader';
+import { DeleteAccountSheet, InviteSentSheet } from '@/components/AccountSheets';
 import { InvitePersonSheet } from '@/components/InvitePersonSheet';
-import { Brand, Fonts, Radius, Shadow, Space } from '@/lib/theme';
-import { useAuth, staffSeesFinancials } from '@/lib/auth';
+import { EventSwitcher } from '@/components/EventSwitcher';
+import {
+  MyEventView,
+  type MyEventFinancials,
+} from '@/components/MyEventView';
+import { Sheet, useC } from '@/components/ui';
+import {
+  decorateSchedule,
+  formatEyebrow,
+  formatMediumDate,
+  formatMoney,
+  hiddenFinancialsBanner,
+  initials,
+  nextPaymentLine,
+  teamActions,
+} from '@/components/eventDisplay';
+import { Type } from '@/lib/theme';
+import { staffSeesFinancials, useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
-import { loadAccount, deleteAccount, money, OFFICE_PHONE, OFFICE_EMAIL_FALLBACK, type AccountData } from '@/lib/account';
+import {
+  deleteAccount,
+  loadAccount,
+  OFFICE_EMAIL_FALLBACK,
+  OFFICE_PHONE,
+  type AccountData,
+} from '@/lib/account';
+import { readMarketingTexts, writeMarketingTexts } from '@/lib/language';
+import { translate, useT, type Locale } from '@/lib/i18n';
+import { supabase } from '@/lib/supabase';
 
-const SUPPORT_EMAIL = 'Events@xpressdjs.com';
 const PRIVACY_URL = 'https://xos.xpressdjs.com/app-privacy';
-
-const fmtDate = (d: string | null) => (d ? new Date(d + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : null);
 
 export default function AccountScreen() {
   const c = useC();
+  const router = useRouter();
   const { profile, session, signOut } = useAuth();
-  const { event, loading: eventLoading } = useEvent();
+  const { event, events, loading: eventLoading } = useEvent();
   const eventId = event?.id ?? null;
+
   const [data, setData] = useState<AccountData | null>(null);
-  const [showInvite, setShowInvite] = useState(false);
+  const [venueName, setVenueName] = useState<string | null>(null);
+  const [coupleName, setCoupleName] = useState<string | null>(null);
+  const [guestRole, setGuestRole] = useState('Guest');
+  const [team, setTeam] = useState<{ name: string; detail: string } | null>(null);
+  const [accountName, setAccountName] = useState(profile?.firstName || 'Your account');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const { locale, setLocale, t } = useT();
+  const [marketing, setMarketing] = useState(false);
 
-  const confirmDelete = useCallback(() => {
-    Alert.alert(
-      'Delete your account?',
-      `This permanently deletes your login and removes your access to this event. ` +
-        `To use the app again you'll need a new invite — email ${SUPPORT_EMAIL}.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete account',
-          style: 'destructive',
-          onPress: async () => {
-            setDeleting(true);
-            const ok = await deleteAccount();
-            setDeleting(false);
-            if (!ok) {
-              Alert.alert('Something went wrong', `We couldn't delete your account. Please try again, or email ${SUPPORT_EMAIL}.`);
-              return;
-            }
-            Alert.alert(
-              'Account deleted',
-              `Your account has been deleted. To return, email ${SUPPORT_EMAIL} for a new invite.`,
-              [{ text: 'OK', onPress: () => signOut() }],
-            );
-          },
-        },
-      ],
-    );
-  }, [signOut]);
+  const [showInvite, setShowInvite] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [switcher, setSwitcher] = useState(false);
+  const [packageOpen, setPackageOpen] = useState(false);
+  const [disclosure, setDisclosure] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletePhase, setDeletePhase] = useState<'confirm' | 'working' | 'done' | 'error'>('confirm');
+
+  useEffect(() => {
+    readMarketingTexts().then(setMarketing);
+  }, []);
 
   const load = useCallback(async () => {
     if (!profile) return;
     const isGuest = profile.accountType === 'event_guest';
-    // Plain staff employees never see financials/contracts on mobile.
     const canSeeFinancials = profile.accountType === 'staff' ? staffSeesFinancials(profile) : true;
-    setData(event ? await loadAccount(event.id, isGuest, canSeeFinancials) : null);
-    setLoading(false);
-  }, [profile, event]);
-  useEffect(() => { load(); }, [load]);
-  const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+    try {
+      const account = event ? await loadAccount(event.id, isGuest, canSeeFinancials) : null;
+      const [venue, couple, role, person, name] = await Promise.all([
+        event ? loadVenueName(event.venue_id) : Promise.resolve(null),
+        event ? loadCoupleName(event.id, event.name) : Promise.resolve(null),
+        isGuest && profile.eventGuestId ? loadGuestRole(profile.eventGuestId) : Promise.resolve('Guest'),
+        event ? loadTeamPerson(event.id, account?.companyName ?? null, locale) : Promise.resolve(null),
+        loadAccountName(profile, locale),
+      ]);
+      setData(account);
+      setVenueName(venue);
+      setCoupleName(couple);
+      setGuestRole(role);
+      setTeam(person);
+      setAccountName(name);
+    } finally {
+      setLoading(false);
+    }
+  }, [profile, event, locale]);
 
-  if (loading || eventLoading) return <View style={[styles.center, { backgroundColor: c.bg }]}><ActivityIndicator color={Brand.purple} /></View>;
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const officeEmail = data?.officeEmail ?? OFFICE_EMAIL_FALLBACK;
-  const officePhone = OFFICE_PHONE.replace(/[^\d+]/g, '');
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
+  const onMarketing = useCallback((on: boolean) => {
+    setMarketing(on);
+    writeMarketingTexts(on).catch(() => {});
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    setDeletePhase('working');
+    const ok = await deleteAccount();
+    setDeletePhase(ok ? 'done' : 'error');
+  }, []);
+
+  const isStaff = profile?.accountType === 'staff';
+  const emailAddress = (data?.officeEmail?.trim() || OFFICE_EMAIL_FALLBACK).trim();
+  const actions = teamActions(OFFICE_PHONE, emailAddress);
+  const phone = OFFICE_PHONE.replace(/[^\d+]/g, '');
+
+  const financials: MyEventFinancials | null = data?.financialsVisible
+    ? buildFinancials(data, locale)
+    : null;
+  const hiddenReason = !data || data.financialsVisible
+    ? null
+    : profile?.accountType === 'event_guest'
+      ? 'guest'
+      : profile?.accountType === 'staff' && !staffSeesFinancials(profile)
+        ? 'role'
+        : 'event';
 
   return (
-    <View style={{ flex: 1 }}>
-      <Backdrop />
-      <AppHeader />
-      <View style={{ flex: 1 }}>
-        <ScrollView
-          contentContainerStyle={{ padding: Space.lg, gap: Space.lg, paddingBottom: Space.xxl * 3 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Brand.purple} />}>
-          <Text style={[styles.title, { color: c.text }]}>My Event</Text>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <MyEventView
+        loading={loading || eventLoading}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        eyebrow={event ? formatEyebrow(event.name, event.event_date, locale) : null}
+        onBack={
+          isStaff
+            ? () => {
+                if (router.canGoBack()) router.back();
+                else router.push('/events');
+              }
+            : undefined
+        }
+        onSwitch={events.length > 1 ? () => setSwitcher(true) : undefined}
+        hasEvent={!!event && !!data}
+        financials={financials}
+        banner={hiddenReason ? hiddenFinancialsBanner(hiddenReason, locale) : null}
+        guest={
+          profile?.accountType === 'event_guest' && event
+            ? { role: guestRole === 'Guest' || !guestRole ? t('common.guest') : guestRole, invitedBy: coupleName || event.name }
+            : null
+        }
+        eventFacts={
+          data && !data.financialsVisible
+            ? { dateLabel: formatMediumDate(event?.event_date, locale) ?? t('common.dateTbd'), venue: venueName }
+            : null
+        }
+        packageInfo={
+          data
+            ? {
+                name: data.packageName ?? t('event.customPackage'),
+                detail:
+                  data.packageDescription?.trim() ||
+                  (data.includedHours ? t('event.hours', { count: data.includedHours }) : null),
+              }
+            : null
+        }
+        onPackage={() => setPackageOpen(true)}
+        team={
+          team
+            ? {
+                initials: initials(team.name),
+                name: team.name,
+                detail: team.detail,
+                showCall: actions.call,
+                showText: actions.text,
+                showEmail: actions.email,
+              }
+            : null
+        }
+        onCall={() => Linking.openURL(`tel:${phone}`)}
+        onText={() => Linking.openURL(`sms:${phone}`)}
+        onEmail={() => Linking.openURL(`mailto:${emailAddress}`)}
+        showInvite={profile?.accountType === 'client' && !!eventId}
+        onInvite={() => setShowInvite(true)}
+        accountName={accountName}
+        accountEmail={session?.user.email ?? null}
+        onPrivacy={() => Linking.openURL(PRIVACY_URL)}
+        onDisclosure={() => setDisclosure(true)}
+        onSignOut={() => signOut()}
+        onDelete={() => {
+          setDeletePhase('confirm');
+          setDeleteOpen(true);
+        }}
+        deleting={deletePhase === 'working'}
+        language={locale}
+        onLanguage={setLocale}
+        marketing={marketing}
+        onMarketing={onMarketing}
+      />
 
-          {!data ? (
-            <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
-              <Text style={{ color: c.textSecondary }}>Your event details will appear here once your booking is set up.</Text>
-            </View>
-          ) : (
-            <>
-              {/* Package */}
-              <View style={[styles.card, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
-                <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR PACKAGE</Text>
-                <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', marginTop: 4 }}>{data.packageName ?? 'Custom Package'}</Text>
-                {data.includedHours ? <Text style={{ color: Brand.purpleLight, fontSize: 13, fontWeight: '700', marginTop: 2 }}>{data.includedHours} hours of entertainment</Text> : null}
-                {data.packageDescription ? <Text style={{ color: c.textSecondary, fontSize: 14, lineHeight: 20, marginTop: Space.sm }}>{data.packageDescription}</Text> : null}
-
-                {data.addons.length > 0 && (
-                  <View style={{ marginTop: Space.md, gap: Space.sm }}>
-                    <Text style={[styles.lab, { color: c.textTertiary }]}>WHAT'S INCLUDED</Text>
-                    {data.addons.map((a, i) => (
-                      <View key={i} style={styles.lineRow}>
-                        <Text style={{ color: c.text, fontSize: 14, flex: 1 }}>{a.qty > 1 ? `${a.qty}× ` : ''}{a.name}</Text>
-                        {data.financialsVisible ? <Text style={{ color: c.textSecondary, fontSize: 14 }}>{money(a.price)}</Text> : null}
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-
-              {/* Investment & payments — hidden per event/type, and always for guests */}
-              {data.financialsVisible && (
-              <View style={[styles.card, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
-                <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR INVESTMENT</Text>
-                <View style={{ marginTop: Space.sm, gap: 6 }}>
-                  <Line label="Package" value={money(data.packagePrice)} c={c} />
-                  {data.addons.length > 0 && <Line label="Add-ons" value={money(data.addons.reduce((s, a) => s + a.price, 0))} c={c} />}
-                  {data.travelFee > 0 && <Line label="Travel" value={money(data.travelFee)} c={c} />}
-                  {data.overtimeFee > 0 && <Line label="Overtime" value={money(data.overtimeFee)} c={c} />}
-                  {data.discounts.map((d, i) => <Line key={i} label={d.label} value={`– ${money(d.amount)}`} c={c} accent="#22c55e" />)}
-                </View>
-
-                <View style={[styles.totalsRow, { borderColor: c.border }]}>
-                  <Stat label="Total" value={money(data.total)} c={c} />
-                  <Stat label="Paid" value={money(data.paid)} c={c} color="#22c55e" />
-                  <Stat label="Balance" value={money(data.balance)} c={c} color={data.balance > 0 ? Brand.purpleLight : '#22c55e'} />
-                </View>
-
-                {data.schedule.length > 0 && (
-                  <View style={{ marginTop: Space.md, gap: Space.sm }}>
-                    <Text style={[styles.lab, { color: c.textTertiary }]}>PAYMENT SCHEDULE</Text>
-                    {data.schedule.map((s) => (
-                      <View key={s.id} style={styles.lineRow}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ color: c.text, fontSize: 14 }}>{s.label || `Payment ${s.seq}`}</Text>
-                          {s.dueDate ? <Text style={{ color: c.textTertiary, fontSize: 12 }}>Due {fmtDate(s.dueDate)}</Text> : null}
-                        </View>
-                        <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{money(s.amount)}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                {data.payments.length > 0 && (
-                  <View style={{ marginTop: Space.md, gap: Space.sm }}>
-                    <Text style={[styles.lab, { color: c.textTertiary }]}>PAYMENTS MADE</Text>
-                    {data.payments.map((p) => (
-                      <View key={p.id} style={styles.lineRow}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ color: c.text, fontSize: 14 }}>{p.reason || p.method || 'Payment'}</Text>
-                          <Text style={{ color: c.textTertiary, fontSize: 12 }}>{fmtDate(p.paidAt ? p.paidAt.slice(0, 10) : null) ?? 'Recorded'}{p.pending ? ' · Pending' : ''}</Text>
-                        </View>
-                        <Text style={{ color: p.pending ? c.textTertiary : '#22c55e', fontSize: 14, fontWeight: '600' }}>{money(p.amount)}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                {data.billingTerms ? <Text style={{ color: c.textTertiary, fontSize: 12, marginTop: Space.md, lineHeight: 17 }}>{data.billingTerms}</Text> : null}
-              </View>
-              )}
-
-              {/* Contact the office */}
-              <View style={[styles.card, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
-                <Text style={[styles.lab, { color: c.textTertiary }]}>QUESTIONS?</Text>
-                <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginTop: 4 }}>{data.companyName || 'Xpress Entertainment'}</Text>
-                <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 2, marginBottom: Space.md }}>Our team is here to help with anything about your event.</Text>
-                <View style={{ flexDirection: 'row', gap: Space.sm }}>
-                  {officePhone ? (
-                    <>
-                      <Pressable onPress={() => Linking.openURL(`tel:${officePhone}`)} style={[styles.contactBtn, { backgroundColor: c.cardAlt, borderColor: c.border, flex: 1 }]}>
-                        <Text style={{ color: Brand.purpleLight, fontWeight: '700', fontSize: 14 }}>Call</Text>
-                      </Pressable>
-                      <Pressable onPress={() => Linking.openURL(`sms:${officePhone}`)} style={[styles.contactBtn, { backgroundColor: c.cardAlt, borderColor: c.border, flex: 1 }]}>
-                        <Text style={{ color: Brand.purpleLight, fontWeight: '700', fontSize: 14 }}>Text</Text>
-                      </Pressable>
-                    </>
-                  ) : null}
-                  <Pressable onPress={() => Linking.openURL(`mailto:${officeEmail}`)} style={{ flex: officePhone ? 1 : undefined, width: officePhone ? undefined : '100%' }}>
-                    <LinearGradient colors={[Brand.purple, Brand.purpleLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bigBtn}>
-                      <Text style={styles.bigBtnTxt}>Email</Text>
-                    </LinearGradient>
-                  </Pressable>
-                </View>
-              </View>
-
-              {/* Invite your people — couples only (guests can't invite others) */}
-              {profile?.accountType === 'client' && eventId && (
-                <View style={[styles.card, Shadow.card, { backgroundColor: c.card, borderColor: c.border }]}>
-                  <Text style={[styles.lab, { color: c.textTertiary }]}>YOUR PEOPLE</Text>
-                  <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginTop: 4 }}>Invite a partner or planner</Text>
-                  <Text style={{ color: c.textSecondary, fontSize: 13, marginTop: 2, marginBottom: Space.md }}>
-                    Want help planning? Give your partner or wedding planner their own login to plan alongside you.
-                  </Text>
-                  <Pressable onPress={() => setShowInvite(true)} style={{ width: '100%' }}>
-                    <LinearGradient colors={[Brand.purple, Brand.purpleLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bigBtn}>
-                      <Text style={styles.bigBtnTxt}>＋ Invite someone</Text>
-                    </LinearGradient>
-                  </Pressable>
-                </View>
-              )}
-
-              <Pressable onPress={signOut} style={[styles.signOut, { borderColor: c.border }]}>
-                <Text style={{ color: c.textSecondary, fontWeight: '600' }}>Sign out</Text>
-              </Pressable>
-              <Text style={{ color: c.textTertiary, fontSize: 12, textAlign: 'center' }}>{profile?.firstName ? `${profile.firstName} · ` : ''}{session?.user.email}</Text>
-
-              {/* Legal footer: AI disclosure (Guideline 5.1.2) + privacy policy link (5.1.1). */}
-              <View style={{ marginTop: Space.md, gap: Space.sm, alignItems: 'center' }}>
-                <Text style={{ color: c.textTertiary, fontSize: 11, lineHeight: 16, textAlign: 'center', paddingHorizontal: Space.md }}>
-                  ✨ &ldquo;For You&rdquo; song suggestions are AI-generated. To create them, the event details and music
-                  preferences you enter are sent to OpenAI to build recommendations. This information is never used for
-                  advertising.
-                </Text>
-                <Pressable onPress={() => Linking.openURL(PRIVACY_URL)} hitSlop={8}>
-                  <Text style={{ color: Brand.purpleLight, fontSize: 13, fontWeight: '700' }}>Privacy Policy</Text>
-                </Pressable>
-              </View>
-
-              {/* App Store 5.1.1(v): self-serve account deletion, all the way at the bottom. */}
-              <Pressable onPress={confirmDelete} disabled={deleting} hitSlop={8} style={styles.deleteBtn}>
-                {deleting ? (
-                  <ActivityIndicator color="#c0392b" />
-                ) : (
-                  <Text style={{ color: '#c0392b', fontWeight: '600', fontSize: 13 }}>Delete account</Text>
-                )}
-              </Pressable>
-            </>
-          )}
-        </ScrollView>
-      </View>
-      {eventId && (
+      {events.length > 1 ? <EventSwitcher visible={switcher} onClose={() => setSwitcher(false)} /> : null}
+      {eventId ? (
         <InvitePersonSheet
           visible={showInvite}
           eventId={eventId}
           onClose={() => setShowInvite(false)}
+          onSent={(address) => setSentTo(address)}
         />
-      )}
+      ) : null}
+      <InviteSentSheet visible={!!sentTo} email={sentTo ?? ''} onClose={() => setSentTo(null)} />
+      <DeleteAccountSheet
+        visible={deleteOpen}
+        phase={deletePhase}
+        onClose={() => {
+          if (deletePhase === 'working') return;
+          setDeleteOpen(false);
+        }}
+        onConfirm={confirmDelete}
+        onDone={() => {
+          setDeleteOpen(false);
+          signOut();
+        }}
+      />
+      <Sheet visible={disclosure} onClose={() => setDisclosure(false)} title={t('event.ai')}>
+        <Text style={[Type.footnote, { color: c.ink2 }]}>{t('event.aiBody')}</Text>
+      </Sheet>
+      <Sheet visible={packageOpen} onClose={() => setPackageOpen(false)} title={data?.packageName ?? t('event.package')}>
+        {data ? <PackageDetails data={data} /> : null}
+      </Sheet>
     </View>
   );
 }
 
-function Line({ label, value, c, accent }: { label: string; value: string; c: ReturnType<typeof useC>; accent?: string }) {
+function buildFinancials(data: AccountData, locale: Locale): MyEventFinancials {
+  const schedule = decorateSchedule(data.schedule, data.payments);
+  const pendingTotal = data.payments.filter((p) => p.pending).reduce((sum, p) => sum + p.amount, 0);
+  const progress = data.total > 0 ? Math.max(0, Math.min(100, (data.paid / data.total) * 100)) : 0;
+  const money = (n: number) => formatMoney(n, locale);
+  return {
+    balance: money(Math.max(0, data.balance)),
+    nextLine: nextPaymentLine(schedule, data.balance, locale),
+    paidLabel: translate(locale, 'event.paidOf', { amount: money(data.paid) }),
+    ofLabel: translate(locale, 'event.ofTotal', { amount: money(data.total) }),
+    progress,
+    schedule: schedule.map((item) => {
+      const paidWhen = formatMediumDate(item.paidAt, locale);
+      const dueWhen = formatMediumDate(item.dueDate, locale);
+      return {
+        id: item.id,
+        seqLabel: item.seqLabel,
+        title: item.label?.trim() || translate(locale, 'event.paymentN', { n: item.seqLabel }),
+        detail: item.paid
+          ? (paidWhen ? translate(locale, 'event.paidOn', { when: paidWhen }) : translate(locale, 'event.paid'))
+          : (dueWhen ? translate(locale, 'event.dueOn', { when: dueWhen }) : translate(locale, 'event.due')),
+        paid: item.paid,
+        amount: money(item.amount),
+      };
+    }),
+    footnote: data.billingTerms,
+    pendingNote:
+      pendingTotal > 0
+        ? translate(locale, 'event.pendingNote', { amount: money(pendingTotal) })
+        : null,
+  };
+}
+
+function PackageDetails({ data }: { data: AccountData }) {
+  const c = useC();
+  const { t, locale } = useT();
+  const money = (n: number) => formatMoney(n, locale);
+  const addonsTotal = data.addons.reduce((sum, a) => sum + a.price, 0);
   return (
-    <View style={styles.lineRow}>
-      <Text style={{ color: c.textSecondary, fontSize: 14 }}>{label}</Text>
-      <Text style={{ color: accent ?? c.text, fontSize: 14 }}>{value}</Text>
+    <ScrollView style={{ maxHeight: 460 }} contentContainerStyle={{ gap: 12, paddingBottom: 8 }}>
+      {data.includedHours ? (
+        <Text style={[Type.footnote, { color: c.accent }]}>{t('event.hours', { count: data.includedHours })}</Text>
+      ) : null}
+      {data.packageDescription ? (
+        <Text style={[Type.footnote, { color: c.ink2 }]}>{data.packageDescription}</Text>
+      ) : null}
+      {data.addons.length > 0 ? (
+        <View style={{ gap: 8 }}>
+          <Text style={[Type.label, { color: c.ink3 }]}>{t('event.included')}</Text>
+          {data.addons.map((addon, index) => (
+            <Line
+              key={`${addon.name}-${index}`}
+              label={`${addon.qty > 1 ? `${addon.qty}× ` : ''}${addon.name}`}
+              value={data.financialsVisible ? money(addon.price) : ''}
+            />
+          ))}
+        </View>
+      ) : null}
+      {data.financialsVisible ? (
+        <View style={{ gap: 8 }}>
+          <Text style={[Type.label, { color: c.ink3 }]}>{t('event.investment')}</Text>
+          <Line label={t('event.packageLine')} value={money(data.packagePrice)} />
+          {addonsTotal > 0 ? <Line label={t('event.addons')} value={money(addonsTotal)} /> : null}
+          {data.travelFee > 0 ? <Line label={t('event.travel')} value={money(data.travelFee)} /> : null}
+          {data.overtimeFee > 0 ? <Line label={t('event.overtime')} value={money(data.overtimeFee)} /> : null}
+          {data.discounts.map((discount, index) => (
+            <Line key={`${discount.label}-${index}`} label={discount.label} value={`– ${money(discount.amount)}`} accent={c.success} />
+          ))}
+          <Line label={t('event.total')} value={money(data.total)} />
+          <Line label={t('event.paid')} value={money(data.paid)} accent={c.success} />
+          <Line label={t('event.balanceLine')} value={money(data.balance)} />
+        </View>
+      ) : null}
+      {data.financialsVisible && data.payments.length > 0 ? (
+        <View style={{ gap: 8 }}>
+          <Text style={[Type.label, { color: c.ink3 }]}>{t('event.paymentsMade')}</Text>
+          {data.payments.map((payment) => (
+            <Line
+              key={payment.id}
+              label={`${payment.reason || payment.method || t('event.payment')}${payment.pending ? ` · ${t('event.pending')}` : ''}`}
+              value={money(payment.amount)}
+              hint={formatMediumDate(payment.paidAt ? payment.paidAt.slice(0, 10) : null, locale) ?? undefined}
+            />
+          ))}
+        </View>
+      ) : null}
+    </ScrollView>
+  );
+}
+
+function Line({ label, value, hint, accent }: { label: string; value: string; hint?: string; accent?: string }) {
+  const c = useC();
+  return (
+    <View style={styles.line}>
+      <View style={{ flex: 1 }}>
+        <Text style={[Type.footnote, { color: c.ink2 }]}>{label}</Text>
+        {hint ? <Text style={[Type.footnote, { color: c.ink3 }]}>{hint}</Text> : null}
+      </View>
+      {value ? <Text style={[Type.callout, { color: accent ?? c.ink }]}>{value}</Text> : null}
     </View>
   );
 }
 
-function Stat({ label, value, c, color }: { label: string; value: string; c: ReturnType<typeof useC>; color?: string }) {
-  return (
-    <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={{ color: c.textTertiary, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>{label.toUpperCase()}</Text>
-      <Text style={{ color: color ?? c.text, fontSize: 17, fontWeight: '800', marginTop: 3 }}>{value}</Text>
-    </View>
-  );
+async function loadVenueName(venueId: string | null | undefined): Promise<string | null> {
+  if (!venueId) return null;
+  try {
+    const byName = await supabase.from('venues').select('name').eq('id', venueId).maybeSingle();
+    if (!byName.error) {
+      const name = (byName.data as { name?: string | null } | null)?.name?.trim();
+      return name || null;
+    }
+    const alt = await supabase.from('venues').select('venue_name').eq('id', venueId).maybeSingle();
+    if (!alt.error) {
+      const name = (alt.data as { venue_name?: string | null } | null)?.venue_name?.trim();
+      return name || null;
+    }
+  } catch {
+    /* venue is optional */
+  }
+  return null;
+}
+
+async function loadCoupleName(eventId: string, fallback: string | null): Promise<string | null> {
+  try {
+    const { data: ev } = await supabase.from('events').select('client_id, name').eq('id', eventId).maybeSingle();
+    const clientId = (ev as { client_id?: string | null; name?: string | null } | null)?.client_id;
+    if (clientId) {
+      const { data: client, error } = await supabase
+        .from('clients')
+        .select('first_name, last_name')
+        .eq('id', clientId)
+        .maybeSingle();
+      if (!error && client) {
+        const name = [client.first_name, client.last_name].filter(Boolean).join(' ');
+        if (name) return name;
+      }
+    }
+    return (ev as { name?: string | null } | null)?.name ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function loadGuestRole(guestId: string): Promise<string> {
+  try {
+    const { data, error } = await supabase.from('event_guests').select('relationship').eq('id', guestId).maybeSingle();
+    if (error || !data) return 'Guest';
+    const relationship = (data as { relationship?: string | null }).relationship?.trim();
+    return relationship || 'Guest';
+  } catch {
+    return 'Guest';
+  }
+}
+
+async function loadTeamPerson(eventId: string, companyName: string | null, locale: Locale): Promise<{ name: string; detail: string }> {
+  const company = companyName?.trim() || 'Xpress Entertainment';
+  const fallback = { name: company, detail: translate(locale, 'event.teamFallback') };
+  try {
+    const { data, error } = await supabase
+      .from('event_staff')
+      .select('role, employee:employees(first_name, last_name)')
+      .eq('event_id', eventId);
+    if (error || !data?.length) return fallback;
+    const rows = (data as unknown as {
+      role: string | null;
+      employee:
+        | { first_name: string | null; last_name: string | null }
+        | { first_name: string | null; last_name: string | null }[]
+        | null;
+    }[]).map((row) => ({
+      role: row.role,
+      employee: Array.isArray(row.employee) ? row.employee[0] ?? null : row.employee,
+    }));
+    const dj = rows.find((row) => /dj|mc|entertain/i.test(row.role ?? '')) ?? rows[0];
+    const name = [dj.employee?.first_name, dj.employee?.last_name].filter(Boolean).join(' ') || company;
+    const role = dj.role?.trim() || translate(locale, 'event.djFallback');
+    return { name, detail: `${role} · ${company}` };
+  } catch {
+    return fallback;
+  }
+}
+
+async function loadAccountName(profile: {
+  firstName: string;
+  clientId: string | null;
+  eventGuestId: string | null;
+  employeeId: string | null;
+}, locale: Locale): Promise<string> {
+  try {
+    const table = profile.clientId ? 'clients' : profile.eventGuestId ? 'event_guests' : profile.employeeId ? 'employees' : null;
+    const id = profile.clientId ?? profile.eventGuestId ?? profile.employeeId;
+    if (table && id) {
+      const { data, error } = await supabase.from(table).select('first_name, last_name').eq('id', id).maybeSingle();
+      if (!error && data) {
+        const name = [data.first_name, data.last_name].filter(Boolean).join(' ');
+        if (name) return name;
+      }
+    }
+  } catch {
+    /* the profile first name is enough */
+  }
+  return profile.firstName || translate(locale, 'event.yourAccount');
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 30, fontFamily: Fonts.display },
-  card: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: Space.lg },
-  lab: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  lineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.md },
-  totalsRow: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, marginTop: Space.md, paddingTop: Space.md },
-  contactBtn: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 8, paddingHorizontal: 18 },
-  bigBtn: { borderRadius: Radius.md, paddingVertical: 13, alignItems: 'center' },
-  bigBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  signOut: { borderWidth: 1, borderRadius: Radius.md, paddingVertical: 13, alignItems: 'center' },
-  deleteBtn: { alignItems: 'center', paddingVertical: Space.md, marginTop: Space.xs },
+  line: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
 });
