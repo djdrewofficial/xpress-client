@@ -310,7 +310,5 @@ function toMoment(s: SongRow, liked: boolean, userId: string | null): MomentSong
     previewUrl: s.preview_url,
     liked,
     mine: !!userId && s.requested_by === userId,
-    authorName: s.authorName ?? null,
-    authorRemoved: s.authorRemoved ?? null,
   };
 }

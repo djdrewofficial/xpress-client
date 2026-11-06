@@ -8,8 +8,6 @@ export type RecordTrack = {
   mustPlay: boolean;
   doNotPlay: boolean;
   note: string | null;
-  authorName?: string | null;
-  authorRemoved?: 'guest' | 'host' | null;
 };
 
 export type MusicMoment = {
@@ -67,8 +65,6 @@ function toTrack(song: EventSong, doNotPlay: boolean): RecordTrack {
     mustPlay: doNotPlay ? false : song.must_play,
     doNotPlay,
     note: song.note,
-    authorName: song.authorName ?? null,
-    authorRemoved: song.authorRemoved ?? null,
   };
 }
 

@@ -56,7 +56,7 @@ const privacyEn: LegalDocument = {
     },
     {
       heading: '12. Retention and deletion',
-      body: 'Deleting your app login does not currently delete the complete booking or event record. The in-app route removes the authentication account, account record, event-app memberships and device-token records associated with that login. Some planning author identifiers are cleared and associated likes are deleted. CRM and guest records, event records, planning songs, answers and notes, contracts, payments, cover photos, planner files and invitation logs remain unless separately removed. Clearing an author identifier does not necessarily anonymize content that contains names or event details. There is no verified configured retention schedule for these retained records or join-attempt logs. Backup and point-in-time-recovery retention periods have not been verified for the live service. We cannot promise a fixed deletion period or immediate erasure of backup copies. Contact us to request review or removal of retained information; applicable legal rights are not limited by these technical constraints.',
+      body: 'Deleting your account removes your login and access to the app. Your event\'s planning details, guest information, contract and payment records stay with your booking so your DJ can perform the event and as required by law. Guest records, names, and authorship stay as they are. There is no verified configured retention schedule for these retained records or join-attempt logs. Backup and point-in-time-recovery retention periods have not been verified for the live service. We cannot promise a fixed deletion period or immediate erasure of backup copies. Contact us to request review or removal of retained information; applicable legal rights are not limited by these technical constraints.',
     },
     {
       heading: '13. Choices, rights and security',
@@ -122,7 +122,7 @@ const privacyEs: LegalDocument = {
     },
     {
       heading: '12. Conservación y eliminación',
-      body: 'Eliminar su acceso a la aplicación no elimina actualmente el registro completo de la reserva o del evento. El proceso dentro de la aplicación elimina la cuenta de autenticación, el registro de cuenta, las pertenencias al evento en la aplicación y los registros de tokens de dispositivo asociados a ese acceso. Se borran algunos identificadores de autor y los Me gusta asociados. Permanecen los registros de CRM e invitados, eventos, canciones, respuestas y notas de planificación, contratos, pagos, portadas, archivos del planificador y registros de invitaciones, salvo que se eliminen por separado. Quitar un identificador de autor no anonimiza necesariamente un contenido que incluya nombres o detalles del evento. No se ha verificado un calendario de conservación configurado para estos registros o los de intentos de acceso. Tampoco se han verificado los plazos del servicio activo para copias de seguridad y recuperación a un momento dado. No podemos prometer un plazo fijo de eliminación ni el borrado inmediato de las copias. Contacte con nosotros para solicitar la revisión o eliminación de información conservada; estas limitaciones técnicas no restringen sus derechos legales.',
+      body: 'Eliminar su cuenta quita su acceso y el uso de la aplicación. Los detalles de planificación de su evento, la información de los invitados y los registros del contrato y de los pagos permanecen con su reserva para que su DJ pueda realizar el evento y según exige la ley. Los registros de invitados, los nombres y la autoría permanecen como están. No se ha verificado un calendario de conservación configurado para estos registros o los de intentos de acceso. Tampoco se han verificado los plazos del servicio activo para copias de seguridad y recuperación a un momento dado. No podemos prometer un plazo fijo de eliminación ni el borrado inmediato de las copias. Contacte con nosotros para solicitar la revisión o eliminación de información conservada; estas limitaciones técnicas no restringen sus derechos legales.',
     },
     {
       heading: '13. Opciones, derechos y seguridad',
@@ -236,15 +236,7 @@ const deletionEn: LegalDocument = {
   sections: [
     {
       heading: 'Deleting your account',
-      body: 'Deleting your account removes your login and profile. Planning details for a booked event are kept with the event so your DJ can perform it, and contract and payment records are kept as required by law.',
-    },
-    {
-      heading: 'Guests and co-hosts',
-      body: 'When a guest or co-host deletes their account, their login, name, email, phone, photo, and profile are removed. Their answers, songs, and notes stay on the event and are shown as Former guest or Former host.',
-    },
-    {
-      heading: 'The booked client',
-      body: 'When the main contract client deletes their account, the app login is removed. The event, contract, planning answers, and payments stay with the booking. Staff accounts are not deleted from this app.',
+      body: 'Deleting your account removes your login and access to the app. Your event\'s planning details, guest information, contract and payment records stay with your booking so your DJ can perform the event and as required by law. Guest records, names, and authorship stay as they are. Staff accounts are not deleted from this app.',
     },
   ],
 };
@@ -254,15 +246,7 @@ const deletionEs: LegalDocument = {
   sections: [
     {
       heading: 'Eliminar su cuenta',
-      body: 'Eliminar su cuenta quita su acceso y su perfil. Los detalles de planificación de un evento reservado se conservan con el evento para que su DJ pueda realizarlo, y los registros del contrato y de los pagos se conservan según exige la ley.',
-    },
-    {
-      heading: 'Invitados y coanfitriones',
-      body: 'Cuando un invitado o coanfitrión elimina su cuenta, se quitan su acceso, nombre, correo, teléfono, foto y perfil. Sus respuestas, canciones y notas permanecen en el evento y se muestran como Invitado anterior o Anfitrión anterior.',
-    },
-    {
-      heading: 'El cliente de la reserva',
-      body: 'Cuando el cliente principal del contrato elimina su cuenta, se quita el acceso de la aplicación. El evento, el contrato, las respuestas de planificación y los pagos permanecen con la reserva. Las cuentas del personal no se eliminan desde esta aplicación.',
+      body: 'Eliminar su cuenta quita su acceso y el uso de la aplicación. Los detalles de planificación de su evento, la información de los invitados y los registros del contrato y de los pagos permanecen con su reserva para que su DJ pueda realizar el evento y según exige la ley. Los registros de invitados, los nombres y la autoría permanecen como están. Las cuentas del personal no se eliminan desde esta aplicación.',
     },
   ],
 };

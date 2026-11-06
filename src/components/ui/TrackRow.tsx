@@ -18,7 +18,6 @@ export function TrackRow({
   mustPlay = false,
   doNotPlay = false,
   note,
-  by,
   onPress,
 }: {
   index?: number;
@@ -27,8 +26,6 @@ export function TrackRow({
   mustPlay?: boolean;
   doNotPlay?: boolean;
   note?: string | null;
-  /** Who added this song or note. Null stays hidden. */
-  by?: string | null;
   onPress?: () => void;
 }) {
   const c = useC();
@@ -55,11 +52,6 @@ export function TrackRow({
           {artist ? (
             <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={1}>
               {artist}
-            </Text>
-          ) : null}
-          {by ? (
-            <Text style={[Type.footnote, { color: c.ink3 }]} numberOfLines={1}>
-              {by}
             </Text>
           ) : null}
         </View>

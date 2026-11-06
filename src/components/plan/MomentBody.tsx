@@ -18,7 +18,6 @@ import { useT } from '@/lib/i18n';
 import { questionVisible, type QuestionRow } from '@/lib/planning';
 import { getSectionNotes, normalizeNoteText, saveSectionNotes, type SectionNotesSave } from '@/lib/sectionNotes';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
-import { authorLabel } from '@/lib/authorCredit';
 import { answerText } from './model';
 
 export type MomentTab = 'questions' | 'songs' | 'notes';
@@ -35,8 +34,6 @@ export type MomentSong = {
   liked?: boolean;
   /** The signed-in person added this song. */
   mine?: boolean;
-  authorName?: string | null;
-  authorRemoved?: 'guest' | 'host' | null;
 };
 
 type Tab = MomentTab;
@@ -358,7 +355,6 @@ function QuestionPane({
                   <View style={{ flex: 1 }}>
                     <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={2}>{q.prompt}</Text>
                     <Text style={[Type.subhead, { color: c.ink }]} numberOfLines={1}>{answerText(q, answers[q.id] ?? '')}</Text>
-                    {addedByText(q, t) ? <Text style={[Type.footnote, { color: c.ink3 }]} numberOfLines={1}>{addedByText(q, t)}</Text> : null}
                   </View>
                   <Pressable onPress={() => onFocus(q.id)} hitSlop={8} accessibilityLabel={t('moment.editAnswer')}>
                     <Icon name="edit" size={16} color={c.ink3} />
@@ -432,7 +428,6 @@ function ActiveQuestion({
       </View>
       <Text style={[styles.prompt, { color: c.ink }]}>{q.prompt}</Text>
       {q.help_text ? <Text style={[Type.footnote, { color: c.ink2 }]}>{q.help_text}</Text> : null}
-      {addedByText(q, t) ? <Text style={[Type.footnote, { color: c.ink3 }]}>{addedByText(q, t)}</Text> : null}
       <Text style={[Type.label, { color: c.accent, marginTop: 4 }]}>{t('moment.yourAnswer')}</Text>
 
       {textLike ? (
@@ -558,14 +553,13 @@ function PlainSongs({
   onCancelNote,
 }: SongListProps) {
   const c = useC();
-  const { t } = useT();
   if (songs.length === 0) return null;
   return (
     <View style={[styles.stack, { backgroundColor: c.surface, borderColor: c.line }]}>
       {songs.map((s, i) => (
         <View key={s.id}>
           {i > 0 ? <View style={[styles.hair, { backgroundColor: c.line }]} /> : null}
-          <TrackRow index={i + 1} title={s.title} artist={artistLine(s)} by={addedByText(s, t)} mustPlay={s.mustPlay} note={noteFor?.id === s.id ? null : s.note} onPress={() => onSong(s)} />
+          <TrackRow index={i + 1} title={s.title} artist={artistLine(s)} mustPlay={s.mustPlay} note={noteFor?.id === s.id ? null : s.note} onPress={() => onSong(s)} />
           <NoteEditor song={s} noteFor={noteFor} noteDraft={noteDraft} onNoteDraft={onNoteDraft} onStartNote={onStartNote} onSaveNote={onSaveNote} onCancelNote={onCancelNote} />
         </View>
       ))}
@@ -610,7 +604,7 @@ function DanceLists({
           must.map((s, i) => (
             <View key={s.id}>
               {i > 0 ? <View style={[styles.hair, { backgroundColor: c.line }]} /> : null}
-              <TrackRow index={i + 1} title={s.title} artist={artistLine(s)} by={addedByText(s, t)} mustPlay={s.mustPlay} note={noteFor?.id === s.id ? null : s.note} onPress={() => onSong(s)} />
+              <TrackRow index={i + 1} title={s.title} artist={artistLine(s)} mustPlay={s.mustPlay} note={noteFor?.id === s.id ? null : s.note} onPress={() => onSong(s)} />
               <NoteEditor song={s} noteFor={noteFor} noteDraft={noteDraft} onNoteDraft={onNoteDraft} onStartNote={onStartNote} onSaveNote={onSaveNote} onCancelNote={onCancelNote} />
             </View>
           ))
@@ -867,16 +861,6 @@ function useAutosaveNote(
 
 function artistLine(s: MomentSong): string | null {
   return s.artist;
-}
-
-function addedByText(
-  row: { authorName?: string | null; authorRemoved?: 'guest' | 'host' | null } | null | undefined,
-  t: (key: 'author.formerGuest' | 'author.formerHost') => string,
-): string | null {
-  return authorLabel(
-    { name: row?.authorName ?? null, removed: row?.authorRemoved ?? null },
-    { guest: t('author.formerGuest'), host: t('author.formerHost') },
-  );
 }
 
 const styles = StyleSheet.create({
