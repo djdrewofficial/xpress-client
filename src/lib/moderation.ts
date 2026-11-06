@@ -43,7 +43,22 @@ export type ReportResult = {
   alreadyReported: boolean;
 };
 
-export type BlockResult = { userId: string; alreadyBlocked: boolean };
+export type PersonRole = 'host' | 'guest' | 'staff' | null;
+
+/** Server-built name for someone this member can already act on. `label` is what to show. */
+export type ModerationPerson = {
+  userId: string;
+  displayName: string | null;
+  label: string;
+  role: PersonRole;
+};
+
+export type BlockList = {
+  blockedUserIds: string[];
+  blocked: ModerationPerson[];
+};
+
+export type BlockResult = { userId: string; alreadyBlocked: boolean; label: string | null };
 export type HideResult = { targetType: string; targetId: string; hiddenAt: string | null };
 export type GuestRemoval = { userId: string; access: 'none' | 'other' };
 
@@ -54,24 +69,50 @@ export type EventSong = {
   artist: string | null;
   note: string | null;
   requestedBy: string | null;
+  requestedByLabel: string | null;
   hidden: boolean;
 };
 
-export type EventLike = { songId: string; userId: string; hidden: boolean };
-export type EventAnswer = { questionId: string; answer: string | null; answeredBy: string | null; hidden: boolean };
-export type EventSectionNote = { sectionId: string; notes: string | null; updatedBy: string | null; hidden: boolean };
-export type EventText = { text: string | null; updatedBy: string | null; hidden: boolean };
+export type EventLike = {
+  songId: string;
+  userId: string;
+  displayName: string | null;
+  label: string | null;
+  hidden: boolean;
+};
+export type EventAnswer = {
+  questionId: string;
+  answer: string | null;
+  answeredBy: string | null;
+  answeredByLabel: string | null;
+  hidden: boolean;
+};
+export type EventSectionNote = {
+  sectionId: string;
+  notes: string | null;
+  updatedBy: string | null;
+  updatedByLabel: string | null;
+  hidden: boolean;
+};
+export type EventText = { text: string | null; updatedBy: string | null; updatedByLabel: string | null; hidden: boolean };
 export type EventSongIdea = {
   id: string;
   title: string;
   artist: string | null;
   note: string | null;
   addedBy: string | null;
+  addedByLabel: string | null;
   hidden: boolean;
 };
-export type EventCover = { url: string | null; updatedBy: string | null; hidden: boolean };
-export type EventBooth = { backdropId: string | null; updatedBy: string | null; hidden: boolean };
-export type EventFile = { id: string; name: string | null; uploadedBy: string | null; hidden: boolean };
+export type EventCover = { url: string | null; updatedBy: string | null; updatedByLabel: string | null; hidden: boolean };
+export type EventBooth = { backdropId: string | null; updatedBy: string | null; updatedByLabel: string | null; hidden: boolean };
+export type EventFile = {
+  id: string;
+  name: string | null;
+  uploadedBy: string | null;
+  uploadedByLabel: string | null;
+  hidden: boolean;
+};
 
 export type EventContent = {
   songs: EventSong[];
@@ -83,6 +124,7 @@ export type EventContent = {
   coverPhoto: EventCover | null;
   boothSelection: EventBooth | null;
   timelineFile: EventFile | null;
+  people: ModerationPerson[];
 };
 
 const OWN_ONLY = 'You can only remove your own content.';
@@ -119,6 +161,28 @@ function str(value: unknown): string | null {
 
 function flag(value: unknown): boolean {
   return value === true;
+}
+
+function serverLabel(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function personRole(value: unknown): PersonRole {
+  if (value === 'host' || value === 'guest' || value === 'staff') return value;
+  return null;
+}
+
+function parsePerson(value: unknown): ModerationPerson | null {
+  const row = asRecord(value);
+  const userId = str(row?.userId);
+  const label = serverLabel(row?.label);
+  if (!userId || !label) return null;
+  return {
+    userId,
+    displayName: serverLabel(row?.displayName),
+    label,
+    role: personRole(row?.role),
+  };
 }
 
 export async function submitReport(
@@ -159,18 +223,24 @@ export async function blockPerson(
     data: {
       userId: str(row?.userId) ?? userId,
       alreadyBlocked: row?.alreadyBlocked === true,
+      label: serverLabel(row?.label),
     },
   };
 }
 
 export async function listBlocks(
   eventId: string,
-): Promise<{ ok: true; data: string[] } | ModerationFailure> {
+): Promise<{ ok: true; data: BlockList } | ModerationFailure> {
   const res = await mobileJson('GET', `/api/mobile/events/${eventId}/blocks`);
   if (!res.ok) return fail(res.status, res.error);
   const row = asRecord(res.data);
-  const ids = Array.isArray(row?.blockedUserIds) ? row.blockedUserIds.filter((id): id is string => typeof id === 'string') : [];
-  return { ok: true, data: ids };
+  const blockedUserIds = Array.isArray(row?.blockedUserIds)
+    ? row.blockedUserIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+    : [];
+  const blocked = Array.isArray(row?.blocked)
+    ? row.blocked.map(parsePerson).filter((person): person is ModerationPerson => person != null)
+    : [];
+  return { ok: true, data: { blockedUserIds, blocked } };
 }
 
 export async function unblockPerson(
@@ -229,6 +299,7 @@ function song(value: unknown): EventSong | null {
     artist: str(row.artist),
     note: str(row.note),
     requestedBy: str(row.requestedBy),
+    requestedByLabel: serverLabel(row.requestedByLabel),
     hidden: flag(row.hidden),
   };
 }
@@ -238,7 +309,13 @@ function like(value: unknown): EventLike | null {
   const songId = str(row?.songId);
   const userId = str(row?.userId);
   if (!songId || !userId) return null;
-  return { songId, userId, hidden: flag(row?.hidden) };
+  return {
+    songId,
+    userId,
+    displayName: serverLabel(row?.displayName),
+    label: serverLabel(row?.label),
+    hidden: flag(row?.hidden),
+  };
 }
 
 export async function loadEventContent(
@@ -265,6 +342,7 @@ export async function loadEventContent(
               questionId,
               answer: typeof answer?.answer === 'string' ? answer.answer : null,
               answeredBy: str(answer?.answeredBy),
+              answeredByLabel: serverLabel(answer?.answeredByLabel),
               hidden: flag(answer?.hidden),
             }];
           })
@@ -278,12 +356,18 @@ export async function loadEventContent(
               sectionId,
               notes: typeof note?.notes === 'string' ? note.notes : null,
               updatedBy: str(note?.updatedBy),
+              updatedByLabel: serverLabel(note?.updatedByLabel),
               hidden: flag(note?.hidden),
             }];
           })
         : [],
       doNotPlayNotes: notes
-        ? { text: typeof notes.text === 'string' ? notes.text : null, updatedBy: str(notes.updatedBy), hidden: flag(notes.hidden) }
+        ? {
+            text: typeof notes.text === 'string' ? notes.text : null,
+            updatedBy: str(notes.updatedBy),
+            updatedByLabel: serverLabel(notes.updatedByLabel),
+            hidden: flag(notes.hidden),
+          }
         : null,
       songIdeas: Array.isArray(row.songIdeas)
         ? row.songIdeas.flatMap((item) => {
@@ -296,19 +380,39 @@ export async function loadEventContent(
               artist: str(idea?.artist),
               note: str(idea?.note),
               addedBy: str(idea?.addedBy),
+              addedByLabel: serverLabel(idea?.addedByLabel),
               hidden: flag(idea?.hidden),
             }];
           })
         : [],
       coverPhoto: cover
-        ? { url: str(cover.url), updatedBy: str(cover.updatedBy), hidden: flag(cover.hidden) }
+        ? {
+            url: str(cover.url),
+            updatedBy: str(cover.updatedBy),
+            updatedByLabel: serverLabel(cover.updatedByLabel),
+            hidden: flag(cover.hidden),
+          }
         : null,
       boothSelection: booth
-        ? { backdropId: str(booth.backdropId), updatedBy: str(booth.updatedBy), hidden: flag(booth.hidden) }
+        ? {
+            backdropId: str(booth.backdropId),
+            updatedBy: str(booth.updatedBy),
+            updatedByLabel: serverLabel(booth.updatedByLabel),
+            hidden: flag(booth.hidden),
+          }
         : null,
       timelineFile: file
-        ? { id: str(file.id) ?? '', name: str(file.name), uploadedBy: str(file.uploadedBy), hidden: flag(file.hidden) }
+        ? {
+            id: str(file.id) ?? '',
+            name: str(file.name),
+            uploadedBy: str(file.uploadedBy),
+            uploadedByLabel: serverLabel(file.uploadedByLabel),
+            hidden: flag(file.hidden),
+          }
         : null,
+      people: Array.isArray(row.people)
+        ? row.people.map(parsePerson).filter((person): person is ModerationPerson => person != null)
+        : [],
     },
   };
 }

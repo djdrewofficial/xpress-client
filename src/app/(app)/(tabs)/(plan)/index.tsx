@@ -15,6 +15,7 @@ import { useT } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
 import { blendedProgress, loadOverview, setupMilestones, type Group, type Overview, type SectionRow } from '@/lib/planning';
+import { managesEvent } from '@/lib/membership';
 import { loadEventContent } from '@/lib/moderation';
 import { supabase } from '@/lib/supabase';
 
@@ -24,7 +25,7 @@ export default function HomeScreen() {
   const c = useC();
   const { t, locale } = useT();
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const { event, events, loading: eventLoading } = useEvent();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [venue, setVenue] = useState<string | null>(null);
@@ -33,6 +34,7 @@ export default function HomeScreen() {
   const [showTour, setShowTour] = useState(false);
   const [switcher, setSwitcher] = useState(false);
   const [coverFromFeed, setCoverFromFeed] = useState<string | null | undefined>(undefined);
+  const [coverAuthor, setCoverAuthor] = useState<{ userId: string; label: string | null } | null>(null);
   const [coverTick, setCoverTick] = useState(0);
   const tourChecked = useRef(false);
   const moderation = useModeration(event?.id ?? null, () => setCoverTick((n) => n + 1));
@@ -58,7 +60,16 @@ export default function HomeScreen() {
     let cancel = false;
     void loadEventContent(event.id).then((res) => {
       if (cancel) return;
-      setCoverFromFeed(res.ok ? (res.data.coverPhoto?.hidden ? null : res.data.coverPhoto?.url ?? null) : undefined);
+      if (!res.ok) {
+        setCoverFromFeed(undefined);
+        setCoverAuthor(null);
+        return;
+      }
+      const cover = res.data.coverPhoto;
+      setCoverFromFeed(cover?.hidden ? null : cover?.url ?? null);
+      setCoverAuthor(cover && !cover.hidden && cover.updatedBy
+        ? { userId: cover.updatedBy, label: cover.updatedByLabel }
+        : null);
     });
     return () => { cancel = true; };
   }, [event?.id, coverTick]);
@@ -138,6 +149,18 @@ export default function HomeScreen() {
               onReport={() => moderation.openReport({ targetType: 'cover_photo', targetId: event.id })}
               hideLabel={t('safety.remove')}
               onHide={() => moderation.askHide({ targetType: 'cover_photo', targetId: event.id })}
+              blockLabel={coverAuthor && coverAuthor.userId !== session?.user.id
+                ? (coverAuthor.label ? t('safety.blockNamed', { name: coverAuthor.label }) : t('safety.block'))
+                : undefined}
+              onBlock={coverAuthor && coverAuthor.userId !== session?.user.id
+                ? () => moderation.askBlock(coverAuthor.userId, coverAuthor.label)
+                : undefined}
+              guestLabel={managesEvent(event, profile?.accountType) && coverAuthor && coverAuthor.userId !== session?.user.id
+                ? (coverAuthor.label ? t('safety.removeGuestNamed', { name: coverAuthor.label }) : t('safety.removeGuest'))
+                : undefined}
+              onRemoveGuest={managesEvent(event, profile?.accountType) && coverAuthor && coverAuthor.userId !== session?.user.id
+                ? () => moderation.askRemoveGuest(coverAuthor.userId, coverAuthor.label)
+                : undefined}
             />
           ) : null}
           date={event.event_date}

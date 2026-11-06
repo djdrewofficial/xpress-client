@@ -68,9 +68,13 @@ export default function SectionScreen() {
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [songs, setSongs] = useState<SongRow[]>([]);
   const [likes, setLikes] = useState<Set<string>>(new Set());
-  const [likeUsers, setLikeUsers] = useState<Record<string, string[]>>({});
+  const [likePeople, setLikePeople] = useState<Record<string, { userId: string; label: string | null }[]>>({});
+  const [songLabels, setSongLabels] = useState<Record<string, string | null>>({});
   const [answerAuthors, setAnswerAuthors] = useState<Record<string, string | null>>({});
+  const [answerLabels, setAnswerLabels] = useState<Record<string, string | null>>({});
   const [noteAuthorId, setNoteAuthorId] = useState<string | null>(null);
+  const [noteAuthorLabel, setNoteAuthorLabel] = useState<string | null>(null);
+  const [boothAuthor, setBoothAuthor] = useState<{ userId: string; label: string | null } | null>(null);
   const [momentNo, setMomentNo] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -137,18 +141,31 @@ export default function SectionScreen() {
     const sectionKey = Array.isArray(id) ? id[0] : id;
     const feed = await loadEventContent(eventId);
     if (feed.ok) {
-      const bySong: Record<string, string[]> = {};
+      const bySong: Record<string, { userId: string; label: string | null }[]> = {};
       for (const like of feed.data.likes) {
         if (like.hidden) continue;
-        (bySong[like.songId] ??= []).push(like.userId);
+        (bySong[like.songId] ??= []).push({ userId: like.userId, label: like.label });
       }
       const authors: Record<string, string | null> = {};
+      const authorLabels: Record<string, string | null> = {};
       for (const answer of feed.data.answers) {
-        if (!answer.hidden) authors[answer.questionId] = answer.answeredBy;
+        if (answer.hidden) continue;
+        authors[answer.questionId] = answer.answeredBy;
+        authorLabels[answer.questionId] = answer.answeredByLabel;
       }
-      setLikeUsers(bySong);
+      const labels: Record<string, string | null> = {};
+      for (const song of feed.data.songs) labels[song.id] = song.requestedByLabel;
+      const note = feed.data.sectionNotes.find((item) => item.sectionId === sectionKey && !item.hidden);
+      setLikePeople(bySong);
+      setSongLabels(labels);
       setAnswerAuthors(authors);
-      setNoteAuthorId(feed.data.sectionNotes.find((note) => note.sectionId === sectionKey && !note.hidden)?.updatedBy ?? null);
+      setAnswerLabels(authorLabels);
+      setNoteAuthorId(note?.updatedBy ?? null);
+      setNoteAuthorLabel(note?.updatedByLabel ?? null);
+      const booth = feed.data.boothSelection;
+      setBoothAuthor(booth && !booth.hidden && booth.updatedBy
+        ? { userId: booth.updatedBy, label: booth.updatedByLabel }
+        : null);
     }
     setLoading(false);
   }, [id, eventId, session?.user.id]);
@@ -274,6 +291,7 @@ export default function SectionScreen() {
     return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg }}><ActivityIndicator color={c.accent} /></View>;
   }
 
+  const userId = session?.user.id ?? null;
   const special = meta.module === 'photobooth'
     ? (
       <PhotoBoothSection
@@ -284,6 +302,18 @@ export default function SectionScreen() {
             onReport={() => moderation.openReport({ targetType: 'booth_selection', targetId: eventId })}
             hideLabel={t('safety.remove')}
             onHide={() => moderation.askHide({ targetType: 'booth_selection', targetId: eventId })}
+            blockLabel={boothAuthor && boothAuthor.userId !== userId
+              ? (boothAuthor.label ? t('safety.blockNamed', { name: boothAuthor.label }) : t('safety.block'))
+              : undefined}
+            onBlock={boothAuthor && boothAuthor.userId !== userId
+              ? () => moderation.askBlock(boothAuthor.userId, boothAuthor.label)
+              : undefined}
+            guestLabel={canManage && boothAuthor && boothAuthor.userId !== userId
+              ? (boothAuthor.label ? t('safety.removeGuestNamed', { name: boothAuthor.label }) : t('safety.removeGuest'))
+              : undefined}
+            onRemoveGuest={canManage && boothAuthor && boothAuthor.userId !== userId
+              ? () => moderation.askRemoveGuest(boothAuthor.userId, boothAuthor.label)
+              : undefined}
           />
         )}
       />
@@ -292,8 +322,13 @@ export default function SectionScreen() {
       ? <VendorTeam eventId={eventId} />
       : null;
 
-  const userId = session?.user.id ?? null;
-  const momentSongs = songs.map((song) => toMoment(song, likes.has(song.id), userId, likeUsers[song.id] ?? []));
+  const momentSongs = songs.map((song) => toMoment(
+    song,
+    likes.has(song.id),
+    userId,
+    likePeople[song.id] ?? [],
+    songLabels[song.id] ?? null,
+  ));
   const songTotal = danceFloor ? momentSongs.filter((s) => !s.doNotPlay).length : songs.length;
 
   return (
@@ -335,7 +370,9 @@ export default function SectionScreen() {
           userId,
           canManage,
           noteAuthorId,
+          noteAuthorLabel,
           answerAuthors,
+          answerLabels,
           onReport: moderation.openReport,
           onBlock: moderation.askBlock,
           onHide: moderation.askHide,
@@ -366,7 +403,13 @@ export default function SectionScreen() {
   );
 }
 
-function toMoment(s: SongRow, liked: boolean, userId: string | null, likeUserIds: string[]): MomentSong {
+function toMoment(
+  s: SongRow,
+  liked: boolean,
+  userId: string | null,
+  likePeople: { userId: string; label: string | null }[],
+  requestedByLabel: string | null,
+): MomentSong {
   return {
     id: s.id,
     title: s.title,
@@ -379,6 +422,7 @@ function toMoment(s: SongRow, liked: boolean, userId: string | null, likeUserIds
     liked,
     mine: !!userId && s.requested_by === userId,
     requestedBy: s.requested_by ?? null,
-    likeUserIds,
+    requestedByLabel,
+    likePeople,
   };
 }

@@ -94,7 +94,7 @@ export default function TimelineScreen() {
   const [coach, setCoach] = useState(false);
   const [ptBusy, setPtBusy] = useState(false);
   const [addingGroup, setAddingGroup] = useState<{ id: string; title: string } | null>(null);
-  const [plannerFile, setPlannerFile] = useState<{ id: string; name: string | null; uploadedBy: string | null } | null>(null);
+  const [plannerFile, setPlannerFile] = useState<{ id: string; name: string | null; uploadedBy: string | null; uploadedByLabel: string | null } | null>(null);
   const [fileTick, setFileTick] = useState(0);
 
   const canManage = managesEvent(event, profile?.accountType);
@@ -139,12 +139,14 @@ export default function TimelineScreen() {
       if (cancel) return;
       if (feed.ok) {
         const file = feed.data.timelineFile;
-        setPlannerFile(file && !file.hidden && file.id ? { id: file.id, name: file.name, uploadedBy: file.uploadedBy } : null);
+        setPlannerFile(file && !file.hidden && file.id
+          ? { id: file.id, name: file.name, uploadedBy: file.uploadedBy, uploadedByLabel: file.uploadedByLabel }
+          : null);
         return;
       }
       const legacy = await getPlannerTimeline(eventId);
       if (cancel) return;
-      setPlannerFile(legacy ? { id: legacy.id, name: legacy.name, uploadedBy: null } : null);
+      setPlannerFile(legacy ? { id: legacy.id, name: legacy.name, uploadedBy: null, uploadedByLabel: null } : null);
     })();
     return () => { cancel = true; };
   }, [eventId, fileTick]);
@@ -307,9 +309,17 @@ export default function TimelineScreen() {
               onHide={canManage || plannerFile.uploadedBy === uid
                 ? () => moderation.askHide({ targetType: 'timeline_file', targetId: plannerFile.id })
                 : undefined}
-              blockLabel={plannerFile.uploadedBy && plannerFile.uploadedBy !== uid ? t('safety.block') : undefined}
+              blockLabel={plannerFile.uploadedBy && plannerFile.uploadedBy !== uid
+                ? (plannerFile.uploadedByLabel ? t('safety.blockNamed', { name: plannerFile.uploadedByLabel }) : t('safety.block'))
+                : undefined}
               onBlock={plannerFile.uploadedBy && plannerFile.uploadedBy !== uid
-                ? () => moderation.askBlock(plannerFile.uploadedBy as string)
+                ? () => moderation.askBlock(plannerFile.uploadedBy as string, plannerFile.uploadedByLabel)
+                : undefined}
+              guestLabel={canManage && plannerFile.uploadedBy && plannerFile.uploadedBy !== uid
+                ? (plannerFile.uploadedByLabel ? t('safety.removeGuestNamed', { name: plannerFile.uploadedByLabel }) : t('safety.removeGuest'))
+                : undefined}
+              onRemoveGuest={canManage && plannerFile.uploadedBy && plannerFile.uploadedBy !== uid
+                ? () => moderation.askRemoveGuest(plannerFile.uploadedBy as string, plannerFile.uploadedByLabel)
                 : undefined}
             />
           </View>

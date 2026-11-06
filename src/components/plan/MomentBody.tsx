@@ -37,19 +37,22 @@ export type MomentSong = {
   /** The signed-in person added this song. */
   mine?: boolean;
   requestedBy?: string | null;
-  /** Other members who liked this song. */
-  likeUserIds?: string[];
+  requestedByLabel?: string | null;
+  /** Other members who liked this song. `label` is the server label, or null when the server sent none. */
+  likePeople?: { userId: string; label: string | null }[];
 };
 
 export type MomentSafety = {
   userId: string | null;
   canManage: boolean;
   noteAuthorId: string | null;
+  noteAuthorLabel: string | null;
   answerAuthors: Record<string, string | null>;
+  answerLabels: Record<string, string | null>;
   onReport: (target: ModerationTarget) => void;
-  onBlock: (userId: string) => void;
+  onBlock: (userId: string, label?: string | null) => void;
   onHide: (target: ModerationTarget) => void;
-  onRemoveGuest: (userId: string) => void;
+  onRemoveGuest: (userId: string, label?: string | null) => void;
 };
 
 type Tab = MomentTab;
@@ -351,59 +354,95 @@ export function MomentBody({
 function SongMenuSafety({ song, safety, onDone }: { song: MomentSong; safety: MomentSafety; onDone: () => void }) {
   const c = useC();
   const { t } = useT();
-  const likes = [...new Set((song.likeUserIds ?? []).filter((id) => id && id !== safety.userId))];
+  const likes = (song.likePeople ?? []).filter((person) => person.userId && person.userId !== safety.userId);
+  const labeledLikes = likes.filter((person) => person.label);
+  const unlabeled = likes.filter((person) => !person.label);
   const requester = song.requestedBy && song.requestedBy !== safety.userId ? song.requestedBy : null;
-  const onlyLike = likes.length === 1 ? likes[0] : null;
-  const onlyPerson = requester && (!onlyLike || onlyLike === requester)
-    ? requester
-    : !requester && onlyLike
-      ? onlyLike
-      : null;
+  const requesterLabel = requester ? song.requestedByLabel ?? null : null;
+  const people = new Map<string, string>();
+  if (requester && requesterLabel) people.set(requester, requesterLabel);
+  for (const like of labeledLikes) {
+    if (like.label) people.set(like.userId, like.label);
+  }
+  const singleUnlabeled = unlabeled.length === 1 && labeledLikes.length === 0 ? unlabeled[0] : null;
   return (
     <>
-      {onlyPerson ? (
-        <Button
-          label={t('safety.reportPerson')}
-          variant="ghost"
-          onPress={() => { onDone(); safety.onReport({ targetType: 'user', targetUserId: onlyPerson }); }}
-        />
+      {unlabeled.length > 1 || (unlabeled.length > 0 && labeledLikes.length > 0) ? (
+        <Text style={[Type.footnote, { color: c.ink3, textAlign: 'center' }]}>{t('safety.namesUnavailable')}</Text>
       ) : null}
-      {onlyLike ? (
+      {labeledLikes.map((like) => (
+        <Button
+          key={`like-${like.userId}`}
+          label={t('safety.reportLikeNamed', { name: like.label ?? '' })}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onReport({ targetType: 'song_like', targetId: song.id, targetUserId: like.userId }); }}
+        />
+      ))}
+      {singleUnlabeled ? (
         <Button
           label={t('safety.reportLike')}
           variant="ghost"
-          onPress={() => { onDone(); safety.onReport({ targetType: 'song_like', targetId: song.id, targetUserId: onlyLike }); }}
+          onPress={() => { onDone(); safety.onReport({ targetType: 'song_like', targetId: song.id, targetUserId: singleUnlabeled.userId }); }}
         />
       ) : null}
-      {likes.length > 1 ? (
-        <Text style={[Type.footnote, { color: c.ink3, textAlign: 'center' }]}>{t('safety.namesUnavailable')}</Text>
-      ) : null}
-      {requester ? (
+      {[...people.entries()].map(([userId, label]) => (
         <Button
-          label={onlyLike && onlyLike !== requester ? t('safety.blockAdded') : t('safety.block')}
+          key={`person-${userId}`}
+          label={t('safety.reportPersonNamed', { name: label })}
           variant="ghost"
-          onPress={() => { onDone(); safety.onBlock(requester); }}
+          onPress={() => { onDone(); safety.onReport({ targetType: 'user', targetUserId: userId }); }}
         />
-      ) : null}
-      {onlyLike && onlyLike !== requester ? (
+      ))}
+      {requester && !requesterLabel ? (
         <Button
-          label={t('safety.blockLiked')}
+          label={t('safety.blockAdded')}
           variant="ghost"
-          onPress={() => { onDone(); safety.onBlock(onlyLike); }}
+          onPress={() => { onDone(); safety.onBlock(requester, null); }}
         />
       ) : null}
-      {safety.canManage && onlyLike ? (
+      {singleUnlabeled ? (
+        <Button
+          label={t('safety.block')}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onBlock(singleUnlabeled.userId, null); }}
+        />
+      ) : null}
+      {[...people.entries()].map(([userId, label]) => (
+        <Button
+          key={`block-${userId}`}
+          label={t('safety.blockNamed', { name: label })}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onBlock(userId, label); }}
+        />
+      ))}
+      {safety.canManage ? labeledLikes.map((like) => (
+        <Button
+          key={`hide-${like.userId}`}
+          label={t('safety.hideLikeNamed', { name: like.label ?? '' })}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onHide({ targetType: 'song_like', targetId: song.id, targetUserId: like.userId }); }}
+        />
+      )) : null}
+      {safety.canManage && singleUnlabeled ? (
         <Button
           label={t('safety.hideLike')}
           variant="ghost"
-          onPress={() => { onDone(); safety.onHide({ targetType: 'song_like', targetId: song.id, targetUserId: onlyLike }); }}
+          onPress={() => { onDone(); safety.onHide({ targetType: 'song_like', targetId: song.id, targetUserId: singleUnlabeled.userId }); }}
         />
       ) : null}
-      {safety.canManage && requester ? (
+      {safety.canManage ? [...people.entries()].map(([userId, label]) => (
+        <Button
+          key={`guest-${userId}`}
+          label={t('safety.removeGuestNamed', { name: label })}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onRemoveGuest(userId, label); }}
+        />
+      )) : null}
+      {safety.canManage && requester && !requesterLabel ? (
         <Button
           label={t('safety.removeGuest')}
           variant="ghost"
-          onPress={() => { onDone(); safety.onRemoveGuest(requester); }}
+          onPress={() => { onDone(); safety.onRemoveGuest(requester, null); }}
         />
       ) : null}
     </>
@@ -413,12 +452,14 @@ function SongMenuSafety({ song, safety, onDone }: { song: MomentSong; safety: Mo
 function AnswerSafety({
   questionId,
   authorId,
+  authorLabel,
   safety,
   reportKey = 'safety.reportAnswer',
   targetType = 'answer',
 }: {
   questionId: string;
   authorId: string | null;
+  authorLabel?: string | null;
   safety?: MomentSafety;
   reportKey?: 'safety.reportAnswer' | 'safety.reportNote';
   targetType?: 'answer' | 'section_note';
@@ -430,16 +471,17 @@ function AnswerSafety({
   const canReport = !mine;
   const canBlock = !!authorId && !mine;
   if (!canHide && !canReport && !canBlock) return null;
+  const name = authorLabel || null;
   return (
     <SafetyLinks
       reportLabel={canReport ? t(reportKey) : undefined}
       onReport={canReport ? () => safety.onReport({ targetType, targetId: questionId }) : undefined}
       hideLabel={canHide ? t('safety.remove') : undefined}
       onHide={canHide ? () => safety.onHide({ targetType, targetId: questionId }) : undefined}
-      blockLabel={canBlock ? t('safety.block') : undefined}
-      onBlock={canBlock && authorId ? () => safety.onBlock(authorId) : undefined}
-      guestLabel={safety.canManage && canBlock ? t('safety.removeGuest') : undefined}
-      onRemoveGuest={safety.canManage && canBlock && authorId ? () => safety.onRemoveGuest(authorId) : undefined}
+      blockLabel={canBlock ? (name ? t('safety.blockNamed', { name }) : t('safety.block')) : undefined}
+      onBlock={canBlock && authorId ? () => safety.onBlock(authorId, name) : undefined}
+      guestLabel={safety.canManage && canBlock ? (name ? t('safety.removeGuestNamed', { name }) : t('safety.removeGuest')) : undefined}
+      onRemoveGuest={safety.canManage && canBlock && authorId ? () => safety.onRemoveGuest(authorId, name) : undefined}
     />
   );
 }
@@ -493,7 +535,7 @@ function QuestionPane({
                 </View>
                 {(answers[q.id] ?? '').trim() ? (
                   <View style={{ paddingLeft: 44, paddingBottom: 8 }}>
-                    <AnswerSafety questionId={q.id} authorId={safety?.answerAuthors[q.id] ?? null} safety={safety} />
+                    <AnswerSafety questionId={q.id} authorId={safety?.answerAuthors[q.id] ?? null} authorLabel={safety?.answerLabels[q.id] ?? null} safety={safety} />
                   </View>
                 ) : null}
               </View>
@@ -515,7 +557,7 @@ function QuestionPane({
         />
       ))}
       {expanded.filter((q) => (answers[q.id] ?? '').trim()).map((q) => (
-        <AnswerSafety key={`safety-${q.id}`} questionId={q.id} authorId={safety?.answerAuthors[q.id] ?? null} safety={safety} />
+        <AnswerSafety key={`safety-${q.id}`} questionId={q.id} authorId={safety?.answerAuthors[q.id] ?? null} authorLabel={safety?.answerLabels[q.id] ?? null} safety={safety} />
       ))}
 
       {rest.map((q) => {
@@ -831,6 +873,7 @@ function NotesPane({
         <AnswerSafety
           questionId={sectionId}
           authorId={safety.noteAuthorId}
+          authorLabel={safety.noteAuthorLabel}
           safety={safety}
           reportKey="safety.reportNote"
           targetType="section_note"

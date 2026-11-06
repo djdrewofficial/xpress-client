@@ -67,9 +67,9 @@ export function useModeration(eventId: string | null, onChanged?: () => void) {
     Alert.alert(result.data.alreadyReported ? t('safety.already') : t('safety.sent'));
   }
 
-  function askBlock(userId: string) {
+  function askBlock(userId: string, label?: string | null) {
     if (!eventId) return;
-    Alert.alert(t('safety.confirmBlockTitle'), t('safety.confirmBlockBody'), [
+    Alert.alert(label ? t('safety.confirmBlockNamed', { name: label }) : t('safety.confirmBlockTitle'), t('safety.confirmBlockBody'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('safety.block'),
@@ -89,9 +89,9 @@ export function useModeration(eventId: string | null, onChanged?: () => void) {
     ]);
   }
 
-  function askUnblock(userId: string) {
+  function askUnblock(userId: string, label?: string | null) {
     if (!eventId) return;
-    Alert.alert(t('safety.confirmUnblockTitle'), t('safety.confirmUnblockBody'), [
+    Alert.alert(label ? t('safety.confirmUnblockNamed', { name: label }) : t('safety.confirmUnblockTitle'), t('safety.confirmUnblockBody'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('safety.unblock'),
@@ -132,9 +132,9 @@ export function useModeration(eventId: string | null, onChanged?: () => void) {
     ]);
   }
 
-  function askRemoveGuest(userId: string) {
+  function askRemoveGuest(userId: string, label?: string | null) {
     if (!eventId) return;
-    Alert.alert(t('safety.confirmGuestTitle'), t('safety.confirmGuestBody'), [
+    Alert.alert(label ? t('safety.confirmGuestNamed', { name: label }) : t('safety.confirmGuestTitle'), t('safety.confirmGuestBody'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('safety.removeGuest'),
