@@ -14,11 +14,11 @@ export type AiConsentRecord = {
 
 export type AiConsentResult =
   | { ok: true; record: AiConsentRecord }
-  | { ok: false; unavailable: boolean };
+  | { ok: false; status: number };
 
 export async function loadAiConsent(eventId: string): Promise<AiConsentResult> {
   const result = await mobileJson('GET', `/api/mobile/ai-consent?eventId=${encodeURIComponent(eventId)}`);
-  if (!result.ok) return { ok: false, unavailable: result.status === 503 || result.status === 0 };
+  if (!result.ok) return { ok: false, status: result.status };
   return { ok: true, record: parseRecord(result.data, eventId) };
 }
 
@@ -29,7 +29,7 @@ export async function grantAiConsent(eventId: string): Promise<AiConsentResult> 
     policyVersion: AI_CONSENT_POLICY_VERSION,
     source: 'app',
   });
-  if (!result.ok) return { ok: false, unavailable: result.status === 503 || result.status === 400 || result.status === 0 };
+  if (!result.ok) return { ok: false, status: result.status };
   return { ok: true, record: parseRecord(result.data, eventId) };
 }
 
@@ -38,7 +38,7 @@ export async function withdrawAiConsent(eventId: string): Promise<AiConsentResul
     eventId,
     action: 'withdraw',
   });
-  if (!result.ok) return { ok: false, unavailable: result.status === 503 || result.status === 0 };
+  if (!result.ok) return { ok: false, status: result.status };
   return { ok: true, record: parseRecord(result.data, eventId) };
 }
 
