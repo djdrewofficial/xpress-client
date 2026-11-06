@@ -140,11 +140,20 @@ export function money(n: number): string {
 /** Permanently delete the signed-in user's login (App Store 5.1.1(v)). Removes
     the auth user + account link server-side; the caller should sign out after.
     Returns false on failure. */
-export async function deleteAccount(): Promise<boolean> {
+/** Permanently delete the signed-in user's login (App Store 5.1.1(v)).
+    When they used Sign in with Apple, pass a fresh authorization code so XOS can
+    revoke that Apple token. The .p8 key stays on the server. The caller signs out after. */
+export async function deleteAccount(opts?: { appleAuthorizationCode?: string | null }): Promise<boolean> {
   const base = apiBase();
   if (!base) return false;
+  const headers: Record<string, string> = {};
+  let body: string | undefined;
+  if (opts?.appleAuthorizationCode) {
+    headers['Content-Type'] = 'application/json';
+    body = JSON.stringify({ appleAuthorizationCode: opts.appleAuthorizationCode });
+  }
   try {
-    const res = await authorizedFetch(`${base}/api/mobile/delete-account`, { method: 'POST' });
+    const res = await authorizedFetch(`${base}/api/mobile/delete-account`, { method: 'POST', headers, body });
     return res.ok;
   } catch {
     return false;

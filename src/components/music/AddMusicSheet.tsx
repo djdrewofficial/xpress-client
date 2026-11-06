@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -580,11 +581,12 @@ export function AddMusicSheet({
         delete next[item.key];
         return next;
       });
+      Alert.alert(t('common.couldntSave'), t('common.tryAgain'));
       return false;
     } finally {
       inflight.current.delete(item.key);
     }
-  }, [eventId, sectionId, onAdded]);
+  }, [eventId, sectionId, onAdded, t]);
 
   const stateFor = (item: PickItem) => {
     const marked = added[item.key];

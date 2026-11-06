@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 
+import { JoinGate } from '@/components/JoinGate';
 import { OnboardingGate } from '@/components/onboarding/OnboardingGate';
 import { SocialPrompt } from '@/components/SocialPrompt';
 import { EventProvider } from '@/lib/events';
@@ -11,11 +12,13 @@ export const unstable_settings = { initialRouteName: '(tabs)' };
 export default function AppLayout() {
   return (
     <EventProvider>
-      <OnboardingGate>
-        <Stack screenOptions={{ headerShown: false }} />
-        {/* Shows ~24h after first sign-in to collect IG/TikTok handles. */}
-        <SocialPrompt />
-      </OnboardingGate>
+      <JoinGate>
+        <OnboardingGate>
+          <Stack screenOptions={{ headerShown: false }} />
+          {/* Shows ~24h after first sign-in to collect IG/TikTok handles. */}
+          <SocialPrompt />
+        </OnboardingGate>
+      </JoinGate>
     </EventProvider>
   );
 }

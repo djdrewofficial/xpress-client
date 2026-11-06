@@ -63,6 +63,7 @@ async function uploadPlannerFile(eventId: string, file: { uri: string; name: str
       signal: controller.signal,
     });
     const json = (await res.json().catch(() => ({}))) as { ok?: boolean; name?: string; error?: string };
+    if (res.status === 403) throw new Error(json.error || 'Guests cannot upload the planner timeline.');
     if (!res.ok || !json.ok) throw new Error(json.error || 'Upload failed.');
     return { name: json.name || file.name || 'Timeline' };
   } catch (e) {

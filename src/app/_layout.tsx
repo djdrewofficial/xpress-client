@@ -1,5 +1,6 @@
 import { Component, useEffect, useState, type ReactNode } from 'react';
-import { Stack, type ErrorBoundaryProps } from 'expo-router';
+import { Stack, useRouter, useSegments, type ErrorBoundaryProps } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { LogBox, Pressable, ScrollView, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -13,6 +14,7 @@ import {
   Montserrat_800ExtraBold,
 } from '@expo-google-fonts/montserrat';
 
+import { adoptIncomingUrl } from '@/lib/authCallback';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { LocaleProvider } from '@/lib/i18n';
 import { BrandSplash } from '@/components/BrandSplash';
@@ -80,21 +82,60 @@ class RootBoundary extends Component<{ children: ReactNode }, { error: unknown }
   }
 }
 
+function IncomingLinks() {
+  const { markPasswordReset } = useAuth();
+  useEffect(() => {
+    let cancelled = false;
+    const handle = async (url: string | null) => {
+      if (!url || cancelled) return;
+      const result = await adoptIncomingUrl(url);
+      if (!cancelled && result === 'recovery') markPasswordReset();
+    };
+    Linking.getInitialURL().then(handle).catch(() => {});
+    const sub = Linking.addEventListener('url', (event) => {
+      handle(event.url);
+    });
+    return () => {
+      cancelled = true;
+      sub.remove();
+    };
+  }, [markPasswordReset]);
+  return null;
+}
+
+function RecoveryRedirect() {
+  const { session, pendingPasswordReset } = useAuth();
+  const router = useRouter();
+  const segments = useSegments();
+  useEffect(() => {
+    if (!session || !pendingPasswordReset) return;
+    const onReset = segments.join('/') === 'auth/reset';
+    if (!onReset) router.replace('/auth/reset');
+  }, [session, pendingPasswordReset, segments, router]);
+  return null;
+}
+
 function RootNavigator() {
-  const { session, loading } = useAuth();
+  const { session, loading, pendingPasswordReset } = useAuth();
   if (loading) return <Splash label="Connecting…" />;
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
-      <Stack.Protected guard={!!session}>
-        <Stack.Screen name="(app)" />
-      </Stack.Protected>
-      <Stack.Protected guard={!session}>
-        <Stack.Screen name="login" />
-      </Stack.Protected>
-      {/* Legacy invite/reset links. They no longer set a password — they sign in or return to the code screen. */}
-      <Stack.Screen name="auth/set-password" />
-      <Stack.Screen name="auth/forgot-password" />
-    </Stack>
+    <>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
+        <Stack.Protected guard={!!session && !pendingPasswordReset}>
+          <Stack.Screen name="(app)" />
+        </Stack.Protected>
+        <Stack.Protected guard={!session}>
+          <Stack.Screen name="login" />
+          <Stack.Screen name="signup" />
+          <Stack.Screen name="auth/forgot-password" />
+        </Stack.Protected>
+        <Stack.Screen name="auth/reset" />
+        <Stack.Screen name="auth/confirm" />
+        <Stack.Screen name="auth/set-password" />
+        <Stack.Screen name="j/[token]" />
+      </Stack>
+      <RecoveryRedirect />
+    </>
   );
 }
 
@@ -134,6 +175,7 @@ export default function RootLayout() {
             <AuthProvider>
               <LocaleProvider>
                 <StatusBar style="auto" />
+                <IncomingLinks />
                 <RootNavigator />
               </LocaleProvider>
             </AuthProvider>

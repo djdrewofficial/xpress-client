@@ -2,7 +2,7 @@ import { apiBase, authorizedFetch } from '@/lib/api';
 
 /* Invite a partner or planner to the couple's event. Posts to the XOS mobile
    endpoint, which creates/refreshes the event_guests row and emails a branded
-   invite (the link deep-links back into this app; sign-in is a one-time code). */
+   invite (the link deep-links back into this app). */
 
 export async function inviteGuest(input: {
   eventId: string;

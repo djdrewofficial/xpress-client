@@ -3,6 +3,7 @@ import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { DeleteAccountSheet, InviteSentSheet } from '@/components/AccountSheets';
+import { HostEventTools } from '@/components/HostEventTools';
 import { InvitePersonSheet } from '@/components/InvitePersonSheet';
 import { EventSwitcher } from '@/components/EventSwitcher';
 import {
@@ -22,6 +23,8 @@ import {
 } from '@/components/eventDisplay';
 import { Type } from '@/lib/theme';
 import { staffSeesFinancials, useAuth } from '@/lib/auth';
+import { viewerRole } from '@/lib/membership';
+import { appleAuthorizationCode, sessionUsesApple } from '@/lib/socialAuth';
 import { useEvent } from '@/lib/events';
 import {
   deleteAccount,
@@ -68,7 +71,7 @@ export default function AccountScreen() {
 
   const load = useCallback(async () => {
     if (!profile) return;
-    const isGuest = profile.accountType === 'event_guest';
+    const isGuest = viewerRole(event, profile.accountType) === 'guest';
     const canSeeFinancials = profile.accountType === 'staff' ? staffSeesFinancials(profile) : true;
     try {
       const account = event ? await loadAccount(event.id, isGuest, canSeeFinancials) : null;
@@ -107,9 +110,12 @@ export default function AccountScreen() {
 
   const confirmDelete = useCallback(async () => {
     setDeletePhase('working');
-    const ok = await deleteAccount();
+    // Apple only returns a fresh authorization code from another Sign in with Apple
+    // prompt. Cancel still deletes the Xpress account. Revocation itself is server-side.
+    const code = sessionUsesApple(session) ? await appleAuthorizationCode() : null;
+    const ok = await deleteAccount({ appleAuthorizationCode: code });
     setDeletePhase(ok ? 'done' : 'error');
-  }, []);
+  }, [session]);
 
   const isStaff = profile?.accountType === 'staff';
   const emailAddress = (data?.officeEmail?.trim() || OFFICE_EMAIL_FALLBACK).trim();
@@ -121,7 +127,7 @@ export default function AccountScreen() {
     : null;
   const hiddenReason = !data || data.financialsVisible
     ? null
-    : profile?.accountType === 'event_guest'
+    : viewerRole(event, profile?.accountType) === 'guest'
       ? 'guest'
       : profile?.accountType === 'staff' && !staffSeesFinancials(profile)
         ? 'role'
@@ -147,17 +153,17 @@ export default function AccountScreen() {
         financials={financials}
         banner={hiddenReason ? hiddenFinancialsBanner(hiddenReason, locale) : null}
         guest={
-          profile?.accountType === 'event_guest' && event
+          viewerRole(event, profile?.accountType) === 'guest' && event
             ? { role: guestRole === 'Guest' || !guestRole ? t('common.guest') : guestRole, invitedBy: coupleName || event.name }
             : null
         }
         eventFacts={
           data && !data.financialsVisible
-            ? { dateLabel: formatMediumDate(event?.event_date, locale) ?? t('common.dateTbd'), venue: venueName }
+            ? { dateLabel: formatMediumDate(event?.event_date, locale) ?? t('common.dateTbd'), venue: venueName || event?.venueName || null }
             : null
         }
         packageInfo={
-          data
+          data && viewerRole(event, profile?.accountType) !== 'guest'
             ? {
                 name: data.packageName ?? t('event.customPackage'),
                 detail:
@@ -182,7 +188,8 @@ export default function AccountScreen() {
         onCall={() => Linking.openURL(`tel:${phone}`)}
         onText={() => Linking.openURL(`sms:${phone}`)}
         onEmail={() => Linking.openURL(`mailto:${emailAddress}`)}
-        showInvite={profile?.accountType === 'client' && !!eventId}
+        showInvite={false}
+        hostTools={viewerRole(event, profile?.accountType) === 'host' && eventId ? <HostEventTools eventId={eventId} /> : null}
         onInvite={() => setShowInvite(true)}
         accountName={accountName}
         accountEmail={session?.user.email ?? null}

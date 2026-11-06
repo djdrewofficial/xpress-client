@@ -1,18 +1,20 @@
 import { useLayoutEffect } from 'react';
 import { Redirect, useLocalSearchParams } from 'expo-router';
 
+import { JoinEventScreen } from '@/components/JoinEventScreen';
 import { FirstSongStep } from '@/components/onboarding/FirstSongStep';
 import { MusicStep } from '@/components/onboarding/MusicStep';
 import { WelcomeScreen } from '@/components/onboarding/WelcomeScreen';
+import { ForgotPasswordScreen } from '@/components/sign-in/ForgotPasswordScreen';
 import { SignInScreen } from '@/components/sign-in/SignInScreen';
-import { useT } from '@/lib/i18n';
+import { SignUpScreen } from '@/components/sign-in/SignUpScreen';
 import { useDevLocale } from '@/lib/devLocale';
-import type { OtpTransport } from '@/lib/otp';
+import { useT } from '@/lib/i18n';
 import type { WelcomeSnapshot } from '@/lib/welcome';
 
 /**
- * Dev-only stills of this phase, with sample data. Not linked from the app.
- * Open /dev/phase2?frame=login|code|code-error|welcome|welcome-es|privacy|music|song
+ * Dev-only stills. Not linked from the app.
+ * Open /dev/phase2?frame=login|signup|forgot|join|welcome|welcome-es|privacy|music|song
  */
 
 const SAMPLE: WelcomeSnapshot = {
@@ -20,11 +22,6 @@ const SAMPLE: WelcomeSnapshot = {
   date: '2027-06-12',
   venue: 'Sample Venue',
   progress: 43,
-};
-
-const fake: OtpTransport = {
-  send: async () => ({ ok: true }),
-  verify: async (_channel, _target, token) => token.replace(/\D/g, '') !== '482107',
 };
 
 export default function Phase2Preview() {
@@ -40,22 +37,9 @@ export default function Phase2Preview() {
 
   if (!__DEV__) return <Redirect href="/login" />;
 
-  if (frame === 'code' || frame === 'code-es') {
-    return (
-      <SignInScreen
-        transport={fake}
-        initial={{ phase: 'code', phone: '(555) 555-0123', code: '482', seconds: 28, autoFocus: false }}
-      />
-    );
-  }
-  if (frame === 'code-error') {
-    return (
-      <SignInScreen
-        transport={fake}
-        initial={{ phase: 'code', phone: '(555) 555-0123', code: '482107', error: true, autoFocus: false }}
-      />
-    );
-  }
+  if (frame === 'signup' || frame === 'signup-es') return <SignUpScreen />;
+  if (frame === 'forgot' || frame === 'forgot-es') return <ForgotPasswordScreen />;
+  if (frame === 'join' || frame === 'join-es') return <JoinEventScreen onJoined={async () => {}} />;
   if (frame === 'welcome' || frame === 'welcome-es') {
     return <WelcomeScreen preview={SAMPLE} onContinue={() => {}} />;
   }
@@ -68,5 +52,5 @@ export default function Phase2Preview() {
   if (frame === 'song') {
     return <FirstSongStep preview onSkip={() => {}} onDone={() => {}} />;
   }
-  return <SignInScreen transport={fake} initial={{ phone: '(555) 555-0123' }} />;
+  return <SignInScreen />;
 }

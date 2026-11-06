@@ -29,6 +29,9 @@ function buildClient(): SupabaseClient {
       autoRefreshToken: !webServer,
       persistSession: !webServer,
       detectSessionInUrl: false,
+      // Email confirmation and password reset return a ?code= on the app link.
+      // Existing refresh tokens keep working. This does not turn on magic-link login.
+      flowType: 'pkce',
     },
   });
 }

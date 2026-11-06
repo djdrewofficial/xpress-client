@@ -1,6 +1,5 @@
-import { Redirect } from 'expo-router';
+import { ForgotPasswordScreen } from '@/components/sign-in/ForgotPasswordScreen';
 
-/** Legacy route. Password reset is gone; old links land on the one-time-code screen. */
-export default function ForgotPasswordScreen() {
-  return <Redirect href="/login" />;
+export default function ForgotPasswordRoute() {
+  return <ForgotPasswordScreen />;
 }

@@ -4,7 +4,7 @@ import { apiBase, authorizedFetch } from '@/lib/api';
    GET/PUT /api/mobile/planning/sections/{id}/notes
    Couples and guests receive { notes }. Staff also receive { staffNotes }.
    PUT body is { notes?, staffNotes? }. Blank text is stored as null.
-   Guests cannot write (403). A 404 means the route is not deployed yet. */
+   Guests can write notes on sections the host left open. A 403 means this section is closed. A 404 means the route is not deployed yet. */
 
 export const NOTE_MAX = 4000;
 
