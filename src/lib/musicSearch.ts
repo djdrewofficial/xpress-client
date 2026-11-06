@@ -1,4 +1,4 @@
-import { apiBase, authHeader } from '@/lib/api';
+import { apiBase, authorizedFetch } from '@/lib/api';
 
 /* Talks to the XOS music endpoints (search across Spotify/Apple/YouTube +
    iTunes preview resolution) using the signed-in user's Supabase token. */
@@ -21,9 +21,7 @@ export async function searchTracks(query: string): Promise<Track[]> {
   const q = query.trim();
   if (!base || q.length < 2) return [];
   try {
-    const res = await fetch(`${base}/api/music/search?q=${encodeURIComponent(q)}`, {
-      headers: await authHeader(),
-    });
+    const res = await authorizedFetch(`${base}/api/music/search?q=${encodeURIComponent(q)}`);
     if (!res.ok) return [];
     const json = (await res.json()) as { results?: Track[] };
     return json.results ?? [];
@@ -37,9 +35,8 @@ export async function resolvePreview(title: string, artist: string): Promise<str
   const base = apiBase();
   if (!base) return null;
   try {
-    const res = await fetch(
+    const res = await authorizedFetch(
       `${base}/api/music/preview?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`,
-      { headers: await authHeader() },
     );
     if (!res.ok) return null;
     const json = (await res.json()) as { url?: string | null };

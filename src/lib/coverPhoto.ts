@@ -1,15 +1,9 @@
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '@/lib/supabase';
-import { apiBase } from '@/lib/api';
+import { apiBase, authorizedFetch } from '@/lib/api';
 
 /* Couple-uploaded event header photo. Picks from the library, then POSTs it to
    the XOS mobile API (which verifies access and stores it via the admin client —
    clients can't write events.cover_photo_url directly under RLS). */
-
-async function authToken(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token ?? null;
-}
 
 /** Open the photo library and return the chosen asset (or null if cancelled). */
 export async function pickCoverImage(): Promise<ImagePicker.ImagePickerAsset | null> {
@@ -29,8 +23,6 @@ export async function pickCoverImage(): Promise<ImagePicker.ImagePickerAsset | n
 export async function uploadCoverPhoto(eventId: string, asset: ImagePicker.ImagePickerAsset): Promise<string> {
   const base = apiBase();
   if (!base) throw new Error('App is not configured (EXPO_PUBLIC_API_URL).');
-  const token = await authToken();
-  if (!token) throw new Error('You are signed out.');
 
   const name = asset.fileName || `cover.${(asset.mimeType ?? 'image/jpeg').split('/')[1] || 'jpg'}`;
   const form = new FormData();
@@ -38,10 +30,9 @@ export async function uploadCoverPhoto(eventId: string, asset: ImagePicker.Image
   // React Native FormData file shape
   form.append('photo', { uri: asset.uri, name, type: asset.mimeType ?? 'image/jpeg' } as unknown as Blob);
 
-  const res = await fetch(`${base}/api/mobile/cover-photo`, {
+  const res = await authorizedFetch(`${base}/api/mobile/cover-photo`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` }, // let fetch set the multipart boundary
-    body: form,
+    body: form, // let fetch set the multipart boundary
   });
   const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
   if (!res.ok) throw new Error(json.error || `Upload failed (${res.status})`);

@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { apiBase } from '@/lib/api';
+import { apiBase, authorizedFetch } from '@/lib/api';
 
 /**
  * AI song recommendations grounded in the couple's own words.
@@ -100,14 +100,10 @@ export async function getRecommendations(opts: {
   const ctx = await loadCoupleContext(opts.eventId, opts.eventName);
   if (!hasContext(ctx)) return { status: 'needs-profile' };
 
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) return { status: 'error', message: 'Not signed in' };
-
   try {
-    const res = await fetch(`${base}/api/music/recommend`, {
+    const res = await authorizedFetch(`${base}/api/music/recommend`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         eventId: opts.eventId,
         section: opts.sectionTitle,

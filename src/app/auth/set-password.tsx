@@ -32,6 +32,12 @@ function isHashType(value: string): value is HashType {
 
 async function adoptInviteUrl(url: string): Promise<boolean> {
   try {
+    // A live session must win. setSession/verifyOtp on a stale invite link calls
+    // GoTrue with that link's token; a session_not_found response makes the
+    // client drop the session that is already on the device.
+    const existing = await supabase.auth.getSession();
+    if (existing.data.session) return true;
+
     const p = parseParams(url);
     if (p.access_token && p.refresh_token) {
       const { error } = await supabase.auth.setSession({
@@ -66,7 +72,17 @@ export default function SetPasswordScreen() {
     const finish = (ok: boolean) => {
       if (cancelled || settled) return;
       settled = true;
-      router.replace(ok ? '/' : '/login');
+      if (ok) {
+        router.replace('/');
+        return;
+      }
+      // The 1.5s fallback used to send a still-signed-in user to /login.
+      supabase.auth.getSession().then(({ data }) => {
+        if (cancelled) return;
+        router.replace(data.session ? '/' : '/login');
+      }).catch(() => {
+        if (!cancelled) router.replace('/login');
+      });
     };
     const timer = setTimeout(() => finish(false), 1500);
 

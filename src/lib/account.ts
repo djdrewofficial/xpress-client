@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { apiBase, authHeader } from '@/lib/api';
+import { apiBase, authorizedFetch } from '@/lib/api';
 
 /* Read-only event package + payment summary + team contacts for the Account tab.
    Mirrors XOS's price logic: override -> locked -> live default; "Investment"
@@ -144,7 +144,7 @@ export async function deleteAccount(): Promise<boolean> {
   const base = apiBase();
   if (!base) return false;
   try {
-    const res = await fetch(`${base}/api/mobile/delete-account`, { method: 'POST', headers: await authHeader() });
+    const res = await authorizedFetch(`${base}/api/mobile/delete-account`, { method: 'POST' });
     return res.ok;
   } catch {
     return false;

@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { apiBase } from '@/lib/api';
+import { apiBase, authorizedFetch } from '@/lib/api';
 
 export type EventLite = {
   id: string;
@@ -380,13 +380,10 @@ export async function loadOverview(eventId: string): Promise<Overview> {
 async function sectionAction(body: Record<string, unknown>): Promise<boolean> {
   const base = apiBase();
   if (!base) return false;
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) return false;
   try {
-    const res = await fetch(`${base}/api/mobile/planning/sections`, {
+    const res = await authorizedFetch(`${base}/api/mobile/planning/sections`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     return res.ok;
@@ -424,13 +421,10 @@ export type AddableSection = { templateSectionId: string; title: string; icon: s
 export async function getAddableSections(eventId: string): Promise<AddableSection[]> {
   const base = apiBase();
   if (!base) return [];
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) return [];
   try {
-    const res = await fetch(`${base}/api/mobile/planning/addable-sections?eventId=${encodeURIComponent(eventId)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await authorizedFetch(
+      `${base}/api/mobile/planning/addable-sections?eventId=${encodeURIComponent(eventId)}`,
+    );
     if (!res.ok) return [];
     const json = (await res.json()) as { sections?: AddableSection[] };
     return json.sections ?? [];
