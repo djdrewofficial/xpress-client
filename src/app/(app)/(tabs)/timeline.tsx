@@ -52,10 +52,10 @@ function toMoment(s: SectionRow, locale: Locale): TimelineMoment {
     title: s.title,
     icon: s.icon,
     timeLabel: s.time_label,
-    // Timeline moments are the schedule, so they offer a time. Templates leave
-    // `time_enabled` off, which hid the control. Info rows pinned to the timeline
-    // stay dot-only unless Time is on or a time is already saved.
-    timeEnabled: s.time_enabled || s.section_type === 'timeline' || !!s.time_label,
+    // Staff Time toggle on the section (planning_sections.time_enabled). The
+    // timeline reads this from Supabase with the rest of the row; it is not
+    // inferred from the section type.
+    timeEnabled: s.time_enabled === true,
     locked: s.locked,
     meta,
     badge,
