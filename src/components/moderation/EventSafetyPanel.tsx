@@ -6,7 +6,6 @@ import { useT } from '@/lib/i18n';
 import {
   listBlocks,
   loadEventContent,
-  personTag,
   type EventContent,
   type ModerationKind,
 } from '@/lib/moderation';
@@ -53,36 +52,20 @@ export function EventSafetyPanel({
   const visible = (hidden: boolean) => !hidden;
   const songs = content?.songs.filter((song) => visible(song.hidden)) ?? [];
   const likes = (content?.likes ?? []).filter((like) => visible(like.hidden) && like.userId !== userId);
+  const likesOnSong = new Map<string, string[]>();
+  for (const like of likes) {
+    const list = likesOnSong.get(like.songId) ?? [];
+    list.push(like.userId);
+    likesOnSong.set(like.songId, list);
+  }
+  const singleLikes = [...likesOnSong.entries()].filter(([, ids]) => ids.length === 1);
+  const ambiguousPeople = blocked.filter((id) => id !== userId).length > 1 || [...likesOnSong.values()].some((ids) => ids.length > 1);
   const ideas = (content?.songIdeas ?? []).filter((idea) => visible(idea.hidden));
   const avoid = content?.doNotPlayNotes && visible(content.doNotPlayNotes.hidden) && content.doNotPlayNotes.text?.trim()
     ? content.doNotPlayNotes
     : null;
-  const people = new Set<string>();
-  for (const song of songs) if (song.requestedBy && song.requestedBy !== userId) people.add(song.requestedBy);
-  for (const like of likes) people.add(like.userId);
-  for (const answer of content?.answers ?? []) {
-    if (!visible(answer.hidden)) continue;
-    if (answer.answeredBy && answer.answeredBy !== userId) people.add(answer.answeredBy);
-  }
-  for (const idea of ideas) if (idea.addedBy && idea.addedBy !== userId) people.add(idea.addedBy);
-  for (const note of content?.sectionNotes ?? []) {
-    if (!visible(note.hidden) || !note.updatedBy || note.updatedBy === userId) continue;
-    people.add(note.updatedBy);
-  }
-  if (content?.coverPhoto && visible(content.coverPhoto.hidden) && content.coverPhoto.updatedBy && content.coverPhoto.updatedBy !== userId) {
-    people.add(content.coverPhoto.updatedBy);
-  }
-  if (content?.boothSelection && visible(content.boothSelection.hidden) && content.boothSelection.updatedBy && content.boothSelection.updatedBy !== userId) {
-    people.add(content.boothSelection.updatedBy);
-  }
-  if (content?.timelineFile && visible(content.timelineFile.hidden) && content.timelineFile.uploadedBy && content.timelineFile.uploadedBy !== userId) {
-    people.add(content.timelineFile.uploadedBy);
-  }
-  if (avoid?.updatedBy && avoid.updatedBy !== userId) people.add(avoid.updatedBy);
-  for (const id of blocked) if (id !== userId) people.delete(id);
-
-  const who = (id: string) => t('safety.personTag', { id: personTag(id) });
   const songTitle = (songId: string) => songs.find((song) => song.id === songId)?.title ?? t('safety.likes');
+  const onlyBlocked = blocked.filter((id) => id !== userId);
 
   return (
     <View style={{ gap: 10 }}>
@@ -94,32 +77,17 @@ export function EventSafetyPanel({
       {!loading && !notice ? (
         <>
           <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.intro')}</Text>
+          {ambiguousPeople ? <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.namesUnavailable')}</Text> : null}
           <Text style={[Type.subhead, { color: c.ink }]}>{t('safety.blockedPeople')}</Text>
-          {blocked.length === 0 ? (
+          {onlyBlocked.length === 0 ? (
             <Text style={[Type.footnote, { color: c.ink3 }]}>{t('safety.noBlocked')}</Text>
-          ) : (
-            blocked.map((id) => (
-              <Card key={id}>
-                <Text style={[Type.callout, { color: c.ink }]}>{who(id)}</Text>
-                <SafetyLinks blockLabel={t('safety.unblock')} onBlock={() => moderation.askUnblock(id)} />
-              </Card>
-            ))
-          )}
-
-          {[...people].length > 0 ? <Text style={[Type.subhead, { color: c.ink }]}>{t('safety.people')}</Text> : null}
-          {[...people].map((id) => (
-            <Card key={id}>
-              <Text style={[Type.callout, { color: c.ink }]}>{who(id)}</Text>
-              <SafetyLinks
-                reportLabel={t('safety.reportPerson')}
-                onReport={() => moderation.openReport({ targetType: 'user', targetUserId: id })}
-                blockLabel={t('safety.block')}
-                onBlock={() => moderation.askBlock(id)}
-                guestLabel={canManage ? t('safety.removeGuest') : undefined}
-                onRemoveGuest={canManage ? () => moderation.askRemoveGuest(id) : undefined}
-              />
+          ) : null}
+          {onlyBlocked.length === 1 ? (
+            <Card>
+              <Text style={[Type.callout, { color: c.ink }]}>{t('safety.blockedOne')}</Text>
+              <SafetyLinks blockLabel={t('safety.unblock')} onBlock={() => moderation.askUnblock(onlyBlocked[0])} />
             </Card>
-          ))}
+          ) : null}
 
           {ideas.length > 0 ? <Text style={[Type.subhead, { color: c.ink }]}>{t('safety.songIdeas')}</Text> : null}
           {ideas.map((idea) => {
@@ -131,8 +99,10 @@ export function EventSafetyPanel({
                 <SafetyLinks
                   reportLabel={mine ? undefined : t('safety.reportIdea')}
                   onReport={mine ? undefined : () => moderation.openReport({ targetType: 'song_idea', targetId: idea.id })}
-                  blockLabel={idea.addedBy && !mine ? t('safety.block') : undefined}
+                  blockLabel={idea.addedBy && !mine ? t('safety.blockAdded') : undefined}
                   onBlock={idea.addedBy && !mine ? () => moderation.askBlock(idea.addedBy as string) : undefined}
+                  guestLabel={canManage && idea.addedBy && !mine ? t('safety.removeGuest') : undefined}
+                  onRemoveGuest={canManage && idea.addedBy && !mine ? () => moderation.askRemoveGuest(idea.addedBy as string) : undefined}
                   hideLabel={canManage || mine ? t('safety.remove') : undefined}
                   onHide={canManage || mine ? () => moderation.askHide({ targetType: 'song_idea', targetId: idea.id }) : undefined}
                 />
@@ -151,22 +121,25 @@ export function EventSafetyPanel({
                 onHide={canManage || avoid.updatedBy === userId ? () => moderation.askHide({ targetType: 'do_not_play_note', targetId: eventId }) : undefined}
                 blockLabel={avoid.updatedBy && avoid.updatedBy !== userId ? t('safety.block') : undefined}
                 onBlock={avoid.updatedBy && avoid.updatedBy !== userId ? () => moderation.askBlock(avoid.updatedBy as string) : undefined}
+                guestLabel={canManage && avoid.updatedBy && avoid.updatedBy !== userId ? t('safety.removeGuest') : undefined}
+                onRemoveGuest={canManage && avoid.updatedBy && avoid.updatedBy !== userId ? () => moderation.askRemoveGuest(avoid.updatedBy as string) : undefined}
               />
             </Card>
           ) : null}
 
-          {likes.length > 0 ? <Text style={[Type.subhead, { color: c.ink }]}>{t('safety.likes')}</Text> : null}
-          {likes.map((like) => (
-            <Card key={`${like.songId}:${like.userId}`}>
-              <Text style={[Type.callout, { color: c.ink }]}>{songTitle(like.songId)}</Text>
-              <Text style={[Type.footnote, { color: c.ink3 }]}>{who(like.userId)}</Text>
+          {singleLikes.length > 0 ? <Text style={[Type.subhead, { color: c.ink }]}>{t('safety.likes')}</Text> : null}
+          {singleLikes.map(([songId, ids]) => (
+            <Card key={songId}>
+              <Text style={[Type.callout, { color: c.ink }]}>{songTitle(songId)}</Text>
               <SafetyLinks
                 reportLabel={t('safety.reportLike')}
-                onReport={() => moderation.openReport({ targetType: 'song_like', targetId: like.songId, targetUserId: like.userId })}
-                blockLabel={t('safety.block')}
-                onBlock={() => moderation.askBlock(like.userId)}
+                onReport={() => moderation.openReport({ targetType: 'song_like', targetId: songId, targetUserId: ids[0] })}
+                blockLabel={t('safety.blockLiked')}
+                onBlock={() => moderation.askBlock(ids[0])}
                 hideLabel={canManage ? t('safety.hideLike') : undefined}
-                onHide={canManage ? () => moderation.askHide({ targetType: 'song_like', targetId: like.songId, targetUserId: like.userId }) : undefined}
+                onHide={canManage ? () => moderation.askHide({ targetType: 'song_like', targetId: songId, targetUserId: ids[0] }) : undefined}
+                guestLabel={canManage ? t('safety.removeGuest') : undefined}
+                onRemoveGuest={canManage ? () => moderation.askRemoveGuest(ids[0]) : undefined}
               />
             </Card>
           ))}

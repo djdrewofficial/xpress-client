@@ -91,10 +91,6 @@ const ONLY_GUEST = 'Only a guest can be removed.';
 const SELF_REPORT = "You can't report yourself.";
 const SELF_BLOCK = "You can't block yourself.";
 
-export function personTag(userId: string): string {
-  return userId.replace(/-/g, '').slice(-4).toLowerCase();
-}
-
 function classify(status: number, error: string): ModerationKind {
   if (status === 503) return 'unavailable';
   if (status === 401) return 'session';

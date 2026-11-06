@@ -16,7 +16,7 @@ import {
 } from '@/components/ui';
 import { SafetyLinks } from '@/components/moderation/SafetyLinks';
 import { useT } from '@/lib/i18n';
-import { personTag, type ModerationTarget } from '@/lib/moderation';
+import type { ModerationTarget } from '@/lib/moderation';
 import { questionVisible, type QuestionRow } from '@/lib/planning';
 import { getSectionNotes, normalizeNoteText, saveSectionNotes, type SectionNotesSave } from '@/lib/sectionNotes';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
@@ -49,6 +49,7 @@ export type MomentSafety = {
   onReport: (target: ModerationTarget) => void;
   onBlock: (userId: string) => void;
   onHide: (target: ModerationTarget) => void;
+  onRemoveGuest: (userId: string) => void;
 };
 
 type Tab = MomentTab;
@@ -348,40 +349,63 @@ export function MomentBody({
 }
 
 function SongMenuSafety({ song, safety, onDone }: { song: MomentSong; safety: MomentSafety; onDone: () => void }) {
+  const c = useC();
   const { t } = useT();
   const likes = [...new Set((song.likeUserIds ?? []).filter((id) => id && id !== safety.userId))];
-  const people = new Set<string>();
-  if (song.requestedBy && song.requestedBy !== safety.userId) people.add(song.requestedBy);
-  for (const id of likes) people.add(id);
-  const named = (id: string) => t('safety.personTag', { id: personTag(id) });
+  const requester = song.requestedBy && song.requestedBy !== safety.userId ? song.requestedBy : null;
+  const onlyLike = likes.length === 1 ? likes[0] : null;
+  const onlyPerson = requester && (!onlyLike || onlyLike === requester)
+    ? requester
+    : !requester && onlyLike
+      ? onlyLike
+      : null;
   return (
     <>
-      {likes.map((id) => (
+      {onlyPerson ? (
         <Button
-          key={`like-${id}`}
-          label={likes.length > 1 ? t('safety.reportLikeNamed', { who: named(id) }) : t('safety.reportLike')}
+          label={t('safety.reportPerson')}
           variant="ghost"
-          onPress={() => { onDone(); safety.onReport({ targetType: 'song_like', targetId: song.id, targetUserId: id }); }}
+          onPress={() => { onDone(); safety.onReport({ targetType: 'user', targetUserId: onlyPerson }); }}
         />
-      ))}
-      {[...people].map((id) => (
+      ) : null}
+      {onlyLike ? (
         <Button
-          key={`block-${id}`}
-          label={people.size > 1 ? t('safety.blockNamed', { who: named(id) }) : t('safety.block')}
+          label={t('safety.reportLike')}
           variant="ghost"
-          onPress={() => { onDone(); safety.onBlock(id); }}
+          onPress={() => { onDone(); safety.onReport({ targetType: 'song_like', targetId: song.id, targetUserId: onlyLike }); }}
         />
-      ))}
-      {safety.canManage
-        ? likes.map((id) => (
-          <Button
-            key={`hide-like-${id}`}
-            label={t('safety.hideLike')}
-            variant="ghost"
-            onPress={() => { onDone(); safety.onHide({ targetType: 'song_like', targetId: song.id, targetUserId: id }); }}
-          />
-        ))
-        : null}
+      ) : null}
+      {likes.length > 1 ? (
+        <Text style={[Type.footnote, { color: c.ink3, textAlign: 'center' }]}>{t('safety.namesUnavailable')}</Text>
+      ) : null}
+      {requester ? (
+        <Button
+          label={onlyLike && onlyLike !== requester ? t('safety.blockAdded') : t('safety.block')}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onBlock(requester); }}
+        />
+      ) : null}
+      {onlyLike && onlyLike !== requester ? (
+        <Button
+          label={t('safety.blockLiked')}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onBlock(onlyLike); }}
+        />
+      ) : null}
+      {safety.canManage && onlyLike ? (
+        <Button
+          label={t('safety.hideLike')}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onHide({ targetType: 'song_like', targetId: song.id, targetUserId: onlyLike }); }}
+        />
+      ) : null}
+      {safety.canManage && requester ? (
+        <Button
+          label={t('safety.removeGuest')}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onRemoveGuest(requester); }}
+        />
+      ) : null}
     </>
   );
 }
@@ -414,6 +438,8 @@ function AnswerSafety({
       onHide={canHide ? () => safety.onHide({ targetType, targetId: questionId }) : undefined}
       blockLabel={canBlock ? t('safety.block') : undefined}
       onBlock={canBlock && authorId ? () => safety.onBlock(authorId) : undefined}
+      guestLabel={safety.canManage && canBlock ? t('safety.removeGuest') : undefined}
+      onRemoveGuest={safety.canManage && canBlock && authorId ? () => safety.onRemoveGuest(authorId) : undefined}
     />
   );
 }

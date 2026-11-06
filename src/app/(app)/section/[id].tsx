@@ -21,7 +21,6 @@ import {
   loadMyLikes,
   loadOverview,
   loadSection,
-  removeSong,
   saveAnswer,
   setMustPlay,
   setSectionTime,
@@ -220,22 +219,22 @@ export default function SectionScreen() {
   };
 
   const hideSong = async (song: MomentSong) => {
-    setSongs((prev) => prev.filter((s) => s.id !== song.id));
     const hidden = await hideContent(eventId, { targetType: 'song', targetId: song.id });
-    if (hidden.ok) return;
-    if (hidden.kind === 'unavailable' && await removeSong(song.id)) return;
-    Alert.alert(t(hidden.kind === 'unavailable'
-      ? 'safety.unavailable'
-      : hidden.kind === 'ownOnly'
-        ? 'safety.ownOnly'
-        : hidden.kind === 'guestOnly'
-          ? 'safety.guestOnly'
-          : hidden.kind === 'forbidden'
-            ? 'safety.forbidden'
-            : hidden.kind === 'notFound'
-              ? 'safety.notFound'
-              : 'safety.failed'));
-    load();
+    if (!hidden.ok) {
+      Alert.alert(t(hidden.kind === 'unavailable'
+        ? 'safety.unavailable'
+        : hidden.kind === 'ownOnly'
+          ? 'safety.ownOnly'
+          : hidden.kind === 'guestOnly'
+            ? 'safety.guestOnly'
+            : hidden.kind === 'forbidden'
+              ? 'safety.forbidden'
+              : hidden.kind === 'notFound'
+                ? 'safety.notFound'
+                : 'safety.failed'));
+      return;
+    }
+    setSongs((prev) => prev.filter((s) => s.id !== song.id));
   };
 
   const onSaveNote = async (song: MomentSong, note: string) => {
@@ -340,6 +339,7 @@ export default function SectionScreen() {
           onReport: moderation.openReport,
           onBlock: moderation.askBlock,
           onHide: moderation.askHide,
+          onRemoveGuest: moderation.askRemoveGuest,
         }}
       />
       <SongPicker
