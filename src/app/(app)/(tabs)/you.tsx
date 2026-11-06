@@ -10,7 +10,9 @@ import {
   MyEventView,
   type MyEventFinancials,
 } from '@/components/MyEventView';
+import { LegalSheet } from '@/components/onboarding/LegalSheet';
 import { Sheet, useC } from '@/components/ui';
+import type { LegalDoc } from '@/lib/legal';
 import {
   decorateSchedule,
   formatEyebrow,
@@ -37,8 +39,6 @@ import { readMarketingTexts, writeMarketingTexts } from '@/lib/language';
 import { translate, useT, type Locale } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 
-const PRIVACY_URL = 'https://xos.xpressdjs.com/app-privacy';
-
 export default function AccountScreen() {
   const c = useC();
   const router = useRouter();
@@ -62,6 +62,7 @@ export default function AccountScreen() {
   const [switcher, setSwitcher] = useState(false);
   const [packageOpen, setPackageOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [legal, setLegal] = useState<LegalDoc | null>(null);
   const [deletePhase, setDeletePhase] = useState<'confirm' | 'working' | 'done' | 'error'>('confirm');
 
   useEffect(() => {
@@ -192,7 +193,9 @@ export default function AccountScreen() {
         onInvite={() => setShowInvite(true)}
         accountName={accountName}
         accountEmail={session?.user.email ?? null}
-        onPrivacy={() => Linking.openURL(PRIVACY_URL)}
+        onPrivacy={() => setLegal('privacy')}
+        onTerms={() => setLegal('terms')}
+        onDeletion={() => setLegal('deletion')}
         onSignOut={() => signOut()}
         onDelete={() => {
           setDeletePhase('confirm');
@@ -215,6 +218,7 @@ export default function AccountScreen() {
         />
       ) : null}
       <InviteSentSheet visible={!!sentTo} email={sentTo ?? ''} onClose={() => setSentTo(null)} />
+      <LegalSheet visible={legal != null} doc={legal} onClose={() => setLegal(null)} />
       <DeleteAccountSheet
         visible={deleteOpen}
         phase={deletePhase}

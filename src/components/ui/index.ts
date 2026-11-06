@@ -30,4 +30,4 @@ export { Sheet } from './Sheet';
 export { CoachMark } from './CoachMark';
 export { CodeInput } from './CodeInput';
 export { LanguageCard } from './LanguageCard';
-export { LegalLine } from './LegalLine';
+export { LegalLine, PolicyLinks } from './LegalLine';

@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Modal, Platfor
 
 import { Icon, useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { useT } from '@/lib/i18n';
 import { Brand, Fonts, Radius, Space } from '@/lib/theme';
 import { getSocialPromptState, saveSocialHandles, type SocialPromptState } from '@/lib/social';
 
@@ -10,6 +11,7 @@ const cleanHandle = (s: string) => s.trim().replace(/^@+/, '');
 
 export function SocialPrompt() {
   const c = useC();
+  const { t } = useT();
   const { session } = useAuth();
   const [state, setState] = useState<SocialPromptState | null>(null);
   const [step, setStep] = useState<1 | 2>(1);
@@ -55,9 +57,7 @@ export function SocialPrompt() {
             <>
               <Icon name="camera" size={40} color={c.accent} />
               <Text style={[styles.title, { color: c.text }]}>Let&apos;s connect!</Text>
-              <Text style={[styles.sub, { color: c.textSecondary }]}>
-                Share your Instagram &amp; TikTok so we can tag you and feature your big day.
-              </Text>
+              <Text style={[styles.sub, { color: c.textSecondary }]}>{t('social.optional')}</Text>
 
               <View style={styles.fields}>
                 <Field label="Instagram" value={ig} onChange={setIg} c={c} />
@@ -65,10 +65,10 @@ export function SocialPrompt() {
               </View>
 
               <Pressable onPress={() => resolve(false)} disabled={busy} style={[styles.primary, { backgroundColor: Brand.purple, opacity: busy ? 0.7 : 1 }]}>
-                {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryTxt}>Save</Text>}
+                {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryTxt}>{t('social.save')}</Text>}
               </Pressable>
               <Pressable onPress={() => resolve(true)} disabled={busy} hitSlop={10} style={styles.skip}>
-                <Text style={{ color: c.textTertiary, fontSize: 14, fontWeight: '600' }}>I don&apos;t have these</Text>
+                <Text style={{ color: c.textTertiary, fontSize: 14, fontWeight: '600' }}>{t('social.skip')}</Text>
               </Pressable>
             </>
           ) : (

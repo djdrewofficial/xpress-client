@@ -156,7 +156,7 @@ function GalleryBody({ scheme, onScheme }: { scheme: Scheme; onScheme: (s: Schem
         </Section>
       </ScrollView>
       <Sheet visible={sheet} onClose={() => setSheet(false)} title="Privacy Policy">
-        <Text style={[Type.body, { color: c.ink2 }]}>Placeholder sheet. The live policy stays at the existing privacy URL.</Text>
+        <Text style={[Type.body, { color: c.ink2 }]}>Design preview. The readable policy opens from sign-in and My Event.</Text>
         <View style={{ height: 12 }} />
         <Button label="Close" variant="ghost" onPress={() => setSheet(false)} />
       </Sheet>
