@@ -15,7 +15,9 @@ A wedding-planning companion app. The DJ (staff) runs everything from the **XOS*
 - **event_guest** — invited guests. Scoped, read/limited access (e.g. can view, some can answer/suggest).
 - **staff** — DJs/admins. Land on an **Events list** and open any event into the same planner (used for preview/management).
 
-**Sign-in is Email, Google, then Apple.** Email opens the password form as the next step, with create-account, forgot-password, and the confirmation/reset links. There is no client passkey. Staff passkeys stay in XOS and are not called from this app.
+**Sign-in is Email, Google, then Apple.** Email opens the password form as the next step, with create-account, forgot-password, and the confirmation/reset links. There is no client passkey and no For You recommendation call. Staff passkeys stay in XOS and are not called from this app.
+
+**Legal copy is in the app** (`src/lib/legalCopy.ts`), in English and Spanish, for Privacy, Terms of Use, and account deletion. Sign-in, sign-up, Welcome, and My Event open those screens. They do not link to `xos.xpressdjs.com/app-terms` or `/app-data-deletion`, which are not published yet. The older `/app-privacy` page is also not opened from the app, because it still describes deletion by email. Continuing past Welcome does not authorize marketing texts or third-party AI. There is no staff AI opt-in control in this app. Marketing texts stay off until the person turns them on in My Event.
 
 **Main screens** (file-based routes, see §3):
 - `login` — three choices: Email, Google, Apple. Email is email + password. "Forgot password" and "Create an account" stay on that step. Confirmation and reset return through `auth/confirm` and `auth/reset`.
@@ -23,7 +25,7 @@ A wedding-planning companion app. The DJ (staff) runs everything from the **XOS*
   - **Plan** (`(plan)/index.tsx`) — home. Hero card (cover photo, welcome, event date, a **countdown**, overall **progress ring**), a "pick up where you left off" card, and category cards ("groups") that open into sections.
   - **Music** (`music.tsx`) — vibe/open-dancing playlists.
   - **Timeline** (`timeline.tsx`) — the couple's event timeline view.
-  - **You** (`you.tsx`) — account: package/financials summary (when visible), team contacts, privacy policy link, and **Delete account**. There is no AI disclosure.
+  - **You** (`you.tsx`) — account: package/financials summary (when visible), team contacts, in-app Privacy, Terms, and deletion notice, and **Delete account**. There is no AI opt-in.
 - `(app)/events.tsx` — staff-only event list (couples don't see this; they use the inline event switcher when they have >1 event).
 - `(app)/(tabs)/(plan)/group/[id].tsx` — a category's section list.
 - `(app)/section/[id].tsx` — a single section: answer questions (autosave) + manage songs (search, playlist import, must-play / do-not-play, notes).

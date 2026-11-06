@@ -674,6 +674,7 @@ export function AddMusicSheet({
                       onChange={setTab}
                     />
                   </View>
+                  <Text style={[Type.footnote, { color: c.ink3, paddingHorizontal: 20 }]}>{t('add.providerNote')}</Text>
 
                   <ScrollView
                     contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: sessionCount > 0 ? 120 : 32, gap: 8 }}

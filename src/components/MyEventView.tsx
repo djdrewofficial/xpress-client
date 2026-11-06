@@ -53,6 +53,8 @@ export function MyEventView({
   accountName,
   accountEmail,
   onPrivacy,
+  onTerms,
+  onDeletion,
   onSignOut,
   onDelete,
   deleting,
@@ -85,6 +87,8 @@ export function MyEventView({
   accountName: string;
   accountEmail: string | null;
   onPrivacy: () => void;
+  onTerms: () => void;
+  onDeletion: () => void;
   onSignOut: () => void;
   onDelete: () => void;
   deleting: boolean;
@@ -311,7 +315,11 @@ export function MyEventView({
           <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
             <Cell icon="user" title={accountName} subtitle={accountEmail} />
             <View style={[styles.div, { backgroundColor: c.line, marginLeft: 62 }]} />
-            <Cell icon="shield" title={t('event.privacy')} onPress={onPrivacy} chevron />
+            <Cell icon="shield" title={t('legal.privacyTitle')} onPress={onPrivacy} chevron />
+            <View style={[styles.div, { backgroundColor: c.line, marginLeft: 62 }]} />
+            <Cell icon="file-up" title={t('legal.termsTitle')} onPress={onTerms} chevron />
+            <View style={[styles.div, { backgroundColor: c.line, marginLeft: 62 }]} />
+            <Cell icon="info" title={t('legal.deletionTitle')} onPress={onDeletion} chevron />
             <View style={[styles.div, { backgroundColor: c.line, marginLeft: 62 }]} />
             <Cell icon="signout" title={t('event.signOut')} onPress={onSignOut} chevron />
             <View style={[styles.div, { backgroundColor: c.line, marginLeft: 62 }]} />
