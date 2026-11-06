@@ -1,5 +1,4 @@
-import { supabase } from '@/lib/supabase';
-import { apiBase } from '@/lib/api';
+import { apiBase, authorizedFetch } from '@/lib/api';
 
 /* Invite a partner or planner to the couple's event. Posts to the XOS mobile
    endpoint, which creates/refreshes the event_guests row and emails a branded
@@ -13,16 +12,14 @@ export async function inviteGuest(input: {
   relationship: string;
 }): Promise<{ ok: boolean; error?: string }> {
   const base = apiBase();
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!base || !token) return { ok: false, error: 'Not signed in.' };
+  if (!base) return { ok: false, error: 'Not signed in.' };
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30000);
   try {
-    const res = await fetch(`${base}/api/mobile/invite-guest`, {
+    const res = await authorizedFetch(`${base}/api/mobile/invite-guest`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
       signal: controller.signal,
     });

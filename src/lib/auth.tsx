@@ -53,18 +53,24 @@ export function AuthProvider({ children }: PropsWithChildren) {
       settled = true;
       setLoading(false);
     };
+    // A null getSession result must not wipe a session the listener already
+    // applied, and a storage/network rejection is not a sign-out. The login
+    // screen is shown only when there is still no session after this settles.
     supabase.auth
       .getSession()
       .then(({ data }) => {
-        setSession(data.session);
+        if (data.session) setSession(data.session);
         finish();
       })
-      // never leave the app on a blank loading screen if getSession rejects
       .catch(finish);
     // ...or if it *hangs* (never resolves and never rejects — a real release-build
     // failure mode with AsyncStorage): force past the splash after 8s.
     const timer = setTimeout(finish, 8000);
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
+      if (event === 'SIGNED_OUT') setSession(null);
+      else if (next) setSession(next);
+      finish();
+    });
     return () => {
       clearTimeout(timer);
       sub.subscription.unsubscribe();
@@ -118,7 +124,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   return (
     <AuthContext.Provider
-      value={{ session, loading, profile, signOut: () => { setProfile(null); return supabase.auth.signOut().then(() => {}); } }}>
+      value={{
+        session,
+        loading,
+        profile,
+        // Local scope ends this device only. The default (global) revokes every
+        // session for the user, including XOS in the browser.
+        signOut: () => {
+          setProfile(null);
+          return supabase.auth.signOut({ scope: 'local' }).then(() => {});
+        },
+      }}>
       {children}
     </AuthContext.Provider>
   );

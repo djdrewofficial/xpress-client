@@ -1,4 +1,4 @@
-import { apiBase, authHeader } from '@/lib/api';
+import { apiBase, authorizedFetch } from '@/lib/api';
 
 import type { SectionNotesSave } from '@/lib/sectionNotes';
 
@@ -22,7 +22,7 @@ export async function getDoNotPlayNotes(eventId: string): Promise<DoNotPlayNotes
   const url = notesUrl(eventId);
   if (!url) return { ok: false, unavailable: true, forbidden: false };
   try {
-    const res = await fetch(url, { headers: { Accept: 'application/json', ...(await authHeader()) } });
+    const res = await authorizedFetch(url, { headers: { Accept: 'application/json' } });
     if (res.status === 404) return { ok: false, unavailable: true, forbidden: false };
     if (res.status === 403) return { ok: false, unavailable: false, forbidden: true };
     if (!res.ok) return { ok: false, unavailable: false, forbidden: false };
@@ -37,9 +37,9 @@ export async function saveDoNotPlayNotes(eventId: string, text: string | null): 
   const url = notesUrl(eventId);
   if (!url) return 'unavailable';
   try {
-    const res = await fetch(url, {
+    const res = await authorizedFetch(url, {
       method: 'PUT',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(await authHeader()) },
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
     });
     if (res.status === 404) return 'unavailable';

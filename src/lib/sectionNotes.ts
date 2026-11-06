@@ -1,4 +1,4 @@
-import { apiBase, authHeader } from '@/lib/api';
+import { apiBase, authorizedFetch } from '@/lib/api';
 
 /* Free-text notes for one planning section.
    GET/PUT /api/mobile/planning/sections/{id}/notes
@@ -36,7 +36,7 @@ export async function getSectionNotes(sectionId: string): Promise<SectionNotesGe
   const url = await notesUrl(sectionId);
   if (!url) return { ok: false, unavailable: true, forbidden: false };
   try {
-    const res = await fetch(url, { headers: { Accept: 'application/json', ...(await authHeader()) } });
+    const res = await authorizedFetch(url, { headers: { Accept: 'application/json' } });
     if (res.status === 404) return { ok: false, unavailable: true, forbidden: false };
     if (res.status === 403) return { ok: false, unavailable: false, forbidden: true };
     if (!res.ok) return { ok: false, unavailable: false, forbidden: false };
@@ -56,9 +56,9 @@ export async function saveSectionNotes(
   const url = await notesUrl(sectionId);
   if (!url) return 'unavailable';
   try {
-    const res = await fetch(url, {
+    const res = await authorizedFetch(url, {
       method: 'PUT',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(await authHeader()) },
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     if (res.status === 404) return 'unavailable';

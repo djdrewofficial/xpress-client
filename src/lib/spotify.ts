@@ -1,4 +1,4 @@
-import { apiBase, authHeader } from '@/lib/api';
+import { apiBase, authorizedFetch } from '@/lib/api';
 
 /* Public playlist import by pasted link (Spotify OR Apple Music), read with
    XOS's own app credentials — no user login/OAuth. The former personal-Spotify
@@ -28,7 +28,7 @@ export async function importPublicPlaylist(url: string): Promise<PlaylistImport 
   const base = apiBase();
   if (!base) return { error: 'unconfigured' };
   try {
-    const res = await fetch(`${base}/api/music/playlist?url=${encodeURIComponent(url)}`, { headers: await authHeader() });
+    const res = await authorizedFetch(`${base}/api/music/playlist?url=${encodeURIComponent(url)}`);
     const j = (await res.json().catch(() => ({}))) as { name?: string | null; tracks?: SpotifyTrack[]; error?: string };
     if (!res.ok) return { error: (j.error as PlaylistImportError) ?? 'failed' };
     return { name: j.name ?? null, tracks: j.tracks ?? [] };

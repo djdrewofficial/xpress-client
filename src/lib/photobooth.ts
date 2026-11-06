@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { apiBase, authHeader } from '@/lib/api';
+import { apiBase, authorizedFetch } from '@/lib/api';
 
 /* Photo Booth planner module data layer (mobile).
    - Backdrops are XOS-managed; read directly via Supabase (RLS exposes active ones).
@@ -110,7 +110,7 @@ export async function fetchBoothTemplates(
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== '' && v != null) qs.set(k, String(v));
   try {
-    const res = await fetch(`${base}/api/mobile/booth-templates?${qs.toString()}`, { headers: await authHeader() });
+    const res = await authorizedFetch(`${base}/api/mobile/booth-templates?${qs.toString()}`);
     if (!res.ok) return { designs: [], totalPages: 1 };
     const json = await res.json();
     return { designs: normalizeDesigns(json), totalPages: totalPagesOf(json) };

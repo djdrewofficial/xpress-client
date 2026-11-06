@@ -1,8 +1,8 @@
 import 'react-native-url-polyfill/auto';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient } from '@supabase/supabase-js';
-import { AppState, Platform } from 'react-native';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { AppState, Platform, type AppStateStatus } from 'react-native';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
@@ -12,18 +12,44 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 // still persist the session.
 const webServer = Platform.OS === 'web' && typeof window === 'undefined';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: webServer ? undefined : AsyncStorage,
-    autoRefreshToken: !webServer,
-    persistSession: !webServer,
-    detectSessionInUrl: false,
-  },
-});
+type AuthGlobals = typeof globalThis & {
+  __xpressSupabase?: SupabaseClient;
+  __xpressSupabaseAuthBound?: boolean;
+};
 
-if (Platform.OS !== 'web') {
-  AppState.addEventListener('change', (state) => {
-    if (state === 'active') supabase.auth.startAutoRefresh();
-    else supabase.auth.stopAutoRefresh();
+const globals = globalThis as AuthGlobals;
+
+function buildClient(): SupabaseClient {
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      // AsyncStorage, not SecureStore. A Supabase session (JWT + user) is often
+      // larger than SecureStore's 2048-byte limit; a failed write drops the
+      // rotated refresh token and the next refresh revokes the session.
+      storage: webServer ? undefined : AsyncStorage,
+      autoRefreshToken: !webServer,
+      persistSession: !webServer,
+      detectSessionInUrl: false,
+    },
   });
+}
+
+// One client per JS runtime. Fast refresh would otherwise construct a second
+// client on the same stored refresh token; both refresh, GoTrue treats the
+// second use as reuse, and the session is revoked (session_not_found).
+export const supabase = globals.__xpressSupabase ?? buildClient();
+globals.__xpressSupabase = supabase;
+
+// Supabase's React Native guidance: refresh only while the app is foregrounded,
+// and register the listener once. `autoRefreshToken` starts the ticker at
+// construction; this re-syncs it when iOS/Android moves between active and
+// background. `unknown` is left alone so a not-yet-reported state doesn't
+// stop a ticker that just started.
+if (!webServer && Platform.OS !== 'web' && !globals.__xpressSupabaseAuthBound) {
+  globals.__xpressSupabaseAuthBound = true;
+  const syncRefresh = (state: AppStateStatus) => {
+    if (state === 'active') supabase.auth.startAutoRefresh();
+    else if (state === 'background' || state === 'inactive') supabase.auth.stopAutoRefresh();
+  };
+  AppState.addEventListener('change', syncRefresh);
+  syncRefresh(AppState.currentState);
 }
