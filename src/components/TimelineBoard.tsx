@@ -357,8 +357,12 @@ function MomentLine({
   const drag = useReorderableDrag();
   const active = useIsActive();
   const swipe = useRef<SwipeableMethods>(null);
-  const editable = canManage && moment.timeEnabled && !moment.locked;
   const clock = splitClock(moment.timeLabel);
+  // Locked rows and guests can read a saved time. Only the couple (or staff)
+  // can open the picker, and not while this row is the lifted drag card.
+  const canEditTime = canManage && moment.timeEnabled && !moment.locked && !reordering && !active;
+  const showAdd = !clock && canManage && moment.timeEnabled && !moment.locked;
+  const showClock = !!clock;
 
   const confirmArchive = () => {
     Alert.alert(
@@ -371,39 +375,42 @@ function MomentLine({
     );
   };
 
-  const time = (
+  const marker = showAdd || showClock ? (
     <Pressable
-      onPress={editable ? onPressTime : undefined}
-      disabled={!editable}
-      hitSlop={6}
-      style={styles.timeCol}
-      accessibilityRole={editable ? 'button' : undefined}
+      onPress={canEditTime ? onPressTime : undefined}
+      onLongPress={canManage ? drag : undefined}
+      delayLongPress={180}
+      hitSlop={4}
+      style={styles.timeHit}
+      accessibilityRole={canEditTime ? 'button' : undefined}
       accessibilityLabel={clock ? t('timeline.timeA11y', { title: moment.title }) : t('timeline.setTimeA11y', { title: moment.title })}>
-      {clock ? (
-        <>
-          <Text style={[styles.hm, { color: c.ink }]}>{clock.main}</Text>
-          {clock.suffix ? <Text style={[styles.suffix, { color: c.ink3 }]}>{clock.suffix}</Text> : null}
-        </>
-      ) : moment.timeEnabled ? (
-        <Text style={[styles.setTime, { color: c.red }]}>{t('timeline.setTime')}</Text>
-      ) : null}
+      <View style={[styles.timeBox, { backgroundColor: c.bg }]}>
+        {showClock && clock ? (
+          <>
+            <Text style={[styles.hm, { color: c.ink }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+              {clock.main}
+            </Text>
+            {clock.suffix ? <Text style={[styles.suffix, { color: c.ink3 }]}>{clock.suffix}</Text> : null}
+          </>
+        ) : (
+          <Text style={[styles.setTime, { color: c.red }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>
+            {t('timeline.setTime')}
+          </Text>
+        )}
+      </View>
     </Pressable>
+  ) : (
+    <View
+      style={[styles.dot, { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: c.red }]}
+    />
   );
 
   const card = (
     <View style={styles.lineRow}>
-      {time}
-      <View style={styles.rail} pointerEvents="none">
-        {!active && !first ? <View style={[styles.line, styles.lineUp, { backgroundColor: c.line }]} /> : null}
-        {!active && !last ? <View style={[styles.line, styles.lineDown, { backgroundColor: c.line }]} /> : null}
-        <View
-          style={[
-            styles.dot,
-            clock
-              ? { backgroundColor: c.ink }
-              : { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: c.red },
-          ]}
-        />
+      <View style={styles.gutter}>
+        {!active && !first ? <View pointerEvents="none" style={[styles.line, styles.lineUp, { backgroundColor: c.line }]} /> : null}
+        {!active && !last ? <View pointerEvents="none" style={[styles.line, styles.lineDown, { backgroundColor: c.line }]} /> : null}
+        {marker}
       </View>
       <View style={{ flex: 1, paddingVertical: 6 }}>
         <MomentRow
@@ -481,15 +488,16 @@ const styles = StyleSheet.create({
   chapter: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   chapterNum: { fontFamily: Fonts.bold, fontSize: 13, lineHeight: 16 },
   lineRow: { flexDirection: 'row', alignItems: 'stretch' },
-  timeCol: { width: TIME_W, alignItems: 'center', justifyContent: 'center' },
-  hm: { fontFamily: Fonts.display, fontSize: 18, lineHeight: 20, textAlign: 'center' },
+  gutter: { width: TIME_W + RAIL_W, alignItems: 'flex-end', justifyContent: 'center' },
+  timeHit: { alignSelf: 'stretch', flex: 1, alignItems: 'flex-end', justifyContent: 'center', zIndex: 1 },
+  timeBox: { width: TIME_W + 4, alignItems: 'center', justifyContent: 'center', marginRight: 1, paddingVertical: 2 },
+  hm: { fontFamily: Fonts.display, fontSize: 16, lineHeight: 18, textAlign: 'center' },
   suffix: { fontFamily: Fonts.bold, fontSize: 10, letterSpacing: 0.6, textAlign: 'center', marginTop: 1 },
-  setTime: { fontFamily: Fonts.bold, fontSize: 11, lineHeight: 13, textAlign: 'center', width: 40 },
-  rail: { width: RAIL_W, alignItems: 'center', justifyContent: 'center' },
-  line: { position: 'absolute', width: 1.5, left: (RAIL_W - 1.5) / 2 },
+  setTime: { fontFamily: Fonts.bold, fontSize: 11, lineHeight: 13, textAlign: 'center', width: TIME_W },
+  line: { position: 'absolute', width: 1.5, left: TIME_W + (RAIL_W - 1.5) / 2 },
   lineUp: { top: 0, bottom: '50%' },
   lineDown: { top: '50%', bottom: 0 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  dot: { width: 8, height: 8, borderRadius: 4, marginRight: (RAIL_W - 8) / 2 },
   glyph: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   archiveAction: {
     flex: 1,

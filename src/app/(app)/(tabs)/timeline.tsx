@@ -52,7 +52,10 @@ function toMoment(s: SectionRow, locale: Locale): TimelineMoment {
     title: s.title,
     icon: s.icon,
     timeLabel: s.time_label,
-    timeEnabled: s.time_enabled,
+    // Timeline moments are the schedule, so they offer a time. Templates leave
+    // `time_enabled` off, which hid the control. Info rows pinned to the timeline
+    // stay dot-only unless Time is on or a time is already saved.
+    timeEnabled: s.time_enabled || s.section_type === 'timeline' || !!s.time_label,
     locked: s.locked,
     meta,
     badge,

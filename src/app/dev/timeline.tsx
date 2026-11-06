@@ -43,9 +43,9 @@ const SAMPLE: TimelineChapter[] = [
     id: 'ceremony',
     title: 'Ceremony',
     moments: [
-      moment({ id: 'processional', title: 'Processional', icon: 'users', timeLabel: '4:00 PM', meta: '1 song', badge: 'done' }),
+      moment({ id: 'processional', title: 'Processional', icon: 'users', timeLabel: null, meta: '1 song', badge: 'done' }),
       moment({ id: 'vows', title: 'Vows', icon: 'rings', timeLabel: '4:15 PM', meta: 'No songs', badge: '2/2' }),
-      moment({ id: 'recessional', title: 'Recessional', icon: 'heart', timeLabel: '4:35 PM', meta: '1 song', badge: 'done' }),
+      moment({ id: 'recessional', title: 'Recessional', icon: 'heart', timeLabel: null, timeEnabled: false, meta: '1 song', badge: 'done' }),
     ],
   },
   {
