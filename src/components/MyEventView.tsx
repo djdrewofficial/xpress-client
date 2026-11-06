@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, S
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EventAccessSection } from '@/components/EventAccessSection';
 import { Logo } from '@/components/Logo';
 import { Icon, LanguageCard, NavBar, useC, type IconName } from '@/components/ui';
 import { useT } from '@/lib/i18n';
@@ -49,6 +50,9 @@ export function MyEventView({
   onEmail,
   showInvite,
   onInvite,
+  partnerEventId,
+  accessRevision = 0,
+  onHaveCode,
   accountName,
   accountEmail,
   onPrivacy,
@@ -80,6 +84,10 @@ export function MyEventView({
   onEmail: () => void;
   showInvite: boolean;
   onInvite: () => void;
+  /** Set for a couple member (host). Guests and staff leave this empty. */
+  partnerEventId?: string | null;
+  accessRevision?: number;
+  onHaveCode?: () => void;
   accountName: string;
   accountEmail: string | null;
   onPrivacy: () => void;
@@ -147,10 +155,15 @@ export function MyEventView({
         </View>
 
         {!hasEvent ? (
-          <View style={[styles.card, Shadow.card, { backgroundColor: c.surface, padding: Space.lg }]}>
+          <View style={[styles.card, Shadow.card, { backgroundColor: c.surface, padding: Space.lg, gap: 12 }]}>
             <Text style={[Type.footnote, { color: c.ink2 }]}>
               {t('event.empty')}
             </Text>
+            {onHaveCode ? (
+              <Pressable onPress={onHaveCode} accessibilityRole="link" hitSlop={8}>
+                <Text style={[Type.callout, { color: c.accent }]}>{t('join.haveCode')}</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : (
           <>
@@ -291,6 +304,10 @@ export function MyEventView({
                   ) : null}
                 </View>
               </View>
+            ) : null}
+
+            {partnerEventId ? (
+              <EventAccessSection eventId={partnerEventId} revision={accessRevision} onHaveCode={onHaveCode} />
             ) : null}
 
             {showInvite ? (

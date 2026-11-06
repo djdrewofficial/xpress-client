@@ -44,6 +44,7 @@ export function HomeBody({
   refreshing,
   onRefresh,
   emptyMessage,
+  emptyAction,
 }: {
   greeting: string;
   eventName: string;
@@ -62,6 +63,7 @@ export function HomeBody({
   refreshing?: boolean;
   onRefresh?: () => void;
   emptyMessage?: string | null;
+  emptyAction?: { label: string; onPress: () => void } | null;
 }) {
   const c = useC();
   const { t, locale } = useT();
@@ -109,8 +111,13 @@ export function HomeBody({
 
       <View style={[styles.sheet, { backgroundColor: c.bg }]}>
         {emptyMessage ? (
-          <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
+          <View style={[styles.card, Shadow.card, { backgroundColor: c.surface, gap: 12 }]}>
             <Text style={[Type.callout, { color: c.ink2 }]}>{emptyMessage}</Text>
+            {emptyAction ? (
+              <Pressable onPress={emptyAction.onPress} accessibilityRole="link" hitSlop={8}>
+                <Text style={[Type.callout, { color: c.accent }]}>{emptyAction.label}</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : (
           <>

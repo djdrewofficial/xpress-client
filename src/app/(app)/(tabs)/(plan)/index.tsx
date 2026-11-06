@@ -106,6 +106,11 @@ export default function HomeScreen() {
           onChapter={() => {}}
           onSeeAll={() => {}}
           emptyMessage={t('home.noEvent')}
+          emptyAction={
+            profile?.accountType === 'client'
+              ? { label: t('join.haveCode'), onPress: () => router.push('/join') }
+              : null
+          }
         />
       ) : (
         <HomeBody
