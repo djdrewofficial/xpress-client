@@ -2,7 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, ListCell, TrackRow, useC } from '@/components/ui';
+import { Icon, TrackRow, useC } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
 import {
@@ -46,7 +46,6 @@ export function MusicRecord({
   onAddToMoment,
   onAddMusic,
   onImport,
-  onForYou,
   onSearch,
   onSwitchEvent,
 }: {
@@ -57,7 +56,6 @@ export function MusicRecord({
   onAddToMoment: (moment: MusicMoment) => void;
   onAddMusic: () => void;
   onImport: () => void;
-  onForYou: () => void;
   onSearch: () => void;
   onSwitchEvent?: () => void;
 }) {
@@ -119,8 +117,6 @@ export function MusicRecord({
             <Stat value={loading ? '—' : String(stats.doNotPlay)} label={t('record.doNotPlay')} tone="red" />
           </View>
         </LinearGradient>
-
-        <ListCell icon="sparkle" title={t('record.forYou')} subtitle={t('record.forYouSub')} onPress={onForYou} />
 
         {moments.length === 0 && !loading ? (
           <View style={[styles.empty, { backgroundColor: c.surface }]}>

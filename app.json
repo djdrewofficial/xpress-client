@@ -21,8 +21,7 @@
       "bundleIdentifier": "com.xpressentertainment.client",
       "usesAppleSignIn": true,
       "associatedDomains": [
-        "applinks:xos.xpressdjs.com",
-        "webcredentials:xos.xpressdjs.com"
+        "applinks:xos.xpressdjs.com"
       ],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false

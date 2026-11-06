@@ -51,7 +51,6 @@ export type SectionRow = {
   module: string | null;
   songs_enabled: boolean;
   questions_enabled: boolean;
-  ai_picks_enabled: boolean;
   song_limit: number | null;
   sort_order: number;
   on_timeline: boolean | null; // per-event override; null = auto (on when section_type==='timeline')
@@ -87,7 +86,6 @@ export type Group = {
   totalQuestions: number;
   answeredQuestions: number;
   songCount: number;
-  aiPicks: boolean;
 };
 
 export type RemovedSection = { id: string; title: string; icon: string | null };
@@ -393,7 +391,7 @@ export async function loadOverview(eventId: string): Promise<Overview> {
 
   const ensureGroup = (): Group => {
     if (!current) {
-      current = { id: 'start', title: 'Your plan', icon: '✨', intro: null, sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0, aiPicks: false };
+      current = { id: 'start', title: 'Your plan', icon: '✨', intro: null, sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0 };
       groups.push(current);
     }
     return current;
@@ -406,7 +404,7 @@ export async function loadOverview(eventId: string): Promise<Overview> {
       continue;
     }
     if (s.section_type === 'headline') {
-      current = { id: s.id, title: s.title, icon: s.icon, intro: s.intro ?? null, sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0, aiPicks: false };
+      current = { id: s.id, title: s.title, icon: s.icon, intro: s.intro ?? null, sections: [], totalQuestions: 0, answeredQuestions: 0, songCount: 0 };
       groups.push(current);
       continue;
     }
@@ -428,7 +426,6 @@ export async function loadOverview(eventId: string): Promise<Overview> {
     g.totalQuestions += qs.length;
     g.answeredQuestions += ans;
     g.songCount += songCount;
-    if (row.ai_picks_enabled) g.aiPicks = true;
   }
 
   const overview = { groups: groups.filter((g) => g.sections.length > 0), sections: flat, removed, totalQuestions, answeredQuestions };
@@ -608,7 +605,7 @@ export async function saveAnswer(eventId: string, questionId: string, answer: st
   return !error;
 }
 
-/** Add a song to a section (used by For You + search + import). Returns the new row. */
+/** Add a song to a section from search or a playlist import. Returns the new row. */
 export async function addSong(
   eventId: string,
   sectionId: string,

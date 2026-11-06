@@ -8,7 +8,6 @@ import { Button, useC } from '@/components/ui';
 import { usePendingEventLink } from '@/lib/eventLinks';
 import { resendConfirmation, signInWithEmail, type EmailAuthError } from '@/lib/emailAuth';
 import { useT, type TranslationKey } from '@/lib/i18n';
-import { signInWithPasskey, type PasskeySignInResult } from '@/lib/passkeyAuth';
 import { signInWithApple, signInWithGoogle, type SocialResult } from '@/lib/socialAuth';
 import { Type } from '@/lib/theme';
 
@@ -35,16 +34,7 @@ const SOCIAL_KEY: Record<Exclude<SocialResult, { ok: true }>['reason'], Translat
   generic: 'login.socialFailed',
 };
 
-const PASSKEY_KEY: Record<Exclude<PasskeySignInResult, { ok: true }>['reason'], TranslationKey | null> = {
-  cancelled: null,
-  none: null,
-  unavailable: 'passkey.unavailable',
-  disabled: 'passkey.disabled',
-  unconfirmed: 'passkey.unconfirmed',
-  failed: 'passkey.failed',
-};
-
-type Step = 'choices' | 'email' | 'passkey-none';
+type Step = 'choices' | 'email';
 
 export function SignInScreen() {
   const c = useC();
@@ -56,7 +46,7 @@ export function SignInScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<TranslationKey | null>(null);
   const [notice, setNotice] = useState<TranslationKey | null>(null);
-  const [busy, setBusy] = useState<'passkey' | 'social' | 'email' | null>(null);
+  const [busy, setBusy] = useState<'social' | 'email' | null>(null);
 
   function back() {
     setStep('choices');
@@ -106,34 +96,6 @@ export function SignInScreen() {
     } finally {
       setBusy(null);
     }
-  }
-
-  async function choosePasskey() {
-    if (busy) return;
-    setBusy('passkey');
-    setError(null);
-    setNotice(null);
-    try {
-      const result = await signInWithPasskey();
-      if (result.ok) return;
-      if (result.reason === 'none') {
-        setStep('passkey-none');
-        return;
-      }
-      const key = PASSKEY_KEY[result.reason];
-      if (key) setError(key);
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  if (step === 'passkey-none') {
-    return (
-      <AuthFrame title={t('passkey.noneTitle')} subtitle={t('passkey.noneBody')}>
-        <Button label={t('passkey.useEmail')} onPress={() => { setError(null); setStep('email'); }} />
-        <Button label={t('login.backChoices')} variant="ghost" onPress={back} />
-      </AuthFrame>
-    );
   }
 
   if (step === 'email') {
@@ -190,10 +152,8 @@ export function SignInScreen() {
   return (
     <AuthFrame kicker title={t('login.welcome')} subtitle={t('login.subtitle')}>
       {pendingLink ? <Text style={[Type.footnote, { color: c.accent }]}>{t('login.pendingLink')}</Text> : null}
-      {busy === 'passkey' ? <Text style={[Type.footnote, { color: c.ink2 }]}>{t('passkey.working')}</Text> : null}
       {error ? <Text style={[Type.footnote, { color: c.redInk }]}>{t(error)}</Text> : null}
       <View style={{ gap: 12 }}>
-        <Button label={t('login.choicePasskey')} variant="ghost" onPress={choosePasskey} disabled={busy != null} />
         <Button label={t('login.choiceEmail')} variant="ghost" onPress={() => { setError(null); setStep('email'); }} disabled={busy != null} />
         <Button label={t('login.choiceGoogle')} variant="ghost" onPress={() => chooseSocial('google')} disabled={busy != null} />
         <Button label={t('login.choiceApple')} variant="ghost" onPress={() => chooseSocial('apple')} disabled={busy != null} />

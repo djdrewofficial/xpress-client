@@ -121,9 +121,7 @@ export function FirstSongStep({
         <SongPicker
           visible={pickerOpen}
           onClose={() => setPickerOpen(false)}
-          mode="search"
           eventId={event.id}
-          eventName={event.name}
           sectionId={starter.id}
           sectionTitle={starter.title}
           existingTitles={new Set()}

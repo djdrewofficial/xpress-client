@@ -149,9 +149,7 @@ function SampleMoment({ initial, dancing }: { initial: MomentTab; dancing?: bool
       isDanceFloor={!!dancing}
       songCount={songs.length}
       songsEnabled
-      aiPicks={false}
       onAddMusic={() => {}}
-      onForYou={() => {}}
       onToggleMust={() => {}}
       onRemove={() => {}}
       onSaveNote={() => {}}

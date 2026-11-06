@@ -61,7 +61,6 @@ export default function AccountScreen() {
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [switcher, setSwitcher] = useState(false);
   const [packageOpen, setPackageOpen] = useState(false);
-  const [disclosure, setDisclosure] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePhase, setDeletePhase] = useState<'confirm' | 'working' | 'done' | 'error'>('confirm');
 
@@ -194,8 +193,6 @@ export default function AccountScreen() {
         accountName={accountName}
         accountEmail={session?.user.email ?? null}
         onPrivacy={() => Linking.openURL(PRIVACY_URL)}
-        onPasskeys={() => router.push('/passkeys')}
-        onDisclosure={() => setDisclosure(true)}
         onSignOut={() => signOut()}
         onDelete={() => {
           setDeletePhase('confirm');
@@ -231,9 +228,6 @@ export default function AccountScreen() {
           signOut();
         }}
       />
-      <Sheet visible={disclosure} onClose={() => setDisclosure(false)} title={t('event.ai')}>
-        <Text style={[Type.footnote, { color: c.ink2 }]}>{t('event.aiBody')}</Text>
-      </Sheet>
       <Sheet visible={packageOpen} onClose={() => setPackageOpen(false)} title={data?.packageName ?? t('event.package')}>
         {data ? <PackageDetails data={data} /> : null}
       </Sheet>

@@ -146,7 +146,6 @@ export default function DevMusicPreview() {
             onAddToMoment={() => {}}
             onAddMusic={() => {}}
             onImport={() => {}}
-            onForYou={() => {}}
             onSearch={() => {}}
           />
           {sheet ? null : <TabBar active="music" />}
@@ -155,7 +154,6 @@ export default function DevMusicPreview() {
             onClose={() => {}}
             initialSegment={sheet === 'import' || sheet === 'sources' ? 'import' : 'search'}
             eventId="sample-event"
-            eventName="Sample Wedding"
             sections={SECTIONS}
             sectionId="entrance"
             existingTitles={new Set(['Sample Song Two'])}
@@ -174,7 +172,6 @@ export default function DevMusicPreview() {
                 url: 'https://open.spotify.example/playlist/sample',
                 tracks: PLAYLIST,
               },
-              forYou: [],
               startOnPreview: sheet === 'import',
             }}
           />

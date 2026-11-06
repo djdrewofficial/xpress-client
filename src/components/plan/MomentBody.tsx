@@ -60,9 +60,7 @@ export function MomentBody({
   isDanceFloor,
   songCount,
   songsEnabled,
-  aiPicks,
   onAddMusic,
-  onForYou,
   onToggleMust,
   onToggleLike,
   onRemove,
@@ -95,9 +93,7 @@ export function MomentBody({
   isDanceFloor: boolean;
   songCount: number;
   songsEnabled: boolean;
-  aiPicks: boolean;
   onAddMusic: () => void;
-  onForYou: () => void;
   onToggleMust: (song: MomentSong) => void;
   onToggleLike?: (song: MomentSong) => void;
   onRemove: (song: MomentSong) => void;
@@ -278,11 +274,6 @@ export function MomentBody({
 
       {bottom ? (
         <View style={[styles.bottom, { backgroundColor: c.bg, paddingBottom: Math.max(insets.bottom, 16), borderTopColor: c.line }]}>
-          {aiPicks && activeTab === 'songs' ? (
-            <Pressable onPress={onForYou} hitSlop={6} style={{ alignSelf: 'center' }}>
-              <Text style={[Type.subhead, { color: c.accent }]}>{t('moment.forYou')}</Text>
-            </Pressable>
-          ) : null}
           <Button label={bottom.label} arrow={bottom.arrow || undefined} onPress={bottom.onPress} />
         </View>
       ) : null}
