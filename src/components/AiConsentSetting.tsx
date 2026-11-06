@@ -8,9 +8,9 @@ import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
 
 type Notice = 'unavailable' | 'blocked' | 'failed' | null;
 
-function noticeFor(status: number): Notice {
+function noticeFor(status: number, ineligible: boolean): Notice {
+  if (ineligible) return 'blocked';
   if (status === 503 || status === 0 || status === 400) return 'unavailable';
-  if (status === 403) return 'blocked';
   return 'failed';
 }
 
@@ -29,6 +29,8 @@ export function AiConsentSetting({
   const c = useC();
   const { t } = useT();
   const [granted, setGranted] = useState(false);
+  const [canGrant, setCanGrant] = useState(false);
+  const [canWithdraw, setCanWithdraw] = useState(false);
   const [ready, setReady] = useState(preview);
   const [notice, setNotice] = useState<Notice>(null);
   const [confirm, setConfirm] = useState(false);
@@ -42,10 +44,11 @@ export function AiConsentSetting({
       if (cancelled) return;
       if (!result.ok) {
         setGranted(false);
-        setNotice(noticeFor(result.status));
+        setCanGrant(false);
+        setCanWithdraw(false);
+        setNotice(noticeFor(result.status, result.ineligible));
       } else {
-        setGranted(result.record.granted);
-        setNotice(null);
+        apply(result.record);
       }
       setReady(true);
     });
@@ -55,18 +58,20 @@ export function AiConsentSetting({
   }, [eventId, preview, reloadSignal]);
 
   async function turnOff() {
-    if (busy || !granted || preview) return;
+    if (busy || !granted || !canWithdraw || preview) return;
     setBusy(true);
     setNotice(null);
     const result = await withdrawAiConsent(eventId);
     setBusy(false);
     if (!result.ok) {
-      setGranted(true);
-      setNotice(noticeFor(result.status));
+      setNotice(noticeFor(result.status, result.ineligible));
       return;
     }
-    setGranted(result.record.granted);
-    setNotice(null);
+    if (result.record.granted === false) {
+      apply(result.record);
+      return;
+    }
+    setNotice('failed');
   }
 
   async function confirmOn() {
@@ -78,14 +83,25 @@ export function AiConsentSetting({
     setConfirm(false);
     if (!result.ok) {
       setGranted(false);
-      setNotice(noticeFor(result.status));
+      setNotice(noticeFor(result.status, result.ineligible));
       return;
     }
-    setGranted(result.record.granted === true);
-    setNotice(null);
+    if (result.record.granted === true) {
+      apply(result.record);
+      return;
+    }
+    setGranted(false);
+    setNotice(result.record.capability.reason === 'not_contract_client' ? 'blocked' : 'failed');
   }
 
-  const disabled = !ready || busy || notice === 'unavailable' || notice === 'blocked';
+  function apply(record: { granted: boolean; capability: { canGrant: boolean; canWithdraw: boolean; reason: string | null } }) {
+    setGranted(record.granted === true);
+    setCanGrant(record.capability.canGrant);
+    setCanWithdraw(record.capability.canWithdraw);
+    setNotice(record.capability.reason === 'not_contract_client' ? 'blocked' : null);
+  }
+
+  const disabled = !ready || busy || notice === 'unavailable' || notice === 'blocked' || (granted ? !canWithdraw : !canGrant);
 
   return (
     <View style={[card, Shadow.card, { backgroundColor: c.surface, paddingHorizontal: 14, paddingVertical: 12, gap: 8 }]}>

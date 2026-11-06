@@ -1,40 +1,79 @@
-import { supabase } from '@/lib/supabase';
-import { toE164 } from '@/lib/phone';
+import { asRecord, mobileJson } from '@/lib/mobileJson';
 
-/**
- * Promotional texts are not stored on a server from this app.
- * `xpress.marketingTexts` is a device flag only. It has no phone number,
- * no timestamp, and no audit source, so it is not consent.
- */
+/** Must match the disclosure on screen. XOS rejects an older version with 400. */
+export const SMS_DISCLOSURE_VERSION = '2026-11-06';
 
-const PHONE_COLUMNS = ['phone', 'mobile_phone', 'mobile'] as const;
+export type SmsCapability = {
+  canGrant: boolean;
+  canWithdraw: boolean;
+  reason: string | null;
+};
 
-export async function loadOwnMobile(opts: { clientId: string | null; eventGuestId: string | null }): Promise<string | null> {
-  const table = opts.clientId ? 'clients' : opts.eventGuestId ? 'event_guests' : null;
-  const id = opts.clientId ?? opts.eventGuestId;
-  if (!table || !id) return null;
-  for (const column of PHONE_COLUMNS) {
-    const { data, error } = await supabase.from(table).select(column).eq('id', id).maybeSingle();
-    if (error || !data) continue;
-    const value = (data as Record<string, unknown>)[column];
-    if (typeof value === 'string') {
-      const phone = toE164(value);
-      if (phone) return phone;
-    }
-  }
-  return null;
+export type SmsConsentRecord = {
+  granted: boolean;
+  disclosureVersion: string | null;
+  phone: string | null;
+  eligibleOnFile: boolean;
+  capability: SmsCapability;
+};
+
+export type SmsConsentResult =
+  | { ok: true; record: SmsConsentRecord }
+  | { ok: false; status: number; ineligible: boolean };
+
+export async function loadSmsConsent(): Promise<SmsConsentResult> {
+  return readSms(await mobileJson('GET', '/api/mobile/sms-marketing-consent'));
 }
 
-export type SmsSaveResult =
-  | { ok: false; reason: 'no-phone' }
-  | { ok: false; reason: 'no-server' };
+export async function grantSmsConsent(eventId?: string | null): Promise<SmsConsentResult> {
+  return postSms('grant', eventId);
+}
 
-/** Turning texts on never writes a local-only flag. There is no consent API yet. */
-export async function requestPromotionalTexts(opts: {
-  clientId: string | null;
-  eventGuestId: string | null;
-}): Promise<SmsSaveResult> {
-  const phone = await loadOwnMobile(opts);
-  if (!phone) return { ok: false, reason: 'no-phone' };
-  return { ok: false, reason: 'no-server' };
+export async function withdrawSmsConsent(eventId?: string | null): Promise<SmsConsentResult> {
+  return postSms('withdraw', eventId);
+}
+
+/** The server writes nothing for skip. Welcome does not call this. */
+export async function skipSmsConsent(eventId?: string | null): Promise<SmsConsentResult> {
+  return postSms('skip', eventId);
+}
+
+async function postSms(action: 'grant' | 'withdraw' | 'skip', eventId?: string | null): Promise<SmsConsentResult> {
+  const body: Record<string, unknown> = {
+    action,
+    disclosureVersion: SMS_DISCLOSURE_VERSION,
+    source: 'app',
+  };
+  if (eventId) body.eventId = eventId;
+  return readSms(await mobileJson('POST', '/api/mobile/sms-marketing-consent', body));
+}
+
+function readSms(result: Awaited<ReturnType<typeof mobileJson>>): SmsConsentResult {
+  if (!result.ok) {
+    return { ok: false, status: result.status, ineligible: result.status === 403 };
+  }
+  return { ok: true, record: parseRecord(result.data) };
+}
+
+function parseCapability(value: unknown): SmsCapability {
+  const row = asRecord(value);
+  return {
+    canGrant: row.canGrant === true,
+    canWithdraw: row.canWithdraw === true,
+    reason: typeof row.reason === 'string' ? row.reason : null,
+  };
+}
+
+function parseRecord(data: unknown): SmsConsentRecord {
+  const row = asRecord(data);
+  const saved = asRecord(row.saved);
+  const number = asRecord(row.eligibleNumber);
+  const phone = typeof number.e164 === 'string' ? number.e164 : typeof saved.phone === 'string' ? saved.phone : null;
+  return {
+    granted: row.granted === true,
+    disclosureVersion: typeof row.disclosureVersion === 'string' ? row.disclosureVersion : null,
+    phone,
+    eligibleOnFile: number.onFile === true,
+    capability: parseCapability(row.capability),
+  };
 }

@@ -215,7 +215,12 @@ export default function AccountScreen() {
         }
         smsConsent={
           profile?.accountType === 'staff' ? null : (
-            <SmsConsentSetting onPrivacy={() => setLegal('privacy')} onTerms={() => setLegal('terms')} />
+            <SmsConsentSetting
+              eventId={eventId}
+              reloadSignal={consentReload}
+              onPrivacy={() => setLegal('privacy')}
+              onTerms={() => setLegal('terms')}
+            />
           )
         }
       />

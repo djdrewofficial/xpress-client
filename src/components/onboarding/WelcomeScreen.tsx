@@ -127,6 +127,7 @@ export function WelcomeScreen({
           )
         ) : null}
         <SmsConsentSetting
+          eventId={event?.id ?? null}
           onPrivacy={() => setSheet('privacy')}
           onTerms={() => setSheet('terms')}
           preview={!!preview}
