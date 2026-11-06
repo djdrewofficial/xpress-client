@@ -15,20 +15,20 @@ A wedding-planning companion app. The DJ (staff) runs everything from the **XOS*
 - **event_guest** — invited guests. Scoped, read/limited access (e.g. can view, some can answer/suggest).
 - **staff** — DJs/admins. Land on an **Events list** and open any event into the same planner (used for preview/management).
 
-**Accounts are invite-only** — there is **no in-app sign-up**. Staff provision accounts in XOS; the person gets an invite email → sets a password via a deep link. (Important for App Store review — see §6/§8.)
+**Sign-in is Email, Google, then Apple.** Email opens the password form as the next step, with create-account, forgot-password, and the confirmation/reset links. There is no client passkey. Staff passkeys stay in XOS and are not called from this app.
 
 **Main screens** (file-based routes, see §3):
-- `login` — email + password. "Forgot password" → in-app reset (email → code → new password). Invite links land on `auth/set-password`.
+- `login` — three choices: Email, Google, Apple. Email is email + password. "Forgot password" and "Create an account" stay on that step. Confirmation and reset return through `auth/confirm` and `auth/reset`.
 - `(app)/(tabs)` — the signed-in tab bar:
   - **Plan** (`(plan)/index.tsx`) — home. Hero card (cover photo, welcome, event date, a **countdown**, overall **progress ring**), a "pick up where you left off" card, and category cards ("groups") that open into sections.
   - **Music** (`music.tsx`) — vibe/open-dancing playlists.
   - **Timeline** (`timeline.tsx`) — the couple's event timeline view.
-  - **You** (`you.tsx`) — account: package/financials summary (when visible), team contacts, privacy policy link, AI disclosure, and **Delete account**.
+  - **You** (`you.tsx`) — account: package/financials summary (when visible), team contacts, privacy policy link, and **Delete account**. There is no AI disclosure.
 - `(app)/events.tsx` — staff-only event list (couples don't see this; they use the inline event switcher when they have >1 event).
 - `(app)/(tabs)/(plan)/group/[id].tsx` — a category's section list.
-- `(app)/section/[id].tsx` — a single section: answer questions (autosave) + manage songs (add/search/import, must-play / do-not-play, notes).
+- `(app)/section/[id].tsx` — a single section: answer questions (autosave) + manage songs (search, playlist import, must-play / do-not-play, notes).
 
-**Core planning flow:** open a group → open a section → answer questions (saved automatically) and/or add songs via the **SongPicker** (catalog search, "For You" AI recommendations, or paste a public Spotify/Apple Music playlist). Progress rings fill as you go. A first-run **OnboardingTour** walks new users through it.
+**Core planning flow:** open a group → open a section → answer questions (saved automatically) and/or add songs via the **SongPicker** (catalog search, or paste a public Spotify/Apple Music playlist). There is no For You / AI recommendation path and no call to `/api/music/recommend`. Progress rings fill as you go. A first-run **OnboardingTour** walks new users through it.
 
 ---
 
@@ -73,14 +73,14 @@ src/
     AppHeader, Backdrop, BrandSplash, Logo, Countdown, OnboardingTour,
     SongPicker, SectionSongs, PhotoBoothSection, VendorTeam, EventSwitcher,
     AddSectionSheet, InvitePersonSheet, TimePickerSheet, SocialPrompt,
-    Encourager, MixtapeLoader, MovingBlobs, ProviderLogo, ui.tsx (useC, Ring, …)
+    Encourager, MovingBlobs, ProviderLogo, ui.tsx (useC, Ring, …)
   lib/                         # data + helpers (the "model" layer)
     supabase.ts                # supabase client
     auth.tsx                   # useAuth provider
     events.tsx                 # useEvent provider
     planning.ts                # loadOverview, sections/songs/answers CRUD, types
     api.ts                     # apiBase() / authHeader() for XOS /api/mobile/*
-    account.ts, recommendations.ts, musicSearch.ts, spotify.ts,
+    account.ts, musicSearch.ts, spotify.ts,
     coverPhoto.ts, eventFiles.ts, people.ts, photobooth.ts, social.ts,
     vendors.ts, theme.ts, fontPatch.ts
   assets/                      # icon, logos, noise/texture, X-stroke art
@@ -96,8 +96,8 @@ eas.json                       # EAS build/submit profiles
 ## 4. Backend & data
 
 - **Supabase** project `qjnzicqvzmvwryisjvip` (`*.supabase.co`). **This project serves both dev and prod** — there is no separate staging DB. Be careful with destructive queries.
-- **XOS backend** — the Next.js CRM at `https://xos.xpressdjs.com` (repo `djdrewofficial/XOS` at `~/XOS`, auto-deploys to Netlify on push to `main`). The app calls its **mobile endpoints under `/api/mobile/*`** via `apiBase()` + `authHeader()` (`@/lib/api`). Those endpoints are public-by-path but **each self-verifies the Bearer JWT** and resolves the caller's event role (`resolveEventRole`) before doing anything; host/couple writes that RLS blocks are done server-side with the admin client after that check. Examples in use: `/api/mobile/planning/sections`, `/api/mobile/planning/addable-sections`, `/api/mobile/delete-account`, music search/preview/playlist-import.
-- **Auth flow:** Supabase email/password (`supabase.auth.signInWithPassword`). **No social/OAuth login** (so Sign in with Apple is not required). Invite + reset flows set the password through the `xpressclient://auth/set-password` deep link; in-app forgot-password does email → code → new password. Session persists via AsyncStorage.
+- **XOS backend** — the Next.js CRM at `https://xos.xpressdjs.com` (repo `djdrewofficial/XOS` at `~/XOS`, auto-deploys to Netlify on push to `main`). The app calls its **mobile endpoints under `/api/mobile/*`** via `apiBase()` + `authHeader()` (`@/lib/api`). Those endpoints are public-by-path but **each self-verifies the Bearer JWT** and resolves the caller's event role (`resolveEventRole`) before doing anything; host/couple writes that RLS blocks are done server-side with the admin client after that check. Examples in use: `/api/mobile/planning/sections`, `/api/mobile/planning/addable-sections`, `/api/mobile/delete-account`, `/api/music/search`, `/api/music/preview`, `/api/music/playlist`. This app does not call `/api/music/recommend`.
+- **Auth flow:** the first screen is Email, Google, Apple, in that order. Email uses `signInWithPassword`. Google and Apple use native sign-in and `signInWithIdToken`. Signup, email confirmation, and password reset stay. Session persists via AsyncStorage with PKCE. This app does not enable or call Supabase passkeys. Staff passkeys are a separate XOS browser flow.
 - **Account model:** an `accounts` row links a Supabase `auth_user_id` to a `client` or `event_guest` (or staff `employee`). `useEvent` resolves which event(s) the signed-in user can plan.
 - **Account deletion:** `deleteAccount()` (`@/lib/account`) → `POST /api/mobile/delete-account`, which removes the `accounts` link row + the Supabase auth user (keeps the DJ's CRM data). Satisfies App Store Guideline 5.1.1(v).
 
@@ -144,7 +144,7 @@ Two-window workflow: Claude Code / editor in one window, the Simulator in the ot
 - **Versioning:** marketing `version` is `1.0.0` in `app.json`; build number auto-increments on production (`autoIncrement`). Bump `version` in `app.json` for a new marketing version.
 - **Release path:** `eas build -p ios --profile production` → `eas submit -p ios --profile production` → TestFlight → App Store review. `ITSAppUsesNonExemptEncryption: false` is set (skips the export-compliance prompt).
 
-**App Store review note (process, not code):** because login is invite-only with no self-sign-up, submissions **must** include working demo couple credentials in App Review Notes, pointed at a content-rich event. This is the most likely thing to stall review. (A full App Store readiness audit was done — the big code requirements are already satisfied: in-app account deletion, email/password auth, live privacy policy at `xos.xpressdjs.com/app-privacy`, photo-library purpose string, AI disclosure.)
+**App Store review note (process, not code):** a reviewer still needs a working demo account that already belongs to an event. Self-serve signup exists, and a new account has no event until it joins with a code. The in-app AI disclosure was removed with For You. The published page at `xos.xpressdjs.com/app-privacy` was not edited here. TestFlight build 18 does not include this removal until a later build.
 
 ---
 

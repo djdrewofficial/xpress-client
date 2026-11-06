@@ -20,7 +20,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.xpressentertainment.client",
       "usesAppleSignIn": true,
-      "associatedDomains": ["applinks:xos.xpressdjs.com"],
+      "associatedDomains": [
+        "applinks:xos.xpressdjs.com"
+      ],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

@@ -36,7 +36,6 @@ type Meta = {
   icon: string | null;
   intro: string | null;
   songs_enabled: boolean;
-  ai_picks_enabled: boolean;
   module: string | null;
   time_label: string | null;
   time_enabled: boolean;
@@ -64,7 +63,6 @@ export default function SectionScreen() {
   const backLabel = (Array.isArray(from) ? from[0] : from) || t('moment.backTimeline');
 
   const [meta, setMeta] = useState<Meta | null>(null);
-  const [eventName, setEventName] = useState('');
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [songs, setSongs] = useState<SongRow[]>([]);
   const [likes, setLikes] = useState<Set<string>>(new Set());
@@ -80,7 +78,7 @@ export default function SectionScreen() {
     setLoading(true);
   }
   const [closed, setClosed] = useState(false);
-  const [picker, setPicker] = useState<null | { mode: 'foryou' | 'search' }>(null);
+  const [picker, setPicker] = useState(false);
   const [pickingTime, setPickingTime] = useState(false);
 
   const player = useAudioPlayer(null);
@@ -94,9 +92,8 @@ export default function SectionScreen() {
   const load = useCallback(async () => {
     if (!id || !eventId) return;
     const guest = roleForEvent(eventId) === 'guest';
-    const [{ data: m }, { data: ev }, sec, ov] = await Promise.all([
+    const [{ data: m }, sec, ov] = await Promise.all([
       supabase.from('planning_sections').select('*').eq('id', id).maybeSingle(),
-      supabase.from('events').select('name').eq('id', eventId).maybeSingle(),
       loadSection(eventId, id),
       loadOverview(eventId),
     ]);
@@ -112,7 +109,6 @@ export default function SectionScreen() {
       icon: m?.icon ?? null,
       intro: m?.intro ?? null,
       songs_enabled: m?.songs_enabled ?? false,
-      ai_picks_enabled: m?.ai_picks_enabled ?? false,
       module: m?.module ?? null,
       time_label: m?.time_label ?? null,
       time_enabled: m?.time_enabled ?? false,
@@ -121,7 +117,6 @@ export default function SectionScreen() {
       staffNotes: payloadNote(sectionRow, 'staff_notes'),
     };
     setMeta(nextMeta);
-    setEventName(ev?.name ?? '');
     setQuestions(sec.questions);
     const visibleSongs = guest ? sec.songs.filter((song) => !song.do_not_play) : sec.songs;
     setSongs(visibleSongs);
@@ -265,9 +260,7 @@ export default function SectionScreen() {
         isDanceFloor={danceFloor}
         songCount={songTotal}
         songsEnabled={meta.songs_enabled}
-        aiPicks={meta.ai_picks_enabled}
-        onAddMusic={() => setPicker({ mode: 'search' })}
-        onForYou={() => setPicker({ mode: 'foryou' })}
+        onAddMusic={() => setPicker(true)}
         onToggleMust={onToggleMust}
         onRemove={onRemove}
         onSaveNote={onSaveNote}
@@ -283,11 +276,9 @@ export default function SectionScreen() {
         initialStaffNotes={profile?.accountType === 'staff' ? meta.staffNotes : undefined}
       />
       <SongPicker
-        visible={picker !== null}
-        mode={picker?.mode ?? 'search'}
-        onClose={() => setPicker(null)}
+        visible={picker}
+        onClose={() => setPicker(false)}
         eventId={eventId}
-        eventName={eventName}
         sectionId={id}
         sectionTitle={meta.title}
         existingTitles={new Set(songs.map((s) => s.title.toLowerCase()))}

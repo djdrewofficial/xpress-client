@@ -16,7 +16,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 
 import { Button, Icon, PlayPauseIcon, SegmentedControl, useC } from '@/components/ui';
-import { MixtapeLoader } from '@/components/MixtapeLoader';
 import { ProviderLogo, type SongProvider } from '@/components/ProviderLogo';
 import { RecordVinyl } from '@/components/music/MusicRecord';
 import { classifyMusicPaste, isDoNotPlaySectionTitle, playlistProvider } from '@/components/music/model';
@@ -24,11 +23,10 @@ import { useT, type TranslationKey } from '@/lib/i18n';
 import { Fonts, Radius, Type } from '@/lib/theme';
 import { addSong, loadSection, type SongRow } from '@/lib/planning';
 import { searchTracks, resolvePreview, type Track } from '@/lib/musicSearch';
-import { getRecommendations, type RecommendedSong } from '@/lib/recommendations';
 import { importPublicPlaylist, type SpotifyTrack } from '@/lib/spotify';
 import { supabase } from '@/lib/supabase';
 
-export type AddMusicSegment = 'search' | 'foryou' | 'import';
+export type AddMusicSegment = 'search' | 'import';
 
 export type AddMusicSection = {
   id: string;
@@ -43,7 +41,6 @@ type PickItem = {
   artist: string | null;
   artworkUrl: string | null;
   previewUrl: string | null;
-  reason?: string | null;
   provider?: SongProvider | null;
   payload: Parameters<typeof addSong>[2];
 };
@@ -52,7 +49,6 @@ export type AddMusicFixtures = {
   initialQuery?: string;
   initialImportUrl?: string;
   searchResults?: Track[];
-  forYou?: RecommendedSong[];
   doNotPlayTitles?: string[];
   playlist?: { name: string | null; url: string; tracks: SpotifyTrack[] };
   /** Result keys that already show as added, with the tray count. Dev previews only. */
@@ -104,18 +100,6 @@ function fromPlaylistTrack(t: SpotifyTrack): PickItem {
       provider,
       provider_id: providerId,
     },
-  };
-}
-
-function fromRec(s: RecommendedSong): PickItem {
-  return {
-    key: s.id,
-    title: s.title,
-    artist: s.artist,
-    artworkUrl: s.artwork_url,
-    previewUrl: s.preview_url,
-    reason: s.reason,
-    payload: { title: s.title, artist: s.artist, artwork_url: s.artwork_url, preview_url: s.preview_url },
   };
 }
 
@@ -196,7 +180,7 @@ async function fetchDoNotPlayTitles(eventId: string): Promise<Set<string>> {
 }
 
 /**
- * One add-music sheet: Search, For you, and Import.
+ * One add-music sheet: Search and Import.
  * Paste an Apple Music, Spotify, or YouTube link in the search field — playlists
  * open the preview step; everything else goes through catalog search.
  * The Moment screen should open this (or `useAddMusic`) instead of a private picker.
@@ -206,7 +190,6 @@ export function AddMusicSheet({
   onClose,
   initialSegment = 'search',
   eventId,
-  eventName,
   sections,
   sectionId,
   onSectionChange,
@@ -219,7 +202,6 @@ export function AddMusicSheet({
   onClose: () => void;
   initialSegment?: AddMusicSegment;
   eventId: string;
-  eventName: string;
   sections: AddMusicSection[];
   sectionId: string;
   onSectionChange?: (sectionId: string) => void;
@@ -252,12 +234,6 @@ export function AddMusicSheet({
   const [results, setResults] = useState<Track[]>([]);
   const [searching, setSearching] = useState(false);
   const [linkNote, setLinkNote] = useState<string | null>(null);
-  const [fy, setFy] = useState<{ status: 'loading' | 'needs-profile' | 'unconfigured' | 'error' | 'ok'; items: PickItem[]; basis: string[] }>({
-    status: 'loading',
-    items: [],
-    basis: [],
-  });
-  const [fyMore, setFyMore] = useState(false);
   const [added, setAdded] = useState<Record<string, 'busy' | 'done'>>({});
   const [sessionCount, setSessionCount] = useState(0);
   const [playingKey, setPlayingKey] = useState<string | null>(null);
@@ -334,8 +310,6 @@ export function AddMusicSheet({
     setSelected(new Set());
     setImporting(false);
     setPicking(false);
-    setFy({ status: 'loading', items: [], basis: [] });
-    setFyMore(false);
     inflight.current.clear();
   }, [visible, player]);
 
@@ -488,45 +462,6 @@ export function AddMusicSheet({
     }, delay);
     return () => clearTimeout(timer);
   }, [query, tab, visible, step, showPreview]);
-
-  useEffect(() => {
-    if (!(visible && tab === 'foryou' && step === 'browse')) return;
-    const fx = fixturesRef.current;
-    if (fx) {
-      const items = (fx.forYou ?? []).map(fromRec);
-      setFy({ status: 'ok', items, basis: items.length ? ['your songs and genres'] : [] });
-      return;
-    }
-    let cancel = false;
-    setFy({ status: 'loading', items: [], basis: [] });
-    getRecommendations({ eventId, eventName, sectionTitle, exclude: [...titlesRef.current] }).then((res) => {
-      if (cancel) return;
-      if (res.status !== 'ok') {
-        setFy({ status: res.status, items: [], basis: [] });
-        return;
-      }
-      const seen = new Set(titlesRef.current);
-      setFy({ status: 'ok', items: res.songs.filter((s) => !seen.has(titleKey(s.title))).map(fromRec), basis: res.basis });
-    });
-    return () => {
-      cancel = true;
-    };
-  }, [visible, tab, step, eventId, eventName, sectionTitle]);
-
-  const loadMoreForYou = async () => {
-    if (fixturesRef.current) return;
-    setFyMore(true);
-    const exclude = [...titlesRef.current, ...fy.items.map((i) => titleKey(i.title))];
-    const res = await getRecommendations({ eventId, eventName, sectionTitle, exclude });
-    if (res.status === 'ok') {
-      setFy((prev) => {
-        const seen = new Set([...titlesRef.current, ...prev.items.map((i) => titleKey(i.title))]);
-        const add = res.songs.filter((s) => !seen.has(titleKey(s.title))).map(fromRec);
-        return { ...prev, items: [...prev.items, ...add] };
-      });
-    }
-    setFyMore(false);
-  };
 
   const togglePlay = useCallback(async (item: PickItem) => {
     if (playingKey === item.key) {
@@ -733,7 +668,6 @@ export function AddMusicSheet({
                     <SegmentedControl
                       options={[
                         { value: 'search', label: t('add.search') },
-                        { value: 'foryou', label: t('add.forYou') },
                         { value: 'import', label: t('add.import') },
                       ]}
                       value={tab}
@@ -756,17 +690,6 @@ export function AddMusicSheet({
                         playingKey={playingKey}
                         onPlay={togglePlay}
                         onAdd={handleAdd}
-                      />
-                    ) : tab === 'foryou' ? (
-                      <ForYou
-                        fy={fy}
-                        fyMore={fyMore}
-                        eventName={eventName}
-                        stateFor={stateFor}
-                        playingKey={playingKey}
-                        onPlay={togglePlay}
-                        onAdd={handleAdd}
-                        onMore={loadMoreForYou}
                       />
                     ) : (
                       <ImportStart
@@ -837,53 +760,6 @@ function SearchResults({
       {results.map(fromTrack).map((item, index) => (
         <ResultRow key={`${item.key}:${index}`} item={item} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => onPlay(item)} onAdd={() => onAdd(item)} />
       ))}
-    </View>
-  );
-}
-
-function ForYou({
-  fy,
-  fyMore,
-  eventName,
-  stateFor,
-  playingKey,
-  onPlay,
-  onAdd,
-  onMore,
-}: {
-  fy: { status: 'loading' | 'needs-profile' | 'unconfigured' | 'error' | 'ok'; items: PickItem[]; basis: string[] };
-  fyMore: boolean;
-  eventName: string;
-  stateFor: (item: PickItem) => 'busy' | 'done' | undefined;
-  playingKey: string | null;
-  onPlay: (item: PickItem) => void;
-  onAdd: (item: PickItem) => void;
-  onMore: () => void;
-}) {
-  const c = useC();
-  const { t } = useT();
-  if (fy.status === 'loading') return <MixtapeLoader eventName={eventName} />;
-  if (fy.status === 'needs-profile') {
-    return <Empty text={t('add.needsProfile')} />;
-  }
-  if (fy.status === 'unconfigured' || fy.status === 'error') {
-    return <Empty text={t('add.unconfigured')} />;
-  }
-  if (fy.items.length === 0) {
-    return (
-      <View style={{ gap: 12 }}>
-        <Empty text={t('add.fresh')} />
-        <LoadMore loading={fyMore} onPress={onMore} />
-      </View>
-    );
-  }
-  return (
-    <View style={{ gap: 0 }}>
-      {fy.basis.length > 0 ? <Text style={[Type.footnote, { color: c.ink3, fontStyle: 'italic', marginBottom: 8 }]}>{t('add.basedOn', { basis: fy.basis.join(', ') })}</Text> : null}
-      {fy.items.map((item, index) => (
-        <ResultRow key={`${item.key}:${index}`} item={item} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => onPlay(item)} onAdd={() => onAdd(item)} />
-      ))}
-      <LoadMore loading={fyMore} onPress={onMore} />
     </View>
   );
 }
@@ -979,7 +855,6 @@ function ResultRow({
           {item.provider && item.provider !== 'manual' ? <ProviderLogo provider={item.provider} size={13} /> : null}
           <Text style={[Type.footnote, { color: c.ink2, flexShrink: 1 }]} numberOfLines={1}>{item.artist}</Text>
         </View>
-        {item.reason ? <Text style={[Type.footnote, { color: c.ink3, marginTop: 2 }]} numberOfLines={1}>{item.reason}</Text> : null}
       </View>
       <Pressable
         disabled={state != null}
@@ -1173,16 +1048,6 @@ function Mini({ value, label, tone }: { value: number; label: string; tone?: 're
   );
 }
 
-function LoadMore({ loading, onPress }: { loading: boolean; onPress: () => void }) {
-  const c = useC();
-  const { t } = useT();
-  return (
-    <Pressable onPress={onPress} disabled={loading} style={[styles.loadMore, { backgroundColor: c.surface2, borderColor: c.line }]}>
-      {loading ? <ActivityIndicator size="small" color={c.accent} /> : <Text style={{ color: c.accent, fontFamily: Fonts.bold, fontSize: 14 }}>{t('add.loadMore')}</Text>}
-    </Pressable>
-  );
-}
-
 function Empty({ text }: { text: string }) {
   const c = useC();
   return <Text style={[Type.footnote, { color: c.ink2, textAlign: 'center', paddingVertical: 28 }]}>{text}</Text>;
@@ -1194,13 +1059,11 @@ function Empty({ text }: { text: string }) {
  */
 export function useAddMusic({
   eventId,
-  eventName,
   sections,
   onAdded,
   onReload,
 }: {
   eventId: string;
-  eventName: string;
   sections: AddMusicSection[];
   onAdded?: (row: SongRow) => void;
   onReload?: () => void;
@@ -1225,7 +1088,6 @@ export function useAddMusic({
       onClose={close}
       initialSegment={segment}
       eventId={eventId}
-      eventName={eventName}
       sections={sections}
       sectionId={sectionId}
       onSectionChange={setSectionId}
@@ -1241,9 +1103,7 @@ export function useAddMusic({
 export function SongPicker({
   visible,
   onClose,
-  mode,
   eventId,
-  eventName,
   sectionId,
   sectionTitle,
   existingTitles,
@@ -1252,9 +1112,7 @@ export function SongPicker({
 }: {
   visible: boolean;
   onClose: () => void;
-  mode: 'foryou' | 'search';
   eventId: string;
-  eventName: string;
   sectionId: string;
   sectionTitle: string;
   existingTitles: Set<string>;
@@ -1265,9 +1123,8 @@ export function SongPicker({
     <AddMusicSheet
       visible={visible}
       onClose={onClose}
-      initialSegment={mode === 'foryou' ? 'foryou' : 'search'}
+      initialSegment="search"
       eventId={eventId}
-      eventName={eventName}
       sections={[{ id: sectionId, title: sectionTitle }]}
       sectionId={sectionId}
       existingTitles={existingTitles}
@@ -1295,7 +1152,6 @@ const styles = StyleSheet.create({
   playOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.28)', alignItems: 'center', justifyContent: 'center' },
   plus: { width: 32, height: 32, borderRadius: 16, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   provider: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.md, padding: 12 },
-  loadMore: { borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.md, paddingVertical: 13, alignItems: 'center', marginTop: 8 },
   trayWrap: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16 },
   tray: { borderRadius: 28, paddingLeft: 18, paddingRight: 8, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 12 },
   trayCount: { color: '#fff', fontFamily: Fonts.bold, fontSize: 15 },

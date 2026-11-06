@@ -4,7 +4,7 @@ import Svg, { Defs, Ellipse, LinearGradient, Path, Rect, Stop } from 'react-nati
 /* Small brand marks for a song's source. Rendered inline (react-native-svg) so
    no image assets are needed. Spotify uses its official green logo; Apple Music
    uses its app-icon (gradient tile + beamed note); YouTube a red play tile.
-   Anything else (recommendations / manual entries) renders nothing. */
+   Manual entries render nothing. */
 
 export type SongProvider = 'spotify' | 'apple' | 'youtube' | 'manual';
 

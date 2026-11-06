@@ -87,6 +87,5 @@ function recount(group: Group, sections: SectionRow[]): Group {
     totalQuestions: sections.reduce((sum, section) => sum + section.questionCount, 0),
     answeredQuestions: sections.reduce((sum, section) => sum + section.answeredCount, 0),
     songCount: sections.reduce((sum, section) => sum + section.songCount, 0),
-    aiPicks: sections.some((section) => section.ai_picks_enabled),
   };
 }

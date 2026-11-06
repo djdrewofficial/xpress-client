@@ -15,7 +15,7 @@ export default function MusicScreen() {
   const router = useRouter();
   const { t } = useT();
   const { profile } = useAuth();
-  const { event, eventId, events, loading: eventLoading } = useEvent();
+  const { eventId, events, loading: eventLoading } = useEvent();
   const [moments, setMoments] = useState<MusicMoment[] | null>(null);
   const [switcher, setSwitcher] = useState(false);
 
@@ -45,7 +45,6 @@ export default function MusicScreen() {
 
   const music = useAddMusic({
     eventId: eventId ?? '',
-    eventName: event?.name ?? '',
     sections,
     onAdded: () => { load(); },
     onReload: () => { load(); },
@@ -78,7 +77,6 @@ export default function MusicScreen() {
         onAddToMoment={(moment) => music.open({ sectionId: moment.id, segment: 'search' })}
         onAddMusic={() => requireMoment((moment) => music.open({ sectionId: moment.id, segment: 'search' }))}
         onImport={() => requireMoment((moment) => music.open({ sectionId: moment.id, segment: 'import' }))}
-        onForYou={() => requireMoment((moment) => music.open({ sectionId: moment.id, segment: 'foryou' }))}
         onSearch={() => requireMoment((moment) => music.open({ sectionId: moment.id, segment: 'search' }))}
         onSwitchEvent={canSwitch ? () => (isStaff ? router.push('/events') : setSwitcher(true)) : undefined}
       />
