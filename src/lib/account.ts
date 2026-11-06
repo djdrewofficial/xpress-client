@@ -1,5 +1,8 @@
 import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { apiBase, authorizedFetch } from '@/lib/api';
+import { resetMembershipMemory } from '@/lib/membership';
 
 /* Read-only event package + payment summary + team contacts for the Account tab.
    Mirrors XOS's price logic: override -> locked -> live default; "Investment"
@@ -143,6 +146,18 @@ export function money(n: number): string {
 /** Permanently delete the signed-in user's login (App Store 5.1.1(v)).
     When they used Sign in with Apple, pass a fresh authorization code so XOS can
     revoke that Apple token. The .p8 key stays on the server. The caller signs out after. */
+/** Drop this login's saved choices on the phone. Language stays. */
+export async function clearStoredAccount(uid: string | null): Promise<void> {
+  resetMembershipMemory();
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const drop = keys.filter((key) => key === 'xpress.marketingTexts' || (!!uid && key.includes(uid)));
+    if (drop.length) await AsyncStorage.multiRemove(drop);
+  } catch {
+    /* Sign-out still has to finish. */
+  }
+}
+
 export async function deleteAccount(opts?: { appleAuthorizationCode?: string | null }): Promise<boolean> {
   const base = apiBase();
   if (!base) return false;

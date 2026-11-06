@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, TrackRow, useC } from '@/components/ui';
+import { authorLabel } from '@/lib/authorCredit';
 import { useT } from '@/lib/i18n';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
 import {
@@ -208,6 +209,10 @@ function MomentBlock({ moment, onOpen, onAdd }: { moment: MusicMoment; onOpen: (
           index={i + 1}
           title={track.title}
           artist={track.artist}
+          by={authorLabel(
+            { name: track.authorName ?? null, removed: track.authorRemoved ?? null },
+            { guest: t('author.formerGuest'), host: t('author.formerHost') },
+          )}
           mustPlay={track.mustPlay}
           note={track.note}
           onPress={real ? onOpen : undefined}

@@ -4,6 +4,8 @@ import { Image } from 'expo-image';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 
 import { Icon, PlayPauseIcon, useC, type IconName } from '@/components/ui';
+import { authorLabel } from '@/lib/authorCredit';
+import { useT } from '@/lib/i18n';
 import { Brand, Radius, Space } from '@/lib/theme';
 import { resolvePreview } from '@/lib/musicSearch';
 import { removeSong, setDoNotPlay, setMustPlay, updateSongNote, type SongRow } from '@/lib/planning';
@@ -23,6 +25,7 @@ export function SectionSongs({
   allowDoNotPlay?: boolean;
 }) {
   const c = useC();
+  const { t } = useT();
   const player = useAudioPlayer(null);
   const status = useAudioPlayerStatus(player);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -93,7 +96,12 @@ export function SectionSongs({
             </Pressable>
             <View style={{ flex: 1 }}>
               <Text style={{ color: c.text, fontWeight: '600', fontSize: 14, textDecorationLine: s.do_not_play ? 'line-through' : 'none' }} numberOfLines={1}>{s.title}</Text>
-              <Text style={{ color: c.textSecondary, fontSize: 13 }} numberOfLines={1}>{s.artist}</Text>
+              <Text style={{ color: c.textSecondary, fontSize: 13 }} numberOfLines={1}>{s.artist ?? ''}</Text>
+              {authorLabel({ name: s.authorName ?? null, removed: s.authorRemoved ?? null }, { guest: t('author.formerGuest'), host: t('author.formerHost') }) ? (
+                <Text style={{ color: c.ink3, fontSize: 12 }} numberOfLines={1}>
+                  {authorLabel({ name: s.authorName ?? null, removed: s.authorRemoved ?? null }, { guest: t('author.formerGuest'), host: t('author.formerHost') })}
+                </Text>
+              ) : null}
             </View>
             <Pressable onPress={() => onRemove(s)} hitSlop={10} style={{ padding: 4 }} accessibilityLabel="Remove song"><Icon name="close" size={16} color={c.ink3} /></Pressable>
           </View>

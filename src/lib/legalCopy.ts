@@ -235,20 +235,16 @@ const deletionEn: LegalDocument = {
   title: 'Account deletion',
   sections: [
     {
-      heading: 'Delete your app account',
-      body: 'You can initiate deletion using the account-deletion option inside the app and confirm that you want to delete your login. You do not need to email us to initiate that login deletion. If you cannot access the app, contact drew@xpressdjs.com for help with a data request. Staff accounts use a separate administrative process; this client deletion route refuses staff accounts.',
+      heading: 'Deleting your account',
+      body: 'Deleting your account removes your login and profile. Planning details for a booked event are kept with the event so your DJ can perform it, and contract and payment records are kept as required by law.',
     },
     {
-      heading: 'What is removed',
-      body: 'The current process deletes your Supabase authentication user, the app account record, event-app memberships and device-token records for that login. Planning author references covered by the deletion relationships are set to null, and associated likes are removed. You lose access through that account. This is not a promise that every copy of your identity disappears from event text or other records.',
+      heading: 'Guests and co-hosts',
+      body: 'When a guest or co-host deletes their account, their login, name, email, phone, photo, and profile are removed. Their answers, songs, and notes stay on the event and are shown as Former guest or Former host.',
     },
     {
-      heading: 'What remains',
-      body: 'The current process keeps CRM client records, client-to-event links, guest records, events, songs, planning answers and notes, contracts and payments, public cover photos, private planner files and invitation or email logs. Some retained content can still identify you. Keeping these records in the present implementation is not proof that every record is legally required or may be retained indefinitely.',
-    },
-    {
-      heading: 'Further personal-data removal',
-      body: 'Write to drew@xpressdjs.com identifying the relevant event and the information you want reviewed, corrected or removed. Do not send a password or card number. We may verify your identity and distinguish your information from other participants’ records. A separate request does not waive statutory rights and is not a substitute for making the in-app deletion flow meet applicable requirements. We cannot promise a fixed number of days or automatic removal of every event file under the current implementation. Deleting a login does not cancel a booking or change the booking agreement.',
+      heading: 'The booked client',
+      body: 'When the main contract client deletes their account, the app login is removed. The event, contract, planning answers, and payments stay with the booking. Staff accounts are not deleted from this app.',
     },
   ],
 };
@@ -257,20 +253,16 @@ const deletionEs: LegalDocument = {
   title: 'Eliminación de cuenta',
   sections: [
     {
-      heading: 'Eliminar su cuenta de la aplicación',
-      body: 'Puede iniciar la eliminación mediante la opción de eliminación de cuenta dentro de la aplicación y confirmar que desea eliminar su acceso. No necesita enviar un correo para iniciar esa eliminación. Si no puede acceder, escriba a drew@xpressdjs.com para obtener ayuda con una solicitud de datos. Las cuentas del personal siguen un proceso administrativo separado; el proceso del cliente rechaza las cuentas del personal.',
+      heading: 'Eliminar su cuenta',
+      body: 'Eliminar su cuenta quita su acceso y su perfil. Los detalles de planificación de un evento reservado se conservan con el evento para que su DJ pueda realizarlo, y los registros del contrato y de los pagos se conservan según exige la ley.',
     },
     {
-      heading: 'Qué se elimina',
-      body: 'El proceso actual elimina su usuario de autenticación de Supabase, el registro de cuenta de la aplicación, las pertenencias al evento en la aplicación y los registros de tokens de dispositivo de ese acceso. Las referencias de autor cubiertas por las relaciones de eliminación se establecen en null y se eliminan los Me gusta asociados. Pierde el acceso mediante esa cuenta. Esto no promete que todas las copias de su identidad desaparezcan del texto del evento u otros registros.',
+      heading: 'Invitados y coanfitriones',
+      body: 'Cuando un invitado o coanfitrión elimina su cuenta, se quitan su acceso, nombre, correo, teléfono, foto y perfil. Sus respuestas, canciones y notas permanecen en el evento y se muestran como Invitado anterior o Anfitrión anterior.',
     },
     {
-      heading: 'Qué permanece',
-      body: 'Se conservan registros de clientes del CRM, vínculos entre clientes y eventos, registros de invitados, eventos, canciones, respuestas y notas, contratos y pagos, portadas públicas, archivos privados del planificador y registros de invitaciones o correos. Parte del contenido conservado todavía puede identificarle. Que la implementación actual conserve esos registros no demuestra que todos sean obligatorios por ley ni que puedan conservarse indefinidamente.',
-    },
-    {
-      heading: 'Eliminación adicional de datos personales',
-      body: 'Escriba a drew@xpressdjs.com indicando el evento y la información que desea revisar, corregir o eliminar. No envíe contraseñas ni números de tarjeta. Podemos verificar su identidad y distinguir sus datos de los de otros participantes. Una solicitud separada no supone renunciar a derechos legales ni sustituye la obligación de que el proceso dentro de la aplicación cumpla los requisitos aplicables. La implementación actual no permite prometer un número fijo de días ni la eliminación automática de todos los archivos del evento. Eliminar un acceso no cancela una reserva ni cambia el contrato.',
+      heading: 'El cliente de la reserva',
+      body: 'Cuando el cliente principal del contrato elimina su cuenta, se quita el acceso de la aplicación. El evento, el contrato, las respuestas de planificación y los pagos permanecen con la reserva. Las cuentas del personal no se eliminan desde esta aplicación.',
     },
   ],
 };

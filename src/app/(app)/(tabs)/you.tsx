@@ -29,6 +29,7 @@ import { viewerRole } from '@/lib/membership';
 import { appleAuthorizationCode, sessionUsesApple } from '@/lib/socialAuth';
 import { useEvent } from '@/lib/events';
 import {
+  clearStoredAccount,
   deleteAccount,
   loadAccount,
   OFFICE_EMAIL_FALLBACK,
@@ -114,8 +115,14 @@ export default function AccountScreen() {
     // prompt. Cancel still deletes the Xpress account. Revocation itself is server-side.
     const code = sessionUsesApple(session) ? await appleAuthorizationCode() : null;
     const ok = await deleteAccount({ appleAuthorizationCode: code });
-    setDeletePhase(ok ? 'done' : 'error');
-  }, [session]);
+    if (!ok) {
+      setDeletePhase('error');
+      return;
+    }
+    await clearStoredAccount(session?.user.id ?? null);
+    setDeleteOpen(false);
+    await signOut();
+  }, [session, signOut]);
 
   const isStaff = profile?.accountType === 'staff';
   const emailAddress = (data?.officeEmail?.trim() || OFFICE_EMAIL_FALLBACK).trim();

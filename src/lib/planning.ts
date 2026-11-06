@@ -1,4 +1,5 @@
 import { apiBase, authorizedFetch } from '@/lib/api';
+import { authorCredit, type RemovedAuthor } from '@/lib/authorCredit';
 import { fetchEventCard } from '@/lib/eventCard';
 import { restrictGuestOverview } from '@/lib/guestSections';
 import { rememberMembership, roleForEvent } from '@/lib/membership';
@@ -109,6 +110,10 @@ export type QuestionRow = {
   condition_values: string[];
   /** When the answer row was last written. Absent until the couple answers. */
   updated_at?: string | null;
+  /** Name while the person still has a profile. */
+  authorName?: string | null;
+  /** Set when that profile was removed and only the role remains. */
+  authorRemoved?: RemovedAuthor | null;
 };
 
 export type SongRow = {
@@ -120,13 +125,20 @@ export type SongRow = {
   must_play: boolean;
   do_not_play: boolean;
   note: string | null;
-  /** Auth user who added the song. Guests can change only their own rows. */
+  /** Auth user who added the song. Guests can change only their own rows. Null after that login is removed. */
   requested_by?: string | null;
+  authorName?: string | null;
+  authorRemoved?: RemovedAuthor | null;
   provider?: string | null;
   provider_id?: string | null;
 };
 
 export type EventSong = SongRow & { section_id: string };
+
+function authorFields(row: unknown): { authorName: string | null; authorRemoved: RemovedAuthor | null } {
+  const credit = authorCredit(row);
+  return { authorName: credit.name, authorRemoved: credit.removed };
+}
 
 function toSongRow(s: {
   id: string;
@@ -153,6 +165,7 @@ function toSongRow(s: {
     provider: s.provider ?? null,
     provider_id: s.provider_id ?? null,
     requested_by: s.requested_by ?? null,
+    ...authorFields(s),
   };
 }
 
@@ -517,22 +530,26 @@ export const addCustomSection = (
 export async function loadSection(eventId: string, sectionId: string): Promise<{ questions: QuestionRow[]; songs: SongRow[] }> {
   const [{ data: questions }, { data: answers }, { data: songs }] = await Promise.all([
     supabase.from('planning_questions').select('*').eq('section_id', sectionId).order('sort_order'),
-    supabase.from('planning_question_answers').select('question_id, answer, updated_at').eq('event_id', eventId),
+    supabase.from('planning_question_answers').select('*').eq('event_id', eventId),
     supabase.from('planning_songs').select('*').eq('section_id', sectionId).order('sort_order'),
   ]);
   const ansMap = new Map((answers ?? []).map((a) => [a.question_id, a]));
   return {
-    questions: (questions ?? []).map((q) => ({
-      id: q.id,
-      prompt: q.prompt,
-      help_text: q.help_text,
-      answer_type: q.answer_type,
-      options: Array.isArray(q.options) ? q.options : [],
-      answer: ansMap.get(q.id)?.answer ?? null,
-      condition_question_id: q.condition_question_id ?? null,
-      condition_values: Array.isArray(q.condition_values) ? q.condition_values : [],
-      updated_at: ansMap.get(q.id)?.updated_at ?? null,
-    })),
+    questions: (questions ?? []).map((q) => {
+      const answer = ansMap.get(q.id);
+      return {
+        id: q.id,
+        prompt: q.prompt,
+        help_text: q.help_text,
+        answer_type: q.answer_type,
+        options: Array.isArray(q.options) ? q.options : [],
+        answer: answer?.answer ?? null,
+        condition_question_id: q.condition_question_id ?? null,
+        condition_values: Array.isArray(q.condition_values) ? q.condition_values : [],
+        updated_at: answer?.updated_at ?? null,
+        ...authorFields(answer),
+      };
+    }),
     songs: (songs ?? []).map((s) => toSongRow(s)),
   };
 }
@@ -541,7 +558,7 @@ export async function loadSection(eventId: string, sectionId: string): Promise<{
 export async function loadEventSongs(eventId: string): Promise<EventSong[]> {
   const { data } = await supabase
     .from('planning_songs')
-    .select('id, section_id, title, artist, artwork_url, preview_url, must_play, do_not_play, note, provider, provider_id, sort_order')
+    .select('*')
     .eq('event_id', eventId)
     .order('sort_order');
   const rows = (data ?? []).map((s) => ({ ...toSongRow(s), section_id: s.section_id }));
