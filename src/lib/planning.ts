@@ -1,5 +1,7 @@
-import { supabase } from '@/lib/supabase';
 import { apiBase, authorizedFetch } from '@/lib/api';
+import { applyGuestAllowList, loadGuestOpenSections } from '@/lib/guestSections';
+import { roleForEvent } from '@/lib/membership';
+import { supabase } from '@/lib/supabase';
 
 export type EventLite = {
   id: string;
@@ -371,7 +373,12 @@ export async function loadOverview(eventId: string): Promise<Overview> {
     if (row.ai_picks_enabled) g.aiPicks = true;
   }
 
-  return { groups: groups.filter((g) => g.sections.length > 0), sections: flat, removed, totalQuestions, answeredQuestions };
+  const overview = { groups: groups.filter((g) => g.sections.length > 0), sections: flat, removed, totalQuestions, answeredQuestions };
+  if (roleForEvent(eventId) === 'guest') {
+    const open = await loadGuestOpenSections(eventId);
+    if (open.ready) return applyGuestAllowList(overview, open.sectionIds);
+  }
+  return overview;
 }
 
 // ── Section management (staff + hosts) — writes go through an XOS admin route

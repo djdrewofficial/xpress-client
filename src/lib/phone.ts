@@ -1,4 +1,4 @@
-/** US-first phone helpers for passwordless sign-in. No network. */
+/** US phone helpers and a small email check. No network. */
 
 const DIGITS = /\D/g;
 

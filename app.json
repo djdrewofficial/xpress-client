@@ -19,6 +19,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.xpressentertainment.client",
+      "usesAppleSignIn": true,
+      "associatedDomains": ["applinks:xos.xpressdjs.com"],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -61,7 +63,8 @@
       ],
       "expo-font",
       "expo-asset",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": false,

@@ -1,8 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useAuth } from '@/lib/auth';
 import { getMyEvents, type EventLite } from '@/lib/planning';
+import { selectedEventKey } from '@/lib/selectedEvent';
 
 /* One shared "which event am I looking at" for the whole signed-in app. Couples
    usually have one event; some have several. Staff pick an event from the events
@@ -18,6 +19,8 @@ type EventState = {
   eventId: string | null;
   /** Select an event (from the switcher or the staff list) and remember it. */
   selectEvent: (e: EventLite) => void;
+  /** Prefer this event the next time the list reloads (after a link or a join code). */
+  focusEvent: (id: string) => void;
   reload: () => Promise<void>;
 };
 
@@ -27,10 +30,11 @@ const EventContext = createContext<EventState>({
   event: null,
   eventId: null,
   selectEvent: () => {},
+  focusEvent: () => {},
   reload: async () => {},
 });
 
-const keyFor = (uid: string) => `xos.selectedEvent.${uid}`;
+const keyFor = selectedEventKey;
 
 export function EventProvider({ children }: PropsWithChildren) {
   const { profile, session } = useAuth();
@@ -39,6 +43,8 @@ export function EventProvider({ children }: PropsWithChildren) {
   const [eventId, setEventId] = useState<string | null>(null);
   const [selected, setSelected] = useState<EventLite | null>(null); // resolves the header title for staff picks
   const [loading, setLoading] = useState(true);
+  const preferId = useRef<string | null>(null);
+  const loadGen = useRef(0);
 
   const persist = useCallback(
     (id: string | null) => {
@@ -58,7 +64,16 @@ export function EventProvider({ children }: PropsWithChildren) {
     [persist],
   );
 
+  const focusEvent = useCallback(
+    (id: string) => {
+      preferId.current = id;
+      persist(id);
+    },
+    [persist],
+  );
+
   const load = useCallback(async () => {
+    const gen = ++loadGen.current;
     if (!profile || !uid) {
       setEvents([]);
       setEventId(null);
@@ -68,6 +83,7 @@ export function EventProvider({ children }: PropsWithChildren) {
     }
     setLoading(true);
     const saved = await AsyncStorage.getItem(keyFor(uid)).catch(() => null);
+    if (gen !== loadGen.current) return;
 
     // Staff don't get an inline switcher — they choose from the events list, and
     // always start there on a fresh launch. The selection lives only for the
@@ -81,8 +97,12 @@ export function EventProvider({ children }: PropsWithChildren) {
     }
 
     const list = await getMyEvents({ clientId: profile.clientId, eventGuestId: profile.eventGuestId });
+    if (gen !== loadGen.current) return;
     setEvents(list);
-    const initial = (saved ? list.find((e) => e.id === saved) : undefined) ?? list[0] ?? null;
+    const preferred = preferId.current ? list.find((e) => e.id === preferId.current) : undefined;
+    if (preferred) preferId.current = null;
+    const remembered = saved ? list.find((e) => e.id === saved) : undefined;
+    const initial = preferred ?? remembered ?? list[0] ?? null;
     setSelected(initial);
     setEventId(initial?.id ?? null);
     if (initial) persist(initial.id);
@@ -99,7 +119,7 @@ export function EventProvider({ children }: PropsWithChildren) {
   );
 
   return (
-    <EventContext.Provider value={{ loading, events, event, eventId, selectEvent, reload: load }}>
+    <EventContext.Provider value={{ loading, events, event, eventId, selectEvent, focusEvent, reload: load }}>
       {children}
     </EventContext.Provider>
   );

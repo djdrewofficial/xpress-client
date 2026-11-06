@@ -22,6 +22,7 @@ import {
 } from '@/components/eventDisplay';
 import { Type } from '@/lib/theme';
 import { staffSeesFinancials, useAuth } from '@/lib/auth';
+import { appleAuthorizationCode, sessionUsesApple } from '@/lib/socialAuth';
 import { useEvent } from '@/lib/events';
 import {
   deleteAccount,
@@ -107,9 +108,12 @@ export default function AccountScreen() {
 
   const confirmDelete = useCallback(async () => {
     setDeletePhase('working');
-    const ok = await deleteAccount();
+    // Apple only returns a fresh authorization code from another Sign in with Apple
+    // prompt. Cancel still deletes the Xpress account. Revocation itself is server-side.
+    const code = sessionUsesApple(session) ? await appleAuthorizationCode() : null;
+    const ok = await deleteAccount({ appleAuthorizationCode: code });
     setDeletePhase(ok ? 'done' : 'error');
-  }, []);
+  }, [session]);
 
   const isStaff = profile?.accountType === 'staff';
   const emailAddress = (data?.officeEmail?.trim() || OFFICE_EMAIL_FALLBACK).trim();

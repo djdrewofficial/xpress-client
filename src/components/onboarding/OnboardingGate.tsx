@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type PropsWithChildren } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
+import { JoinEventScreen } from '@/components/JoinEventScreen';
+import { useJoinLinkError } from '@/components/JoinGate';
 import { FirstSongStep } from '@/components/onboarding/FirstSongStep';
 import { MusicStep } from '@/components/onboarding/MusicStep';
 import { WelcomeScreen } from '@/components/onboarding/WelcomeScreen';
@@ -13,13 +15,14 @@ type Step = 'loading' | 'welcome' | 'music' | 'song' | 'app';
 
 /**
  * First screen after sign-in for couples and guests: Welcome (language + legal),
- * then the music intro, then the first-song step for clients. Staff skip this
- * and land on the events list. The old multi-slide welcome tour is not shown.
+ * then Join your event when the account has none, then the music intro and the
+ * first-song step for clients. Staff skip this and land on the events list.
  */
 export function OnboardingGate({ children }: PropsWithChildren) {
   const c = useC();
   const { profile, session } = useAuth();
-  const { event, loading: eventLoading } = useEvent();
+  const { event, events, loading: eventLoading, focusEvent, reload } = useEvent();
+  const linkError = useJoinLinkError();
   const [step, setStep] = useState<Step>('loading');
   const decided = useRef(false);
 
@@ -78,6 +81,18 @@ export function OnboardingGate({ children }: PropsWithChildren) {
   }
 
   if (step === 'welcome') return <WelcomeScreen onContinue={afterWelcome} />;
+
+  if (profile.accountType !== 'staff' && !eventLoading && events.length === 0) {
+    return (
+      <JoinEventScreen
+        initialError={linkError}
+        onJoined={async (eventId) => {
+          focusEvent(eventId);
+          await reload();
+        }}
+      />
+    );
+  }
 
   if (step === 'music') {
     const canSong = (profile.accountType === 'client' || profile.accountType === 'staff') && !!event;

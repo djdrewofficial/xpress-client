@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -8,8 +8,9 @@ import { SongPicker } from '@/components/music/AddMusicSheet';
 import { VendorTeam } from '@/components/VendorTeam';
 import { MomentBody, type MomentSong, type MomentTab } from '@/components/plan/MomentBody';
 import { isDanceFloorSection, momentEyebrow, momentNumber } from '@/components/plan/model';
-import { useC } from '@/components/ui';
+import { Button, useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { guestCanSeeSection } from '@/lib/guestSections';
 import { useT } from '@/lib/i18n';
 import { resolvePreview } from '@/lib/musicSearch';
 import {
@@ -24,6 +25,7 @@ import {
   type SongRow,
 } from '@/lib/planning';
 import { supabase } from '@/lib/supabase';
+import { Type } from '@/lib/theme';
 import { TimePickerSheet } from '@/components/TimePickerSheet';
 
 type Meta = {
@@ -73,6 +75,7 @@ export default function SectionScreen() {
     setTab('questions');
     setLoading(true);
   }
+  const [closed, setClosed] = useState(false);
   const [picker, setPicker] = useState<null | { mode: 'foryou' | 'search' }>(null);
   const [pickingTime, setPickingTime] = useState(false);
 
@@ -86,6 +89,13 @@ export default function SectionScreen() {
 
   const load = useCallback(async () => {
     if (!id || !eventId) return;
+    const allowed = await guestCanSeeSection(eventId, id);
+    if (!allowed) {
+      setClosed(true);
+      setLoading(false);
+      return;
+    }
+    setClosed(false);
     const [{ data: m }, { data: ev }, sec, ov] = await Promise.all([
       supabase.from('planning_sections').select('*').eq('id', id).maybeSingle(),
       supabase.from('events').select('name').eq('id', eventId).maybeSingle(),
@@ -179,6 +189,15 @@ export default function SectionScreen() {
       load();
     }
   };
+
+  if (closed) {
+    return (
+      <View style={{ flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 }}>
+        <Text style={[Type.body, { color: c.ink, textAlign: 'center' }]}>{t('guest.closed')}</Text>
+        <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
+      </View>
+    );
+  }
 
   if (loading || !meta) {
     return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg }}><ActivityIndicator color={c.accent} /></View>;
