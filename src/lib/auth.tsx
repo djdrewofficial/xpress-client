@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
-import { createContext, useContext, useEffect, useState, type PropsWithChildren } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type PropsWithChildren } from 'react';
 
+import { claimEventInvites, type ClaimResult } from '@/lib/eventAccess';
 import { supabase } from '@/lib/supabase';
 
 export type PermissionTier = 'master_admin' | 'salesperson' | 'employee';
@@ -27,10 +28,16 @@ export function staffSeesFinancials(p: Profile | null): boolean {
   return p?.accountType === 'staff' && (p.permissionTier === 'master_admin' || p.permissionTier === 'salesperson');
 }
 
+const EMPTY_CLAIM: ClaimResult = { reason: 'unavailable', eventIds: [] };
+
 type AuthState = {
   session: Session | null;
   loading: boolean;
   profile: Profile | null;
+  /** Result of the claim that ran before this profile was loaded. */
+  claim: ClaimResult;
+  /** Re-read the account. Pass `{ claim: true }` to link invites again first. */
+  reloadProfile: (opts?: { claim?: boolean }) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -38,20 +45,57 @@ const AuthContext = createContext<AuthState>({
   session: null,
   loading: true,
   profile: null,
+  claim: EMPTY_CLAIM,
+  reloadProfile: async () => {},
   signOut: async () => {},
 });
 
+async function readProfile(uid: string): Promise<Profile> {
+  const { data: account } = await supabase
+    .from('accounts')
+    .select('account_type, client_id, event_guest_id, employee_id')
+    .eq('auth_user_id', uid)
+    .maybeSingle();
+
+  let firstName = '';
+  let permissionTier: PermissionTier | null = null;
+  if (account?.client_id) {
+    const { data: c } = await supabase.from('clients').select('first_name').eq('id', account.client_id).maybeSingle();
+    firstName = c?.first_name ?? '';
+  } else if (account?.event_guest_id) {
+    const { data: g } = await supabase.from('event_guests').select('first_name').eq('id', account.event_guest_id).maybeSingle();
+    firstName = g?.first_name ?? '';
+  } else if (account?.employee_id) {
+    const { data: e } = await supabase.from('employees').select('first_name, permission_tier').eq('id', account.employee_id).maybeSingle();
+    firstName = e?.first_name ?? '';
+    permissionTier = (e?.permission_tier as PermissionTier | undefined) ?? null;
+  }
+  return {
+    accountType: (account?.account_type as Profile['accountType']) ?? null,
+    clientId: account?.client_id ?? null,
+    eventGuestId: account?.event_guest_id ?? null,
+    employeeId: account?.employee_id ?? null,
+    permissionTier,
+    firstName,
+  };
+}
+
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [readyFor, setReadyFor] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [claim, setClaim] = useState<ClaimResult>(EMPTY_CLAIM);
+  const profileReq = useRef(0);
+  const sessionRef = useRef<Session | null>(null);
+  sessionRef.current = session;
 
   useEffect(() => {
     let settled = false;
     const finish = () => {
       if (settled) return;
       settled = true;
-      setLoading(false);
+      setSessionReady(true);
     };
     // A null getSession result must not wipe a session the listener already
     // applied, and a storage/network rejection is not a sign-out. The login
@@ -77,50 +121,45 @@ export function AuthProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
+  const loadProfile = useCallback(async (uid: string, withClaim: boolean) => {
+    const req = ++profileReq.current;
+    if (withClaim) {
+      // Right after the one-time-code session exists, and again on a cold start,
+      // link invites before we read the account or choose a screen.
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000);
+      const result = await claimEventInvites(controller.signal);
+      clearTimeout(timer);
+      if (req !== profileReq.current) return;
+      setClaim(result);
+    }
+    const next = await readProfile(uid);
+    if (req !== profileReq.current) return;
+    setProfile(next);
+    setReadyFor(uid);
+  }, []);
+
   useEffect(() => {
     const uid = session?.user.id;
     if (!uid) {
+      profileReq.current += 1;
       setProfile(null);
+      setClaim(EMPTY_CLAIM);
+      setReadyFor(null);
       return;
     }
-    // Guard against a stale resolve: if the session changes before this finishes,
-    // don't let an earlier user's profile overwrite the newer one.
-    let cancelled = false;
-    (async () => {
-      const { data: account } = await supabase
-        .from('accounts')
-        .select('account_type, client_id, event_guest_id, employee_id')
-        .eq('auth_user_id', uid)
-        .maybeSingle();
-      if (cancelled) return;
+    loadProfile(uid, true);
+  }, [session?.user.id, loadProfile]);
 
-      let firstName = '';
-      let permissionTier: PermissionTier | null = null;
-      if (account?.client_id) {
-        const { data: c } = await supabase.from('clients').select('first_name').eq('id', account.client_id).maybeSingle();
-        firstName = c?.first_name ?? '';
-      } else if (account?.event_guest_id) {
-        const { data: g } = await supabase.from('event_guests').select('first_name').eq('id', account.event_guest_id).maybeSingle();
-        firstName = g?.first_name ?? '';
-      } else if (account?.employee_id) {
-        const { data: e } = await supabase.from('employees').select('first_name, permission_tier').eq('id', account.employee_id).maybeSingle();
-        firstName = e?.first_name ?? '';
-        permissionTier = (e?.permission_tier as PermissionTier | undefined) ?? null;
-      }
-      if (cancelled) return;
-      setProfile({
-        accountType: (account?.account_type as Profile['accountType']) ?? null,
-        clientId: account?.client_id ?? null,
-        eventGuestId: account?.event_guest_id ?? null,
-        employeeId: account?.employee_id ?? null,
-        permissionTier,
-        firstName,
-      });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [session?.user.id]);
+  const reloadProfile = useCallback(async (opts?: { claim?: boolean }) => {
+    const uid = sessionRef.current?.user.id;
+    if (!uid) return;
+    await loadProfile(uid, opts?.claim === true);
+  }, [loadProfile]);
+
+  // Stay on the splash until claim + the account read finish, so routing sees
+  // a partner who was just linked. Signed out, only the session check matters.
+  const loading = !sessionReady || (session != null && readyFor !== session.user.id);
 
   return (
     <AuthContext.Provider
@@ -128,10 +167,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
         session,
         loading,
         profile,
+        claim,
+        reloadProfile,
         // Local scope ends this device only. The default (global) revokes every
         // session for the user, including XOS in the browser.
         signOut: () => {
+          profileReq.current += 1;
           setProfile(null);
+          setClaim(EMPTY_CLAIM);
+          setReadyFor(null);
           return supabase.auth.signOut({ scope: 'local' }).then(() => {});
         },
       }}>

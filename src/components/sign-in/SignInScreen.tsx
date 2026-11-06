@@ -147,7 +147,7 @@ export function SignInScreen({ transport = liveOtp, initial }: { transport?: Otp
     try {
       const ok = await transport.verify(channel, target, code);
       if (!ok) setCodeError(true);
-      // A session update swaps the root navigator off this screen.
+      // A session update claims open invites, then the root navigator leaves this screen.
     } finally {
       setBusy(false);
     }

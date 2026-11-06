@@ -61,6 +61,7 @@ export default function AccountScreen() {
   const [disclosure, setDisclosure] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePhase, setDeletePhase] = useState<'confirm' | 'working' | 'done' | 'error'>('confirm');
+  const [accessRevision, setAccessRevision] = useState(0);
 
   useEffect(() => {
     readMarketingTexts().then(setMarketing);
@@ -97,6 +98,7 @@ export default function AccountScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await load();
+    setAccessRevision((n) => n + 1);
     setRefreshing(false);
   }, [load]);
 
@@ -184,6 +186,9 @@ export default function AccountScreen() {
         onEmail={() => Linking.openURL(`mailto:${emailAddress}`)}
         showInvite={profile?.accountType === 'client' && !!eventId}
         onInvite={() => setShowInvite(true)}
+        partnerEventId={profile?.accountType === 'client' && eventId ? eventId : null}
+        accessRevision={accessRevision}
+        onHaveCode={profile?.accountType === 'client' ? () => router.push('/join') : undefined}
         accountName={accountName}
         accountEmail={session?.user.email ?? null}
         onPrivacy={() => Linking.openURL(PRIVACY_URL)}
