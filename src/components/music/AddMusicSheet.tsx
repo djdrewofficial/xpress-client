@@ -62,8 +62,9 @@ export type AddMusicFixtures = {
 type PreviewList = { name: string | null; url: string; provider: 'apple' | 'spotify'; tracks: SpotifyTrack[] };
 
 function fromTrack(t: Track): PickItem {
+  const providerId = t.providerId?.trim() || null;
   return {
-    key: `${t.provider}:${t.providerId}`,
+    key: resultKey(t.provider, providerId, t.title, t.artist),
     title: t.title,
     artist: t.artist,
     artworkUrl: t.artworkUrl ?? null,
@@ -77,15 +78,16 @@ function fromTrack(t: Track): PickItem {
       preview_url: t.previewUrl ?? null,
       external_url: t.externalUrl ?? null,
       provider: t.provider,
-      provider_id: t.providerId,
+      provider_id: providerId,
     },
   };
 }
 
 function fromPlaylistTrack(t: SpotifyTrack): PickItem {
   const provider = t.provider ?? 'spotify';
+  const providerId = t.providerId?.trim() || null;
   return {
-    key: `${provider}:${t.providerId}`,
+    key: resultKey(provider, providerId, t.title, t.artist),
     title: t.title,
     artist: t.artist,
     artworkUrl: t.artworkUrl,
@@ -99,7 +101,7 @@ function fromPlaylistTrack(t: SpotifyTrack): PickItem {
       preview_url: t.previewUrl,
       external_url: t.externalUrl,
       provider,
-      provider_id: t.providerId,
+      provider_id: providerId,
     },
   };
 }
@@ -122,6 +124,44 @@ function trackKey(t: { provider?: string | null; providerId: string }) {
 
 function titleKey(title: string) {
   return title.trim().toLowerCase();
+}
+
+function artistKey(artist: string | null | undefined) {
+  return (artist ?? '').trim().toLowerCase();
+}
+
+/** Title + artist. Used only for songs saved without a provider id. */
+function looseIdentity(title: string, artist: string | null | undefined) {
+  return `${titleKey(title)}\u0000${artistKey(artist)}`;
+}
+
+/**
+ * One search row's selection identity.
+ * Provider id alone is not enough: a shared or title-derived id would check
+ * every "Hello". Title alone is not enough either. Both stay in the key.
+ */
+export function resultKey(provider: string | null | undefined, providerId: string | null | undefined, title: string, artist: string | null | undefined) {
+  const who = looseIdentity(title, artist);
+  const id = providerId?.trim();
+  if (!id) return who;
+  return `${trackKey({ provider, providerId: id })}\u0000${who}`;
+}
+
+function catalogIdentity(item: PickItem): string | null {
+  const id = item.payload.provider_id?.trim();
+  if (!id) return null;
+  return resultKey(item.provider ?? item.payload.provider, id, item.title, item.artist);
+}
+
+function placementFromSongs(songs: { title: string; artist?: string | null; provider?: string | null; provider_id?: string | null }[]) {
+  const catalog = new Set<string>();
+  const loose = new Set<string>();
+  for (const song of songs) {
+    const id = song.provider_id?.trim();
+    if (id) catalog.add(resultKey(song.provider, id, song.title, song.artist));
+    else loose.add(looseIdentity(song.title, song.artist));
+  }
+  return { catalog, loose };
 }
 
 function initialSelection(tracks: SpotifyTrack[], existing: Set<string>, dnp: Set<string>) {
@@ -221,6 +261,10 @@ export function AddMusicSheet({
   const [sessionCount, setSessionCount] = useState(0);
   const [playingKey, setPlayingKey] = useState<string | null>(null);
   const [titles, setTitles] = useState<Set<string>>(new Set());
+  /** Provider ids already on this moment. Search checks match these, not the title. */
+  const [catalogKeys, setCatalogKeys] = useState<Set<string>>(new Set());
+  /** Title+artist for songs saved with no provider id. */
+  const [looseKeys, setLooseKeys] = useState<Set<string>>(new Set());
   const [dnpTitles, setDnpTitles] = useState<Set<string>>(new Set());
   const [picking, setPicking] = useState(false);
   const [plUrl, setPlUrl] = useState('');
@@ -232,6 +276,10 @@ export function AddMusicSheet({
 
   const titlesRef = useRef(titles);
   titlesRef.current = titles;
+  const catalogRef = useRef(catalogKeys);
+  catalogRef.current = catalogKeys;
+  const looseRef = useRef(looseKeys);
+  looseRef.current = looseKeys;
   const dnpRef = useRef(dnpTitles);
   dnpRef.current = dnpTitles;
 
@@ -250,6 +298,10 @@ export function AddMusicSheet({
     if (sectionSeen.current === sectionId) return;
     sectionSeen.current = sectionId;
     setAdded({});
+    catalogRef.current = new Set();
+    looseRef.current = new Set();
+    setCatalogKeys(catalogRef.current);
+    setLooseKeys(looseRef.current);
     inflight.current.clear();
   }, [sectionId]);
 
@@ -263,6 +315,10 @@ export function AddMusicSheet({
     try { player.pause(); } catch { /* already stopped */ }
     setPlayingKey(null);
     setAdded({});
+    catalogRef.current = new Set();
+    looseRef.current = new Set();
+    setCatalogKeys(catalogRef.current);
+    setLooseKeys(looseRef.current);
     setSessionCount(0);
     setQuery('');
     setResults([]);
@@ -320,7 +376,13 @@ export function AddMusicSheet({
     if (fx) return;
     let cancel = false;
     loadSection(eventId, sectionId).then((sec) => {
-      if (!cancel) setTitles(new Set(sec.songs.map((s) => titleKey(s.title))));
+      if (cancel) return;
+      setTitles(new Set(sec.songs.map((s) => titleKey(s.title))));
+      const placed = placementFromSongs(sec.songs);
+      catalogRef.current = placed.catalog;
+      looseRef.current = placed.loose;
+      setCatalogKeys(placed.catalog);
+      setLooseKeys(placed.loose);
     });
     fetchDoNotPlayTitles(eventId).then((set) => {
       if (!cancel) setDnpTitles(set);
@@ -489,13 +551,23 @@ export function AddMusicSheet({
 
   const handleAdd = useCallback(async (item: PickItem) => {
     const title = titleKey(item.title);
-    if (titlesRef.current.has(title) || inflight.current.has(item.key)) return false;
+    const catalogId = catalogIdentity(item);
+    const loose = looseIdentity(item.title, item.artist);
+    if (inflight.current.has(item.key)) return false;
+    if ((catalogId && catalogRef.current.has(catalogId)) || looseRef.current.has(loose)) return false;
     inflight.current.add(item.key);
     setAdded((p) => ({ ...p, [item.key]: 'busy' }));
     try {
       if (!fixturesRef.current) {
         const row = await addSong(eventId, sectionId, item.payload);
         if (row) onAdded?.(row);
+      }
+      if (catalogId) {
+        catalogRef.current = new Set(catalogRef.current).add(catalogId);
+        setCatalogKeys(catalogRef.current);
+      } else {
+        looseRef.current = new Set(looseRef.current).add(loose);
+        setLooseKeys(looseRef.current);
       }
       titlesRef.current = new Set(titlesRef.current).add(title);
       setTitles(new Set(titlesRef.current));
@@ -514,7 +586,16 @@ export function AddMusicSheet({
     }
   }, [eventId, sectionId, onAdded]);
 
-  const stateFor = (item: PickItem) => added[item.key] ?? (titles.has(titleKey(item.title)) ? 'done' : undefined);
+  const stateFor = (item: PickItem) => {
+    const marked = added[item.key];
+    if (marked) return marked;
+    const catalogId = catalogIdentity(item);
+    if (catalogId && catalogKeys.has(catalogId)) return 'done';
+    // Songs saved without a provider id can only be recognized by title + artist.
+    // Title alone is not identity: every "Hello" would share Adele's check.
+    if (looseKeys.has(looseIdentity(item.title, item.artist))) return 'done';
+    return undefined;
+  };
 
   const commitImport = async () => {
     if (!plResult || importing) return;
@@ -751,8 +832,8 @@ function SearchResults({
   return (
     <View style={{ gap: 0 }}>
       <Text style={[Type.label, { color: c.ink3, marginBottom: 4 }]}>{t('add.songs')}</Text>
-      {results.map(fromTrack).map((item) => (
-        <ResultRow key={item.key} item={item} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => onPlay(item)} onAdd={() => onAdd(item)} />
+      {results.map(fromTrack).map((item, index) => (
+        <ResultRow key={`${item.key}:${index}`} item={item} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => onPlay(item)} onAdd={() => onAdd(item)} />
       ))}
     </View>
   );
@@ -797,8 +878,8 @@ function ForYou({
   return (
     <View style={{ gap: 0 }}>
       {fy.basis.length > 0 ? <Text style={[Type.footnote, { color: c.ink3, fontStyle: 'italic', marginBottom: 8 }]}>{t('add.basedOn', { basis: fy.basis.join(', ') })}</Text> : null}
-      {fy.items.map((item) => (
-        <ResultRow key={item.key} item={item} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => onPlay(item)} onAdd={() => onAdd(item)} />
+      {fy.items.map((item, index) => (
+        <ResultRow key={`${item.key}:${index}`} item={item} playing={playingKey === item.key} state={stateFor(item)} onPlay={() => onPlay(item)} onAdd={() => onAdd(item)} />
       ))}
       <LoadMore loading={fyMore} onPress={onMore} />
     </View>

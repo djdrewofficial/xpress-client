@@ -3,7 +3,7 @@ import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useDevLocale } from '@/lib/devLocale';
 import { View } from 'react-native';
 
-import { AddMusicSheet } from '@/components/music/AddMusicSheet';
+import { AddMusicSheet, resultKey } from '@/components/music/AddMusicSheet';
 import { MusicRecord } from '@/components/music/MusicRecord';
 import type { MusicMoment } from '@/components/music/model';
 import { TabBar, ThemeSchemeOverride } from '@/components/ui';
@@ -163,7 +163,12 @@ export default function DevMusicPreview() {
               initialQuery: 'sample',
               searchResults: RESULTS,
               doNotPlayTitles: ['Sample Overplayed Song'],
-              seedAddedKeys: sheet === 'add' ? ['spotify:sample-1', 'apple:sample-2'] : [],
+              seedAddedKeys: sheet === 'add'
+                ? [
+                    resultKey('spotify', 'sample-1', 'Sample Entrance Anthem', 'Sample Artist'),
+                    resultKey('apple', 'sample-2', 'Sample Song Title', 'Sample Artist'),
+                  ]
+                : [],
               playlist: {
                 name: 'Sample Dinner Vibes',
                 url: 'https://open.spotify.example/playlist/sample',
