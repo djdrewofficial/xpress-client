@@ -3,7 +3,7 @@ import { translate, type Locale } from '@/lib/i18n';
 import type { Group, QuestionRow, SectionRow } from '@/lib/planning';
 
 /**
- * Dance-floor moment — the only place "Do not play" is shown.
+ * Dance-floor moment (Open Dancing).
  *
  * Rule (same title signals the onboarding first-song step already uses, and
  * only sections that can hold songs):
@@ -12,8 +12,7 @@ import type { Group, QuestionRow, SectionRow } from '@/lib/planning';
  *   3. else /dance floor/i (space optional)
  *   4. else /\bdancing\b/i
  * "First Dance", "Parent Dance", and "Anniversary Dance" do not match.
- * Songs stay where they are stored: `planning_songs.do_not_play`, usually on
- * the section whose title matches /do not play|don't play|dont play/i.
+ * Do-not-play songs stay on their own section (`isDoNotPlaySection`).
  */
 export function isDanceFloorSection(s: Pick<SectionRow, 'title' | 'songs_enabled'>): boolean {
   if (!s.songs_enabled) return false;

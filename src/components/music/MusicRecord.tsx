@@ -217,22 +217,6 @@ function MomentBlock({ moment, onOpen, onAdd }: { moment: MusicMoment; onOpen: (
           onPress={real ? onOpen : undefined}
         />
       ))}
-
-      {moment.doNotPlay.length > 0 ? (
-        <View style={{ gap: 8 }}>
-          <Text style={[Type.label, { color: c.danger, marginTop: 4 }]}>{t('record.doNotPlay')}</Text>
-          {moment.doNotPlay.map((track) => (
-            <TrackRow
-              key={track.id}
-              title={track.title}
-              artist={track.artist}
-              doNotPlay
-              note={track.note}
-              onPress={real ? onOpen : undefined}
-            />
-          ))}
-        </View>
-      ) : null}
     </View>
   );
 }

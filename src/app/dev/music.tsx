@@ -80,10 +80,19 @@ const MOMENTS: MusicMoment[] = [
       { id: 'd1', title: 'Sample Floor Filler', artist: 'Sample Artist', mustPlay: true, doNotPlay: false, note: null },
       { id: 'd2', title: 'Sample Throwback', artist: 'Sample Crew', mustPlay: false, doNotPlay: false, note: null },
     ],
-    doNotPlay: [
+    doNotPlay: [],
+  },
+  {
+    id: 'avoid',
+    side: 'B',
+    index: 3,
+    title: 'Do not play',
+    isOpenDancing: false,
+    tracks: [
       { id: 'n1', title: 'Sample Overplayed Song', artist: 'Sample Artist', mustPlay: false, doNotPlay: true, note: null },
       { id: 'n2', title: 'Sample Line Dance', artist: 'Sample Band', mustPlay: false, doNotPlay: true, note: null },
     ],
+    doNotPlay: [],
   },
 ];
 

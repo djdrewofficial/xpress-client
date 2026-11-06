@@ -16,7 +16,6 @@ import {
 } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { questionVisible, type QuestionRow } from '@/lib/planning';
-import { getDoNotPlayNotes, saveDoNotPlayNotes } from '@/lib/doNotPlayNotes';
 import { getSectionNotes, normalizeNoteText, saveSectionNotes, type SectionNotesSave } from '@/lib/sectionNotes';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
 import { answerText } from './model';
@@ -55,15 +54,12 @@ export function MomentBody({
   onPersist,
   onPick,
   songs,
-  doNotPlaySongs,
   isDanceFloor,
-  isAvoidList,
   songCount,
   songsEnabled,
   aiPicks,
   onAddMusic,
   onForYou,
-  onAddDoNotPlay,
   onToggleMust,
   onRemove,
   onSaveNote,
@@ -76,7 +72,6 @@ export function MomentBody({
   notesReadOnly,
   initialNotes,
   initialStaffNotes,
-  eventId,
 }: {
   backLabel: string;
   onBack: () => void;
@@ -92,15 +87,12 @@ export function MomentBody({
   onPersist: (id: string, value: string) => void;
   onPick: (id: string, value: string) => void;
   songs: MomentSong[];
-  doNotPlaySongs: MomentSong[];
   isDanceFloor: boolean;
-  isAvoidList: boolean;
   songCount: number;
   songsEnabled: boolean;
   aiPicks: boolean;
   onAddMusic: () => void;
   onForYou: () => void;
-  onAddDoNotPlay: () => void;
   onToggleMust: (song: MomentSong) => void;
   onRemove: (song: MomentSong) => void;
   onSaveNote: (song: MomentSong, note: string) => void;
@@ -116,8 +108,6 @@ export function MomentBody({
   initialNotes?: string | null;
   /** From the section row (`staff_notes`), staff only. */
   initialStaffNotes?: string | null;
-  /** Event that owns Open Dancing's do-not-play note. */
-  eventId?: string;
 }) {
   const c = useC();
   const { t } = useT();
@@ -140,11 +130,8 @@ export function MomentBody({
         visible.find((q) => !(answers[q.id] ?? '').trim())?.id ??
         null);
 
-  // Avoid-list sections store the do-not-play rows. Everywhere else, flagged rows split out.
-  const ownMust = isAvoidList ? [] : songs.filter((s) => !s.doNotPlay);
-  const ownAvoid = isAvoidList ? songs : songs.filter((s) => s.doNotPlay);
-  const avoid = dedupe([...ownAvoid, ...doNotPlaySongs]);
-  // Songs to avoid / Do not play is shown on the Open Dancing moment only.
+  // Open Dancing groups its playable songs under Must play. Do-not-play songs stay on their own moment.
+  const ownMust = songs.filter((s) => !s.doNotPlay);
   const showSplit = isDanceFloor;
   const mustShown = showAllMust || ownMust.length <= 2 ? ownMust : ownMust.slice(0, 2);
 
@@ -175,7 +162,6 @@ export function MomentBody({
     initial: initialStaffNotes,
     skipLoad: initialStaffNotes !== undefined,
   });
-  const avoidField = useAutosaveNote(eventId, 'avoid', !!isDanceFloor && !special && !notesReadOnly);
 
   useEffect(() => {
     if (activeTab !== tab) onTab(activeTab);
@@ -252,17 +238,13 @@ export function MomentBody({
                     mustTotal={ownMust.length}
                     expanded={showAllMust || ownMust.length <= 2}
                     onToggleExpand={() => setShowAllMust((v) => !v)}
-                    avoid={avoid}
                     onSong={setMenu}
-                    onRemove={onRemove}
-                    onAddDoNotPlay={songsEnabled ? onAddDoNotPlay : undefined}
                     noteFor={noteFor}
                     noteDraft={noteDraft}
                     onNoteDraft={setNoteDraft}
                     onStartNote={(s) => { setNoteFor(s); setNoteDraft(s.note ?? ''); setMenu(null); }}
                     onSaveNote={() => { if (noteFor) { onSaveNote(noteFor, noteDraft); setNoteFor(null); } }}
                     onCancelNote={() => setNoteFor(null)}
-                    avoidNote={notesReadOnly ? null : avoidField}
                   />
                 ) : (
                   <PlainSongs
@@ -321,17 +303,6 @@ export function MomentBody({
       </Sheet>
     </View>
   );
-}
-
-function dedupe(list: MomentSong[]): MomentSong[] {
-  const seen = new Set<string>();
-  const out: MomentSong[] = [];
-  for (const s of list) {
-    if (seen.has(s.id)) continue;
-    seen.add(s.id);
-    out.push(s);
-  }
-  return out;
 }
 
 function QuestionPane({
@@ -591,11 +562,7 @@ function DanceLists({
   mustTotal,
   expanded,
   onToggleExpand,
-  avoid,
   onSong,
-  onRemove,
-  onAddDoNotPlay,
-  avoidNote,
   noteFor,
   noteDraft,
   onNoteDraft,
@@ -607,11 +574,7 @@ function DanceLists({
   mustTotal: number;
   expanded: boolean;
   onToggleExpand: () => void;
-  avoid: MomentSong[];
   onSong: (s: MomentSong) => void;
-  onRemove: (s: MomentSong) => void;
-  onAddDoNotPlay?: () => void;
-  avoidNote: NoteField | null;
 } & Omit<SongListProps, 'songs' | 'onSong'>) {
   const c = useC();
   const { t } = useT();
@@ -639,50 +602,6 @@ function DanceLists({
         {mustTotal > 2 ? (
           <Pressable onPress={onToggleExpand} style={{ paddingVertical: 12, alignItems: 'center' }}>
             <Text style={[Type.label, { color: c.accent }]}>{expanded ? t('moment.showLess') : t('moment.seeAll', { count: mustTotal })}</Text>
-          </Pressable>
-        ) : null}
-      </View>
-
-      <View style={styles.sectionHead}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Icon name="ban" size={14} color={c.red} />
-          <Text style={[Type.label, { color: c.red }]}>{t('moment.doNotPlay')}</Text>
-        </View>
-        <Text style={[Type.footnote, { color: c.ink3 }]}>{avoid.length} {avoid.length === 1 ? t('moment.song') : t('moment.songs')}</Text>
-      </View>
-      <Text style={[Type.footnote, { color: c.ink2, marginTop: -8 }]}>
-        {t('moment.avoidHelp')}
-      </Text>
-      {avoidNote ? (
-        <View style={{ gap: 8 }}>
-          <Text style={[Type.callout, { color: c.ink2 }]}>{t('moment.avoidFree')}</Text>
-          <NoteBox
-            value={avoidNote.value}
-            onChange={avoidNote.setValue}
-            onBlur={avoidNote.flush}
-            minHeight={108}
-            editable={!avoidNote.readOnly}
-          />
-          <SaveLine state={avoidNote.state} />
-        </View>
-      ) : null}
-      <View style={[styles.stack, { backgroundColor: c.surface, borderColor: c.line }]}>
-        {avoid.map((s, i) => (
-          <View key={s.id}>
-            {i > 0 ? <View style={[styles.hair, { backgroundColor: c.line }]} /> : null}
-            <View>
-              <TrackRow title={s.title} artist={artistLine(s)} doNotPlay onPress={() => onSong(s)} />
-              <Pressable onPress={() => onRemove(s)} hitSlop={8} style={styles.removeX} accessibilityLabel={t('moment.removeTitle', { title: s.title })}>
-                <Icon name="close" size={16} color={c.ink3} />
-              </Pressable>
-              <NoteEditor song={s} noteFor={noteFor} noteDraft={noteDraft} onNoteDraft={onNoteDraft} onStartNote={onStartNote} onSaveNote={onSaveNote} onCancelNote={onCancelNote} />
-            </View>
-          </View>
-        ))}
-        {onAddDoNotPlay ? (
-          <Pressable onPress={onAddDoNotPlay} style={styles.addAvoid}>
-            <Icon name="plus" size={16} color={c.red} />
-            <Text style={[Type.subhead, { color: c.red }]}>{t('moment.addAvoid')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -815,7 +734,7 @@ function SaveLine({ state }: { state: NoteSave }) {
  */
 function useAutosaveNote(
   sectionId: string | undefined,
-  field: 'notes' | 'staffNotes' | 'avoid',
+  field: 'notes' | 'staffNotes',
   enabled = true,
   seed?: { initial?: string | null; skipLoad?: boolean; readOnly?: boolean },
 ) {
@@ -856,20 +775,14 @@ function useAutosaveNote(
       valueRef.current = res.text;
       setValue(res.text);
     };
-    if (field === 'avoid') {
-      void getDoNotPlayNotes(sectionId).then((res) => {
-        applyLoaded(res.ok ? { ok: true, text: res.text ?? '' } : res);
-      });
-    } else {
-      void getSectionNotes(sectionId).then((res) => {
-        if (!res.ok) {
-          applyLoaded(res);
-          return;
-        }
-        const next = (field === 'staffNotes' ? res.notes.staffNotes : res.notes.notes) ?? '';
-        applyLoaded({ ok: true, text: next });
-      });
-    }
+    void getSectionNotes(sectionId).then((res) => {
+      if (!res.ok) {
+        applyLoaded(res);
+        return;
+      }
+      const next = (field === 'staffNotes' ? res.notes.staffNotes : res.notes.notes) ?? '';
+      applyLoaded({ ok: true, text: next });
+    });
     return () => {
       cancel = true;
     };
@@ -887,9 +800,7 @@ function useAutosaveNote(
       if (savedRef.current !== null && snapshot === savedRef.current) return;
       const stored = normalizeNoteText(snapshot);
       if (!missingRef.current) setState('saving');
-      const request = field === 'avoid'
-        ? saveDoNotPlayNotes(sectionId, stored)
-        : saveSectionNotes(sectionId, field === 'staffNotes' ? { staffNotes: stored } : { notes: stored });
+      const request = saveSectionNotes(sectionId, field === 'staffNotes' ? { staffNotes: stored } : { notes: stored });
       void request.then((result) => {
         if (genRef.current !== gen) return;
         applySave(result, snapshot);
@@ -963,6 +874,4 @@ const styles = StyleSheet.create({
   bottom: { paddingHorizontal: 20, paddingTop: 10, gap: 8, borderTopWidth: StyleSheet.hairlineWidth },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   addNote: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 48, paddingBottom: 12 },
-  addAvoid: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
-  removeX: { position: 'absolute', right: 14, top: 22 },
 });

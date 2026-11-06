@@ -7,7 +7,7 @@ import { PhotoBoothSection } from '@/components/PhotoBoothSection';
 import { SongPicker } from '@/components/music/AddMusicSheet';
 import { VendorTeam } from '@/components/VendorTeam';
 import { MomentBody, type MomentSong, type MomentTab } from '@/components/plan/MomentBody';
-import { isDanceFloorSection, isDoNotPlaySection, momentEyebrow, momentNumber } from '@/components/plan/model';
+import { isDanceFloorSection, momentEyebrow, momentNumber } from '@/components/plan/model';
 import { useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useT } from '@/lib/i18n';
@@ -17,7 +17,6 @@ import {
   loadSection,
   removeSong,
   saveAnswer,
-  setDoNotPlay,
   setMustPlay,
   setSectionTime,
   updateSongNote,
@@ -63,8 +62,6 @@ export default function SectionScreen() {
   const [eventName, setEventName] = useState('');
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [songs, setSongs] = useState<SongRow[]>([]);
-  const [externalAvoid, setExternalAvoid] = useState<SongRow[]>([]);
-  const [avoidSectionId, setAvoidSectionId] = useState<string | null>(null);
   const [momentNo, setMomentNo] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -76,7 +73,7 @@ export default function SectionScreen() {
     setTab('questions');
     setLoading(true);
   }
-  const [picker, setPicker] = useState<null | { mode: 'foryou' | 'search'; target: 'section' | 'avoid' }>(null);
+  const [picker, setPicker] = useState<null | { mode: 'foryou' | 'search' }>(null);
   const [pickingTime, setPickingTime] = useState(false);
 
   const player = useAudioPlayer(null);
@@ -117,14 +114,6 @@ export default function SectionScreen() {
     for (const q of sec.questions) a[q.id] = q.answer ?? '';
     setAnswers(a);
     setMomentNo(momentNumber(ov.sections, id));
-    const avoid = ov.sections.find((s) => isDoNotPlaySection(s) && s.id !== id) ?? null;
-    setAvoidSectionId(avoid?.id ?? (isDoNotPlaySection(nextMeta) ? id : null));
-    if (isDanceFloorSection(nextMeta) && avoid) {
-      const extra = await loadSection(eventId, avoid.id);
-      setExternalAvoid(extra.songs);
-    } else {
-      setExternalAvoid([]);
-    }
     setLoading(false);
   }, [id, eventId]);
 
@@ -132,7 +121,6 @@ export default function SectionScreen() {
 
   const canManage = profile?.accountType === 'staff' || profile?.accountType === 'client';
   const danceFloor = meta ? isDanceFloorSection(meta) : false;
-  const avoidList = meta ? isDoNotPlaySection(meta) : false;
 
   function setLocal(qid: string, v: string) {
     setAnswers((prev) => ({ ...prev, [qid]: v }));
@@ -161,9 +149,7 @@ export default function SectionScreen() {
   };
 
   const onRemove = async (song: MomentSong) => {
-    const inSection = songs.some((s) => s.id === song.id);
-    if (inSection) setSongs((prev) => prev.filter((s) => s.id !== song.id));
-    else setExternalAvoid((prev) => prev.filter((s) => s.id !== song.id));
+    setSongs((prev) => prev.filter((s) => s.id !== song.id));
     if (!(await removeSong(song.id))) {
       failed();
       load();
@@ -171,15 +157,13 @@ export default function SectionScreen() {
   };
 
   const onSaveNote = async (song: MomentSong, note: string) => {
-    const apply = (rows: SongRow[]) => rows.map((s) => (s.id === song.id ? { ...s, note: note.trim() || null } : s));
-    setSongs(apply);
-    setExternalAvoid(apply);
+    setSongs((prev) => prev.map((s) => (s.id === song.id ? { ...s, note: note.trim() || null } : s)));
     if (!(await updateSongNote(song.id, note))) { failed(); load(); }
   };
 
   const onPlay = async (song: MomentSong) => {
     if (playingId === song.id) { try { player.pause(); } catch { /* noop */ } setPlayingId(null); return; }
-    const row = [...songs, ...externalAvoid].find((s) => s.id === song.id);
+    const row = songs.find((s) => s.id === song.id);
     let url = song.previewUrl ?? row?.preview_url ?? null;
     if (!url) url = await resolvePreview(song.title, song.artist ?? '');
     if (!url) { setPlayingId(null); return; }
@@ -207,9 +191,7 @@ export default function SectionScreen() {
       : null;
 
   const momentSongs = songs.map(toMoment);
-  const avoidSongs = externalAvoid.map(toMoment);
-  const songTotal = danceFloor ? momentSongs.filter((s) => !s.doNotPlay).length + dedupeCount(momentSongs.filter((s) => s.doNotPlay), avoidSongs) : songs.length;
-  const pickerSectionId = picker?.target === 'avoid' ? (avoidSectionId ?? id) : id;
+  const songTotal = danceFloor ? momentSongs.filter((s) => !s.doNotPlay).length : songs.length;
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -229,15 +211,12 @@ export default function SectionScreen() {
         onPersist={persist}
         onPick={pick}
         songs={momentSongs}
-        doNotPlaySongs={danceFloor ? avoidSongs : []}
         isDanceFloor={danceFloor}
-        isAvoidList={avoidList}
         songCount={songTotal}
         songsEnabled={meta.songs_enabled}
         aiPicks={meta.ai_picks_enabled}
-        onAddMusic={() => setPicker({ mode: 'search', target: 'section' })}
-        onForYou={() => setPicker({ mode: 'foryou', target: 'section' })}
-        onAddDoNotPlay={() => setPicker({ mode: 'search', target: 'avoid' })}
+        onAddMusic={() => setPicker({ mode: 'search' })}
+        onForYou={() => setPicker({ mode: 'foryou' })}
         onToggleMust={onToggleMust}
         onRemove={onRemove}
         onSaveNote={onSaveNote}
@@ -245,7 +224,6 @@ export default function SectionScreen() {
         playingId={playingId}
         special={special}
         sectionId={Array.isArray(id) ? id[0] : id}
-        eventId={Array.isArray(eventId) ? eventId[0] : eventId}
         isStaff={profile?.accountType === 'staff'}
         notesReadOnly={profile?.accountType === 'event_guest'}
         initialNotes={meta.clientNotes}
@@ -257,18 +235,11 @@ export default function SectionScreen() {
         onClose={() => setPicker(null)}
         eventId={eventId}
         eventName={eventName}
-        sectionId={pickerSectionId}
-        sectionTitle={picker?.target === 'avoid' ? 'Do not play' : meta.title}
-        existingTitles={new Set([...songs, ...externalAvoid].map((s) => s.title.toLowerCase()))}
+        sectionId={id}
+        sectionTitle={meta.title}
+        existingTitles={new Set(songs.map((s) => s.title.toLowerCase()))}
         onAdded={(row) => {
-          if (picker?.target === 'avoid') {
-            const flagged = { ...row, do_not_play: true, must_play: false };
-            void setDoNotPlay(row.id, true);
-            if (pickerSectionId === id) setSongs((prev) => prev.some((s) => s.id === row.id) ? prev : [...prev, flagged]);
-            else setExternalAvoid((prev) => prev.some((s) => s.id === row.id) ? prev : [...prev, flagged]);
-          } else {
-            setSongs((prev) => (prev.some((s) => s.id === row.id) ? prev : [...prev, row]));
-          }
+          setSongs((prev) => (prev.some((s) => s.id === row.id) ? prev : [...prev, row]));
         }}
         onReload={load}
       />
@@ -294,9 +265,4 @@ function toMoment(s: SongRow): MomentSong {
     provider: s.provider,
     previewUrl: s.preview_url,
   };
-}
-
-function dedupeCount(a: MomentSong[], b: MomentSong[]) {
-  const ids = new Set(a.map((s) => s.id));
-  return a.length + b.filter((s) => !ids.has(s.id)).length;
 }
