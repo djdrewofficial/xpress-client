@@ -3,6 +3,7 @@ import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { AiConsentSetting } from '@/components/AiConsentSetting';
+import { EventSafetyPanel } from '@/components/moderation/EventSafetyPanel';
 import { DeleteAccountSheet, InviteSentSheet } from '@/components/AccountSheets';
 import { SmsConsentSetting } from '@/components/SmsConsentSetting';
 import { HostEventTools } from '@/components/HostEventTools';
@@ -27,7 +28,7 @@ import {
 } from '@/components/eventDisplay';
 import { Type } from '@/lib/theme';
 import { staffSeesFinancials, useAuth } from '@/lib/auth';
-import { viewerRole } from '@/lib/membership';
+import { managesEvent, viewerRole } from '@/lib/membership';
 import { appleAuthorizationCode, sessionUsesApple } from '@/lib/socialAuth';
 import { useEvent } from '@/lib/events';
 import {
@@ -223,6 +224,14 @@ export default function AccountScreen() {
             />
           )
         }
+        safety={eventId && session?.user.id ? (
+          <EventSafetyPanel
+            eventId={eventId}
+            userId={session.user.id}
+            canManage={managesEvent(event, profile?.accountType)}
+            reloadSignal={consentReload}
+          />
+        ) : null}
       />
 
       {events.length > 1 ? <EventSwitcher visible={switcher} onClose={() => setSwitcher(false)} /> : null}

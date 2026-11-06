@@ -14,7 +14,9 @@ import {
   TrackRow,
   useC,
 } from '@/components/ui';
+import { SafetyLinks } from '@/components/moderation/SafetyLinks';
 import { useT } from '@/lib/i18n';
+import { personTag, type ModerationTarget } from '@/lib/moderation';
 import { questionVisible, type QuestionRow } from '@/lib/planning';
 import { getSectionNotes, normalizeNoteText, saveSectionNotes, type SectionNotesSave } from '@/lib/sectionNotes';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
@@ -34,6 +36,19 @@ export type MomentSong = {
   liked?: boolean;
   /** The signed-in person added this song. */
   mine?: boolean;
+  requestedBy?: string | null;
+  /** Other members who liked this song. */
+  likeUserIds?: string[];
+};
+
+export type MomentSafety = {
+  userId: string | null;
+  canManage: boolean;
+  noteAuthorId: string | null;
+  answerAuthors: Record<string, string | null>;
+  onReport: (target: ModerationTarget) => void;
+  onBlock: (userId: string) => void;
+  onHide: (target: ModerationTarget) => void;
 };
 
 type Tab = MomentTab;
@@ -75,6 +90,7 @@ export function MomentBody({
   notesReadOnly,
   initialNotes,
   initialStaffNotes,
+  safety,
 }: {
   backLabel: string;
   onBack: () => void;
@@ -112,6 +128,7 @@ export function MomentBody({
   initialNotes?: string | null;
   /** From the section row (`staff_notes`), staff only. */
   initialStaffNotes?: string | null;
+  safety?: MomentSafety;
 }) {
   const c = useC();
   const { t } = useT();
@@ -231,6 +248,7 @@ export function MomentBody({
                 onPersist={onPersist}
                 onPick={onPick}
                 onFocus={(id) => { setEditingAll(false); setReeditId(id); setFocusId(id); }}
+                safety={safety}
               />
             ) : null}
 
@@ -266,7 +284,13 @@ export function MomentBody({
             ) : null}
 
             {activeTab === 'notes' ? (
-              <NotesPane notes={noteField} staff={isStaff ? staffField : null} readOnly={!!notesReadOnly} />
+              <NotesPane
+                notes={noteField}
+                staff={isStaff ? staffField : null}
+                readOnly={!!notesReadOnly}
+                sectionId={sectionId}
+                safety={safety}
+              />
             ) : null}
           </>
         )}
@@ -303,6 +327,14 @@ export function MomentBody({
                 onPress={() => { setNoteFor(menu); setNoteDraft(menu.note ?? ''); setMenu(null); }}
               />
             ) : null}
+            {safety && !menu.mine ? (
+              <Button
+                label={t('safety.reportSong')}
+                variant="ghost"
+                onPress={() => { const song = menu; setMenu(null); safety.onReport({ targetType: 'song', targetId: song.id }); }}
+              />
+            ) : null}
+            {safety ? <SongMenuSafety song={menu} safety={safety} onDone={() => setMenu(null)} /> : null}
             {!guestMode || menu.mine ? (
               <Pressable onPress={() => { onRemove(menu); setMenu(null); }} style={{ alignItems: 'center', paddingVertical: 12 }}>
                 <Text style={[Type.button, { color: c.danger }]}>{t('moment.removeSong')}</Text>
@@ -315,6 +347,77 @@ export function MomentBody({
   );
 }
 
+function SongMenuSafety({ song, safety, onDone }: { song: MomentSong; safety: MomentSafety; onDone: () => void }) {
+  const { t } = useT();
+  const likes = [...new Set((song.likeUserIds ?? []).filter((id) => id && id !== safety.userId))];
+  const people = new Set<string>();
+  if (song.requestedBy && song.requestedBy !== safety.userId) people.add(song.requestedBy);
+  for (const id of likes) people.add(id);
+  const named = (id: string) => t('safety.personTag', { id: personTag(id) });
+  return (
+    <>
+      {likes.map((id) => (
+        <Button
+          key={`like-${id}`}
+          label={likes.length > 1 ? t('safety.reportLikeNamed', { who: named(id) }) : t('safety.reportLike')}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onReport({ targetType: 'song_like', targetId: song.id, targetUserId: id }); }}
+        />
+      ))}
+      {[...people].map((id) => (
+        <Button
+          key={`block-${id}`}
+          label={people.size > 1 ? t('safety.blockNamed', { who: named(id) }) : t('safety.block')}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onBlock(id); }}
+        />
+      ))}
+      {safety.canManage
+        ? likes.map((id) => (
+          <Button
+            key={`hide-like-${id}`}
+            label={t('safety.hideLike')}
+            variant="ghost"
+            onPress={() => { onDone(); safety.onHide({ targetType: 'song_like', targetId: song.id, targetUserId: id }); }}
+          />
+        ))
+        : null}
+    </>
+  );
+}
+
+function AnswerSafety({
+  questionId,
+  authorId,
+  safety,
+  reportKey = 'safety.reportAnswer',
+  targetType = 'answer',
+}: {
+  questionId: string;
+  authorId: string | null;
+  safety?: MomentSafety;
+  reportKey?: 'safety.reportAnswer' | 'safety.reportNote';
+  targetType?: 'answer' | 'section_note';
+}) {
+  const { t } = useT();
+  if (!safety) return null;
+  const mine = !!safety.userId && authorId === safety.userId;
+  const canHide = safety.canManage || mine;
+  const canReport = !mine;
+  const canBlock = !!authorId && !mine;
+  if (!canHide && !canReport && !canBlock) return null;
+  return (
+    <SafetyLinks
+      reportLabel={canReport ? t(reportKey) : undefined}
+      onReport={canReport ? () => safety.onReport({ targetType, targetId: questionId }) : undefined}
+      hideLabel={canHide ? t('safety.remove') : undefined}
+      onHide={canHide ? () => safety.onHide({ targetType, targetId: questionId }) : undefined}
+      blockLabel={canBlock ? t('safety.block') : undefined}
+      onBlock={canBlock && authorId ? () => safety.onBlock(authorId) : undefined}
+    />
+  );
+}
+
 function QuestionPane({
   visible,
   answers,
@@ -324,6 +427,7 @@ function QuestionPane({
   onPersist,
   onPick,
   onFocus,
+  safety,
 }: {
   visible: QuestionRow[];
   answers: Record<string, string>;
@@ -333,6 +437,7 @@ function QuestionPane({
   onPersist: (id: string, value: string) => void;
   onPick: (id: string, value: string) => void;
   onFocus: (id: string) => void;
+  safety?: MomentSafety;
 }) {
   const c = useC();
   const { t } = useT();
@@ -360,6 +465,11 @@ function QuestionPane({
                     <Icon name="edit" size={16} color={c.ink3} />
                   </Pressable>
                 </View>
+                {(answers[q.id] ?? '').trim() ? (
+                  <View style={{ paddingLeft: 44, paddingBottom: 8 }}>
+                    <AnswerSafety questionId={q.id} authorId={safety?.answerAuthors[q.id] ?? null} safety={safety} />
+                  </View>
+                ) : null}
               </View>
             );
           })}
@@ -377,6 +487,9 @@ function QuestionPane({
           onPersist={(v) => onPersist(q.id, v)}
           onPick={(v) => onPick(q.id, v)}
         />
+      ))}
+      {expanded.filter((q) => (answers[q.id] ?? '').trim()).map((q) => (
+        <AnswerSafety key={`safety-${q.id}`} questionId={q.id} authorId={safety?.answerAuthors[q.id] ?? null} safety={safety} />
       ))}
 
       {rest.map((q) => {
@@ -667,7 +780,19 @@ type NoteField = { value: string; setValue: (v: string) => void; flush: () => vo
 
 const NOTE_SAVE_MS = 700;
 
-function NotesPane({ notes, staff, readOnly }: { notes: NoteField; staff: NoteField | null; readOnly?: boolean }) {
+function NotesPane({
+  notes,
+  staff,
+  readOnly,
+  sectionId,
+  safety,
+}: {
+  notes: NoteField;
+  staff: NoteField | null;
+  readOnly?: boolean;
+  sectionId?: string;
+  safety?: MomentSafety;
+}) {
   const c = useC();
   const { t } = useT();
 
@@ -676,6 +801,15 @@ function NotesPane({ notes, staff, readOnly }: { notes: NoteField; staff: NoteFi
       <Text style={[Type.callout, { color: c.ink2 }]}>{t('moment.notesHelp')}</Text>
       <NoteBox value={notes.value} onChange={notes.setValue} onBlur={notes.flush} editable={!readOnly && !notes.readOnly} />
       {readOnly ? null : <SaveLine state={notes.state} />}
+      {safety && sectionId && notes.value.trim() ? (
+        <AnswerSafety
+          questionId={sectionId}
+          authorId={safety.noteAuthorId}
+          safety={safety}
+          reportKey="safety.reportNote"
+          targetType="section_note"
+        />
+      ) : null}
       {staff ? (
         <View style={[styles.staffBlock, { borderTopColor: c.line }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>

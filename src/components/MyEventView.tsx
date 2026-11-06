@@ -62,6 +62,7 @@ export function MyEventView({
   onLanguage,
   aiConsent,
   smsConsent,
+  safety,
 }: {
   loading: boolean;
   refreshing: boolean;
@@ -98,6 +99,8 @@ export function MyEventView({
   aiConsent?: ReactNode;
   /** Promotional texts. Omitted for staff. */
   smsConsent?: ReactNode;
+  /** Reports, blocks, and the unblock list. */
+  safety?: ReactNode;
 }) {
   const c = useC();
   const { t } = useT();
@@ -345,6 +348,7 @@ export function MyEventView({
           </View>
           {aiConsent}
           {smsConsent}
+          {safety}
         </View>
 
         <View style={styles.logo}>

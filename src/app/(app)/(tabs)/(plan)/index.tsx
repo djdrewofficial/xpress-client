@@ -4,6 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { SafetyLinks } from '@/components/moderation/SafetyLinks';
+import { useModeration } from '@/components/moderation/useModeration';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { EventSwitcher } from '@/components/EventSwitcher';
 import { HomeBody } from '@/components/plan/HomeBody';
@@ -13,6 +15,7 @@ import { useT } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
 import { blendedProgress, loadOverview, setupMilestones, type Group, type Overview, type SectionRow } from '@/lib/planning';
+import { loadEventContent } from '@/lib/moderation';
 import { supabase } from '@/lib/supabase';
 
 const TOUR_KEY = 'onboarding_seen_v1';
@@ -29,7 +32,10 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showTour, setShowTour] = useState(false);
   const [switcher, setSwitcher] = useState(false);
+  const [coverFromFeed, setCoverFromFeed] = useState<string | null | undefined>(undefined);
+  const [coverTick, setCoverTick] = useState(0);
   const tourChecked = useRef(false);
+  const moderation = useModeration(event?.id ?? null, () => setCoverTick((n) => n + 1));
 
   // Couples finish Welcome in OnboardingGate, which marks this seen.
   // If the flag is still empty (staff opening an event, or an interrupted
@@ -43,6 +49,19 @@ export default function HomeScreen() {
     setShowTour(false);
     AsyncStorage.setItem(TOUR_KEY, '1').catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!event?.id) {
+      setCoverFromFeed(undefined);
+      return;
+    }
+    let cancel = false;
+    void loadEventContent(event.id).then((res) => {
+      if (cancel) return;
+      setCoverFromFeed(res.ok ? (res.data.coverPhoto?.hidden ? null : res.data.coverPhoto?.url ?? null) : undefined);
+    });
+    return () => { cancel = true; };
+  }, [event?.id, coverTick]);
 
   const load = useCallback(async () => {
     setOverview(event ? await loadOverview(event.id) : null);
@@ -111,7 +130,16 @@ export default function HomeScreen() {
         <HomeBody
           greeting={greeting(profile?.firstName, locale)}
           eventName={event.name || t('home.yourEventTitle')}
-          coverUrl={event.cover_photo_url}
+          coverUrl={coverFromFeed === undefined ? event.cover_photo_url : coverFromFeed}
+          coverActions={(coverFromFeed === undefined ? event.cover_photo_url : coverFromFeed) ? (
+            <SafetyLinks
+              tone="onDark"
+              reportLabel={t('safety.reportCover')}
+              onReport={() => moderation.openReport({ targetType: 'cover_photo', targetId: event.id })}
+              hideLabel={t('safety.remove')}
+              onHide={() => moderation.askHide({ targetType: 'cover_photo', targetId: event.id })}
+            />
+          ) : null}
           date={event.event_date}
           dateLabel={event.event_date ? heroDateLabel(event.event_date, locale) : undefined}
           venue={venue}
@@ -149,6 +177,7 @@ export default function HomeScreen() {
       )}
       <OnboardingTour visible={showTour} onClose={closeTour} />
       {events.length > 1 ? <EventSwitcher visible={switcher} onClose={() => setSwitcher(false)} /> : null}
+      {moderation.sheet}
     </View>
   );
 }
