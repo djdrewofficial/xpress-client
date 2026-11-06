@@ -53,6 +53,7 @@ export function MyEventView({
   accountName,
   accountEmail,
   onPrivacy,
+  onPasskeys,
   onDisclosure,
   onSignOut,
   onDelete,
@@ -86,6 +87,7 @@ export function MyEventView({
   accountName: string;
   accountEmail: string | null;
   onPrivacy: () => void;
+  onPasskeys?: () => void;
   onDisclosure: () => void;
   onSignOut: () => void;
   onDelete: () => void;
@@ -314,6 +316,12 @@ export function MyEventView({
             <Cell icon="user" title={accountName} subtitle={accountEmail} />
             <View style={[styles.div, { backgroundColor: c.line, marginLeft: 62 }]} />
             <Cell icon="shield" title={t('event.privacy')} onPress={onPrivacy} chevron />
+            {onPasskeys ? (
+              <>
+                <View style={[styles.div, { backgroundColor: c.line, marginLeft: 62 }]} />
+                <Cell icon="lock" title={t('passkey.settings')} onPress={onPasskeys} chevron />
+              </>
+            ) : null}
             <View style={[styles.div, { backgroundColor: c.line, marginLeft: 62 }]} />
             <Cell icon="info" title={t('event.ai')} onPress={onDisclosure} chevron />
             <View style={[styles.div, { backgroundColor: c.line, marginLeft: 62 }]} />

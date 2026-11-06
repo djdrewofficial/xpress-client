@@ -194,6 +194,7 @@ export default function AccountScreen() {
         accountName={accountName}
         accountEmail={session?.user.email ?? null}
         onPrivacy={() => Linking.openURL(PRIVACY_URL)}
+        onPasskeys={() => router.push('/passkeys')}
         onDisclosure={() => setDisclosure(true)}
         onSignOut={() => signOut()}
         onDelete={() => {

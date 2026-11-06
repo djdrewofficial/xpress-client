@@ -32,6 +32,9 @@ function buildClient(): SupabaseClient {
       // Email confirmation and password reset return a ?code= on the app link.
       // Existing refresh tokens keep working. This does not turn on magic-link login.
       flowType: 'pkce',
+      // Official Supabase passkey API. The server still rejects calls until
+      // passkeys are enabled for this project. This does not use a staff endpoint.
+      experimental: { passkey: true },
     },
   });
 }
