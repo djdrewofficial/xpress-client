@@ -17,7 +17,7 @@ export async function redeemJoinCode(code: string): Promise<{ ok: true; data: Re
   if (!result.ok) return result;
   const record = asRecord(result.data);
   const eventId = typeof record.eventId === 'string' ? record.eventId : '';
-  if (!eventId) return { ok: false, status: 500, error: '', retryAfter: null };
+  if (!eventId) return { ok: false, status: 500, error: '', retryAfter: null, payload: null };
   return {
     ok: true,
     data: {

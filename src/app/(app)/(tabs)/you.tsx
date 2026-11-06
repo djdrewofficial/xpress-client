@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
+import { AiConsentSetting } from '@/components/AiConsentSetting';
 import { DeleteAccountSheet, InviteSentSheet } from '@/components/AccountSheets';
+import { SmsConsentSetting } from '@/components/SmsConsentSetting';
 import { HostEventTools } from '@/components/HostEventTools';
 import { InvitePersonSheet } from '@/components/InvitePersonSheet';
 import { EventSwitcher } from '@/components/EventSwitcher';
@@ -36,7 +38,6 @@ import {
   OFFICE_PHONE,
   type AccountData,
 } from '@/lib/account';
-import { readMarketingTexts, writeMarketingTexts } from '@/lib/language';
 import { translate, useT, type Locale } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 
@@ -55,8 +56,8 @@ export default function AccountScreen() {
   const [accountName, setAccountName] = useState(profile?.firstName || 'Your account');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [consentReload, setConsentReload] = useState(0);
   const { locale, setLocale, t } = useT();
-  const [marketing, setMarketing] = useState(false);
 
   const [showInvite, setShowInvite] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -65,10 +66,6 @@ export default function AccountScreen() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [legal, setLegal] = useState<LegalDoc | null>(null);
   const [deletePhase, setDeletePhase] = useState<'confirm' | 'working' | 'done' | 'error'>('confirm');
-
-  useEffect(() => {
-    readMarketingTexts().then(setMarketing);
-  }, []);
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -101,13 +98,9 @@ export default function AccountScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await load();
+    setConsentReload((n) => n + 1);
     setRefreshing(false);
   }, [load]);
-
-  const onMarketing = useCallback((on: boolean) => {
-    setMarketing(on);
-    writeMarketingTexts(on).catch(() => {});
-  }, []);
 
   const confirmDelete = useCallback(async () => {
     setDeletePhase('working');
@@ -211,8 +204,25 @@ export default function AccountScreen() {
         deleting={deletePhase === 'working'}
         language={locale}
         onLanguage={setLocale}
-        marketing={marketing}
-        onMarketing={onMarketing}
+        aiConsent={
+          event && viewerRole(event, profile?.accountType) === 'host' ? (
+            event.contractClient && eventId ? (
+              <AiConsentSetting eventId={eventId} reloadSignal={consentReload} onPrivacy={() => setLegal('privacy')} />
+            ) : (
+              <Text style={[Type.footnote, { color: c.ink3 }]}>{t('ai.notContractClient')}</Text>
+            )
+          ) : null
+        }
+        smsConsent={
+          profile?.accountType === 'staff' ? null : (
+            <SmsConsentSetting
+              eventId={eventId}
+              reloadSignal={consentReload}
+              onPrivacy={() => setLegal('privacy')}
+              onTerms={() => setLegal('terms')}
+            />
+          )
+        }
       />
 
       {events.length > 1 ? <EventSwitcher visible={switcher} onClose={() => setSwitcher(false)} /> : null}

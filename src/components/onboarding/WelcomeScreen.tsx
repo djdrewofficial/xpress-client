@@ -3,12 +3,15 @@ import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
+import { AiConsentSetting } from '@/components/AiConsentSetting';
+import { SmsConsentSetting } from '@/components/SmsConsentSetting';
 import { Button, CountdownHero, LanguageCard, LegalLine, useC, useScheme } from '@/components/ui';
 import { LegalSheet } from '@/components/onboarding/LegalSheet';
 import { coupleDisplayName } from '@/lib/coupleName';
 import { formatEventEyebrow } from '@/lib/eventDate';
 import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
+import { viewerRole } from '@/lib/membership';
 import { useT } from '@/lib/i18n';
 import { markWelcomeDone, recordLegalAcceptance, saveLocale } from '@/lib/preferences';
 import { Type } from '@/lib/theme';
@@ -115,6 +118,20 @@ export function WelcomeScreen({
             />
           </View>
         </View>
+
+        {event && viewerRole(event, profile?.accountType) === 'host' ? (
+          event.contractClient ? (
+            <AiConsentSetting eventId={event.id} onPrivacy={() => setSheet('privacy')} preview={!!preview} />
+          ) : (
+            <Text style={[Type.footnote, { color: c.ink3 }]}>{t('ai.notContractClient')}</Text>
+          )
+        ) : null}
+        <SmsConsentSetting
+          eventId={event?.id ?? null}
+          onPrivacy={() => setSheet('privacy')}
+          onTerms={() => setSheet('terms')}
+          preview={!!preview}
+        />
       </ScrollView>
 
       <View style={{ paddingHorizontal: 20, gap: 12, paddingBottom: 8 }}>

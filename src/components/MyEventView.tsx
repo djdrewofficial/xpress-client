@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -60,8 +60,8 @@ export function MyEventView({
   deleting,
   language,
   onLanguage,
-  marketing,
-  onMarketing,
+  aiConsent,
+  smsConsent,
 }: {
   loading: boolean;
   refreshing: boolean;
@@ -94,8 +94,10 @@ export function MyEventView({
   deleting: boolean;
   language: AppLanguage;
   onLanguage: (language: AppLanguage) => void;
-  marketing: boolean;
-  onMarketing: (on: boolean) => void;
+  /** Contract-client AI consent, or a short note when this host cannot grant it. */
+  aiConsent?: ReactNode;
+  /** Promotional texts. Omitted for staff. */
+  smsConsent?: ReactNode;
 }) {
   const c = useC();
   const { t } = useT();
@@ -341,25 +343,8 @@ export function MyEventView({
             <LanguageCard label={t('event.english')} selected={language === 'en'} selectedLabel={t('event.selected')} onPress={() => onLanguage('en')} />
             <LanguageCard label={t('event.spanish')} selected={language === 'es'} selectedLabel={t('event.selectedEs')} onPress={() => onLanguage('es')} />
           </View>
-          <View style={[styles.card, Shadow.card, { backgroundColor: c.surface, paddingHorizontal: 14, paddingVertical: 12 }]}>
-            <View style={styles.marketRow}>
-              <View style={[styles.bubble, { backgroundColor: c.accentTint }]}>
-                <Icon name="message" size={18} color={c.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.cellTitle, { color: c.ink }]}>{t('event.marketing')}</Text>
-                <Text style={[Type.footnote, { color: c.ink2 }]}>{t('event.marketingSub')}</Text>
-              </View>
-              <Switch
-                value={marketing}
-                onValueChange={onMarketing}
-                trackColor={{ false: c.sunken, true: c.accent }}
-                thumbColor="#ffffff"
-                ios_backgroundColor={c.sunken}
-                accessibilityLabel={t('event.marketing')}
-              />
-            </View>
-          </View>
+          {aiConsent}
+          {smsConsent}
         </View>
 
         <View style={styles.logo}>

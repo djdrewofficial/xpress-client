@@ -11,6 +11,8 @@ export type EventLite = {
   cover_photo_url: string | null;
   /** Per-event role. One login can be a host of one event and a guest of another. */
   role?: 'host' | 'guest' | 'staff' | null;
+  /** True only when this login is the event's contract client (`events.client_id`). */
+  contractClient?: boolean;
   venueName?: string | null;
   // Booking essentials the DJ already set — drive the endowed-progress seed below.
   venue_id?: string | null;
@@ -165,6 +167,7 @@ export async function getMyEvents(account: { clientId: string | null; eventGuest
     const existing = out.find((row) => row.id === event.id);
     if (existing) {
       if (role === 'host') existing.role = 'host';
+      if (event.contractClient) existing.contractClient = true;
       return;
     }
     seen.add(event.id);
@@ -176,7 +179,7 @@ export async function getMyEvents(account: { clientId: string | null; eventGuest
       supabase.from('events').select('id, name, event_date, cover_photo_url, venue_id, package_id').eq('client_id', account.clientId).is('archived_at', null),
       supabase.from('event_clients').select('event:events(id, name, event_date, cover_photo_url, venue_id, package_id, archived_at)').eq('client_id', account.clientId),
     ]);
-    for (const event of primary ?? []) add(event as EventLite, 'host');
+    for (const event of primary ?? []) add({ ...(event as EventLite), contractClient: true }, 'host');
     for (const row of linked ?? []) {
       const event = (row as unknown as { event: (EventLite & { archived_at: string | null }) | null }).event;
       if (event && !event.archived_at) add(event, 'host');
