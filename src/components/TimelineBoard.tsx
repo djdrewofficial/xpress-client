@@ -362,7 +362,7 @@ function MomentLine({
   // can open the picker, and not while this row is the lifted drag card.
   const canEditTime = canManage && moment.timeEnabled && !moment.locked && !reordering && !active;
   const showAdd = !clock && canManage && moment.timeEnabled && !moment.locked;
-  const showClock = !!clock;
+  const showClock = !!clock && moment.timeEnabled;
 
   const confirmArchive = () => {
     Alert.alert(
