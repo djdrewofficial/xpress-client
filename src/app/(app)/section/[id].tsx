@@ -3,6 +3,8 @@ import { ActivityIndicator, Alert, Text, View } from 'react-native';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import { SafetyLinks } from '@/components/moderation/SafetyLinks';
+import { useModeration } from '@/components/moderation/useModeration';
 import { PhotoBoothSection } from '@/components/PhotoBoothSection';
 import { SongPicker } from '@/components/music/AddMusicSheet';
 import { VendorTeam } from '@/components/VendorTeam';
@@ -12,13 +14,13 @@ import { Button, useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { isDoNotPlayTitle, sectionClosedToGuest } from '@/lib/guestSections';
 import { useT } from '@/lib/i18n';
+import { hideContent, loadEventContent } from '@/lib/moderation';
 import { managesEvent, roleForEvent } from '@/lib/membership';
 import { resolvePreview } from '@/lib/musicSearch';
 import {
   loadMyLikes,
   loadOverview,
   loadSection,
-  removeSong,
   saveAnswer,
   setMustPlay,
   setSectionTime,
@@ -66,6 +68,13 @@ export default function SectionScreen() {
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [songs, setSongs] = useState<SongRow[]>([]);
   const [likes, setLikes] = useState<Set<string>>(new Set());
+  const [likePeople, setLikePeople] = useState<Record<string, { userId: string; label: string | null }[]>>({});
+  const [songLabels, setSongLabels] = useState<Record<string, string | null>>({});
+  const [answerAuthors, setAnswerAuthors] = useState<Record<string, string | null>>({});
+  const [answerLabels, setAnswerLabels] = useState<Record<string, string | null>>({});
+  const [noteAuthorId, setNoteAuthorId] = useState<string | null>(null);
+  const [noteAuthorLabel, setNoteAuthorLabel] = useState<string | null>(null);
+  const [boothAuthor, setBoothAuthor] = useState<{ userId: string; label: string | null } | null>(null);
   const [momentNo, setMomentNo] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -129,6 +138,35 @@ export default function SectionScreen() {
     for (const q of sec.questions) a[q.id] = q.answer ?? '';
     setAnswers(a);
     setMomentNo(momentNumber(ov.sections, id));
+    const sectionKey = Array.isArray(id) ? id[0] : id;
+    const feed = await loadEventContent(eventId);
+    if (feed.ok) {
+      const bySong: Record<string, { userId: string; label: string | null }[]> = {};
+      for (const like of feed.data.likes) {
+        if (like.hidden) continue;
+        (bySong[like.songId] ??= []).push({ userId: like.userId, label: like.label });
+      }
+      const authors: Record<string, string | null> = {};
+      const authorLabels: Record<string, string | null> = {};
+      for (const answer of feed.data.answers) {
+        if (answer.hidden) continue;
+        authors[answer.questionId] = answer.answeredBy;
+        authorLabels[answer.questionId] = answer.answeredByLabel;
+      }
+      const labels: Record<string, string | null> = {};
+      for (const song of feed.data.songs) labels[song.id] = song.requestedByLabel;
+      const note = feed.data.sectionNotes.find((item) => item.sectionId === sectionKey && !item.hidden);
+      setLikePeople(bySong);
+      setSongLabels(labels);
+      setAnswerAuthors(authors);
+      setAnswerLabels(authorLabels);
+      setNoteAuthorId(note?.updatedBy ?? null);
+      setNoteAuthorLabel(note?.updatedByLabel ?? null);
+      const booth = feed.data.boothSelection;
+      setBoothAuthor(booth && !booth.hidden && booth.updatedBy
+        ? { userId: booth.updatedBy, label: booth.updatedByLabel }
+        : null);
+    }
     setLoading(false);
   }, [id, eventId, session?.user.id]);
 
@@ -173,6 +211,7 @@ export default function SectionScreen() {
   }
 
   const failed = () => Alert.alert(t('common.couldntSave'), t('common.checkConnection'));
+  const moderation = useModeration(eventId, () => { void load(); });
 
   const onToggleMust = async (song: MomentSong) => {
     const current = songs.find((s) => s.id === song.id);
@@ -185,12 +224,34 @@ export default function SectionScreen() {
     }
   };
 
-  const onRemove = async (song: MomentSong) => {
-    setSongs((prev) => prev.filter((s) => s.id !== song.id));
-    if (!(await removeSong(song.id))) {
-      failed();
-      load();
+  const onRemove = (song: MomentSong) => {
+    Alert.alert(t('safety.confirmHideTitle'), t('safety.confirmHideBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('moment.removeSong'),
+        style: 'destructive',
+        onPress: () => { void hideSong(song); },
+      },
+    ]);
+  };
+
+  const hideSong = async (song: MomentSong) => {
+    const hidden = await hideContent(eventId, { targetType: 'song', targetId: song.id });
+    if (!hidden.ok) {
+      Alert.alert(t(hidden.kind === 'unavailable'
+        ? 'safety.unavailable'
+        : hidden.kind === 'ownOnly'
+          ? 'safety.ownOnly'
+          : hidden.kind === 'guestOnly'
+            ? 'safety.guestOnly'
+            : hidden.kind === 'forbidden'
+              ? 'safety.forbidden'
+              : hidden.kind === 'notFound'
+                ? 'safety.notFound'
+                : 'safety.failed'));
+      return;
     }
+    setSongs((prev) => prev.filter((s) => s.id !== song.id));
   };
 
   const onSaveNote = async (song: MomentSong, note: string) => {
@@ -230,13 +291,44 @@ export default function SectionScreen() {
     return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg }}><ActivityIndicator color={c.accent} /></View>;
   }
 
+  const userId = session?.user.id ?? null;
   const special = meta.module === 'photobooth'
-    ? <PhotoBoothSection eventId={eventId} />
+    ? (
+      <PhotoBoothSection
+        eventId={eventId}
+        safety={(
+          <SafetyLinks
+            reportLabel={t('safety.reportBooth')}
+            onReport={() => moderation.openReport({ targetType: 'booth_selection', targetId: eventId })}
+            hideLabel={t('safety.remove')}
+            onHide={() => moderation.askHide({ targetType: 'booth_selection', targetId: eventId })}
+            blockLabel={boothAuthor && boothAuthor.userId !== userId
+              ? (boothAuthor.label ? t('safety.blockNamed', { name: boothAuthor.label }) : t('safety.block'))
+              : undefined}
+            onBlock={boothAuthor && boothAuthor.userId !== userId
+              ? () => moderation.askBlock(boothAuthor.userId, boothAuthor.label)
+              : undefined}
+            guestLabel={canManage && boothAuthor && boothAuthor.userId !== userId
+              ? (boothAuthor.label ? t('safety.removeGuestNamed', { name: boothAuthor.label }) : t('safety.removeGuest'))
+              : undefined}
+            onRemoveGuest={canManage && boothAuthor && boothAuthor.userId !== userId
+              ? () => moderation.askRemoveGuest(boothAuthor.userId, boothAuthor.label)
+              : undefined}
+          />
+        )}
+      />
+    )
     : meta.module === 'vendors'
       ? <VendorTeam eventId={eventId} />
       : null;
 
-  const momentSongs = songs.map((song) => toMoment(song, likes.has(song.id), session?.user.id ?? null));
+  const momentSongs = songs.map((song) => toMoment(
+    song,
+    likes.has(song.id),
+    userId,
+    likePeople[song.id] ?? [],
+    songLabels[song.id] ?? null,
+  ));
   const songTotal = danceFloor ? momentSongs.filter((s) => !s.doNotPlay).length : songs.length;
 
   return (
@@ -274,6 +366,18 @@ export default function SectionScreen() {
         notesReadOnly={false}
         initialNotes={meta.clientNotes}
         initialStaffNotes={profile?.accountType === 'staff' ? meta.staffNotes : undefined}
+        safety={{
+          userId,
+          canManage,
+          noteAuthorId,
+          noteAuthorLabel,
+          answerAuthors,
+          answerLabels,
+          onReport: moderation.openReport,
+          onBlock: moderation.askBlock,
+          onHide: moderation.askHide,
+          onRemoveGuest: moderation.askRemoveGuest,
+        }}
       />
       <SongPicker
         visible={picker}
@@ -294,11 +398,18 @@ export default function SectionScreen() {
         onClose={() => setPickingTime(false)}
         onSave={saveTime}
       />
+      {moderation.sheet}
     </View>
   );
 }
 
-function toMoment(s: SongRow, liked: boolean, userId: string | null): MomentSong {
+function toMoment(
+  s: SongRow,
+  liked: boolean,
+  userId: string | null,
+  likePeople: { userId: string; label: string | null }[],
+  requestedByLabel: string | null,
+): MomentSong {
   return {
     id: s.id,
     title: s.title,
@@ -310,5 +421,8 @@ function toMoment(s: SongRow, liked: boolean, userId: string | null): MomentSong
     previewUrl: s.preview_url,
     liked,
     mine: !!userId && s.requested_by === userId,
+    requestedBy: s.requested_by ?? null,
+    requestedByLabel,
+    likePeople,
   };
 }

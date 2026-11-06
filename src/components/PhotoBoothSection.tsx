@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 
@@ -37,7 +37,7 @@ const PHOTO_COUNTS: Opt[] = [
   { value: '3images', label: '3 photos' },
 ];
 
-export function PhotoBoothSection({ eventId }: { eventId: string }) {
+export function PhotoBoothSection({ eventId, safety }: { eventId: string; safety?: ReactNode }) {
   const c = useC();
   const { width } = useWindowDimensions();
   const { session } = useAuth();
@@ -140,6 +140,7 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
         <Text style={{ color: c.textSecondary, fontSize: 13, lineHeight: 19 }}>
           Browse our backdrops and photo-strip designs, then tap to pick your favorites. Your choices go straight to our team.
         </Text>
+        {safety && (backdropId || design) ? safety : null}
       </View>
 
       {/* ── Backdrops ── */}

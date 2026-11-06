@@ -1,20 +1,23 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { reorderItems, type ReorderableListReorderEvent } from 'react-native-reorderable-list';
 
+import { SafetyLinks } from '@/components/moderation/SafetyLinks';
+import { useModeration } from '@/components/moderation/useModeration';
 import { useC } from '@/components/ui';
 import { AddSectionSheet } from '@/components/AddSectionSheet';
 import { TimePickerSheet } from '@/components/TimePickerSheet';
 import { TimelineBoard, type TimelineArchived, type TimelineChapter, type TimelineMoment } from '@/components/TimelineBoard';
-import { Brand } from '@/lib/theme';
+import { Brand, Type } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { managesEvent } from '@/lib/membership';
 import { useEvent } from '@/lib/events';
 import { formatEventEyebrow } from '@/lib/eventDate';
 import { translate, useT, type Locale } from '@/lib/i18n';
-import { pickAndUploadPlannerTimeline, type PlannerSource } from '@/lib/eventFiles';
+import { getPlannerTimeline, pickAndUploadPlannerTimeline, type PlannerSource } from '@/lib/eventFiles';
+import { loadEventContent } from '@/lib/moderation';
 import {
   deleteSection,
   loadOverview,
@@ -91,8 +94,11 @@ export default function TimelineScreen() {
   const [coach, setCoach] = useState(false);
   const [ptBusy, setPtBusy] = useState(false);
   const [addingGroup, setAddingGroup] = useState<{ id: string; title: string } | null>(null);
+  const [plannerFile, setPlannerFile] = useState<{ id: string; name: string | null; uploadedBy: string | null; uploadedByLabel: string | null } | null>(null);
+  const [fileTick, setFileTick] = useState(0);
 
   const canManage = managesEvent(event, profile?.accountType);
+  const moderation = useModeration(eventId, () => setFileTick((n) => n + 1));
 
   const load = useCallback(async () => {
     if (!eventId) {
@@ -117,7 +123,33 @@ export default function TimelineScreen() {
     setLoading(false);
   }, [eventId, locale]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    load();
+    setFileTick((n) => n + 1);
+  }, [load]));
+
+  useEffect(() => {
+    if (!eventId) {
+      setPlannerFile(null);
+      return;
+    }
+    let cancel = false;
+    void (async () => {
+      const feed = await loadEventContent(eventId);
+      if (cancel) return;
+      if (feed.ok) {
+        const file = feed.data.timelineFile;
+        setPlannerFile(file && !file.hidden && file.id
+          ? { id: file.id, name: file.name, uploadedBy: file.uploadedBy, uploadedByLabel: file.uploadedByLabel }
+          : null);
+        return;
+      }
+      const legacy = await getPlannerTimeline(eventId);
+      if (cancel) return;
+      setPlannerFile(legacy ? { id: legacy.id, name: legacy.name, uploadedBy: null, uploadedByLabel: null } : null);
+    })();
+    return () => { cancel = true; };
+  }, [eventId, fileTick]);
 
   // First visit, per signed-in user. Guests have no plus, so they never see it.
   useEffect(() => {
@@ -154,6 +186,7 @@ export default function TimelineScreen() {
       const res = await pickAndUploadPlannerTimeline(eventId, src);
       if (res) {
         await load();
+        setFileTick((n) => n + 1);
         Alert.alert(t('timeline.uploaded'), t('timeline.uploadedBody', { name: res.name }));
       }
     } catch (e) {
@@ -264,6 +297,33 @@ export default function TimelineScreen() {
         onArchive={archive}
         onRestore={restore}
         onReorder={(chapterId, from, to) => reorderInChapter(chapterId, { from, to })}
+        banner={plannerFile && eventId ? (
+          <View style={{ marginLeft: 16, marginRight: 4, marginBottom: 12, gap: 4 }}>
+            <Text style={[Type.subhead, { color: c.ink }]}>{plannerFile.name || t('safety.timeline')}</Text>
+            <SafetyLinks
+              reportLabel={!plannerFile.uploadedBy || plannerFile.uploadedBy !== uid ? t('safety.reportFile') : undefined}
+              onReport={!plannerFile.uploadedBy || plannerFile.uploadedBy !== uid
+                ? () => moderation.openReport({ targetType: 'timeline_file', targetId: plannerFile.id })
+                : undefined}
+              hideLabel={canManage || plannerFile.uploadedBy === uid ? t('safety.remove') : undefined}
+              onHide={canManage || plannerFile.uploadedBy === uid
+                ? () => moderation.askHide({ targetType: 'timeline_file', targetId: plannerFile.id })
+                : undefined}
+              blockLabel={plannerFile.uploadedBy && plannerFile.uploadedBy !== uid
+                ? (plannerFile.uploadedByLabel ? t('safety.blockNamed', { name: plannerFile.uploadedByLabel }) : t('safety.block'))
+                : undefined}
+              onBlock={plannerFile.uploadedBy && plannerFile.uploadedBy !== uid
+                ? () => moderation.askBlock(plannerFile.uploadedBy as string, plannerFile.uploadedByLabel)
+                : undefined}
+              guestLabel={canManage && plannerFile.uploadedBy && plannerFile.uploadedBy !== uid
+                ? (plannerFile.uploadedByLabel ? t('safety.removeGuestNamed', { name: plannerFile.uploadedByLabel }) : t('safety.removeGuest'))
+                : undefined}
+              onRemoveGuest={canManage && plannerFile.uploadedBy && plannerFile.uploadedBy !== uid
+                ? () => moderation.askRemoveGuest(plannerFile.uploadedBy as string, plannerFile.uploadedByLabel)
+                : undefined}
+            />
+          </View>
+        ) : null}
       />
       <TimePickerSheet
         visible={timeEditing !== null}
@@ -281,6 +341,7 @@ export default function TimelineScreen() {
         onClose={() => setAddingGroup(null)}
         onAdded={load}
       />
+      {moderation.sheet}
     </View>
   );
 }

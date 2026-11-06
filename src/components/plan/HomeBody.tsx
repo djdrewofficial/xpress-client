@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -44,6 +45,7 @@ export function HomeBody({
   refreshing,
   onRefresh,
   emptyMessage,
+  coverActions,
 }: {
   greeting: string;
   eventName: string;
@@ -62,6 +64,7 @@ export function HomeBody({
   refreshing?: boolean;
   onRefresh?: () => void;
   emptyMessage?: string | null;
+  coverActions?: ReactNode;
 }) {
   const c = useC();
   const { t, locale } = useT();
@@ -104,6 +107,7 @@ export function HomeBody({
           {date ? (
             <CountdownHero bare size="compact" date={date} dateLabel={dateLabel} venue={venue} progress={progress} locale={locale} />
           ) : null}
+          {coverUrl && coverActions ? <View style={{ marginTop: 12 }}>{coverActions}</View> : null}
         </View>
       </View>
 

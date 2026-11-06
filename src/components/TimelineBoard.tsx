@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { runOnJS } from 'react-native-reanimated';
@@ -72,6 +72,7 @@ export function TimelineBoard({
   onArchive,
   onRestore,
   onReorder,
+  banner,
 }: {
   dateLabel: string | null;
   chapters: TimelineChapter[];
@@ -92,6 +93,7 @@ export function TimelineBoard({
   onArchive: (chapterId: string, moment: TimelineMoment) => void;
   onRestore: (item: TimelineArchived) => void;
   onReorder: (chapterId: string, from: number, to: number) => void;
+  banner?: ReactNode;
 }) {
   const c = useC();
   const { t } = useT();
@@ -141,6 +143,7 @@ export function TimelineBoard({
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingLeft: 10, paddingRight: 16, paddingBottom: insets.bottom + 120 }}
         showsVerticalScrollIndicator={false}>
+        {banner}
         {reordering ? (
           <View style={[styles.hint, { backgroundColor: c.surface2 }]}>
             <Icon name="drag" size={18} color={c.accent} />

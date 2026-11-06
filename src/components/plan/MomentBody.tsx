@@ -14,7 +14,9 @@ import {
   TrackRow,
   useC,
 } from '@/components/ui';
+import { SafetyLinks } from '@/components/moderation/SafetyLinks';
 import { useT } from '@/lib/i18n';
+import type { ModerationTarget } from '@/lib/moderation';
 import { questionVisible, type QuestionRow } from '@/lib/planning';
 import { getSectionNotes, normalizeNoteText, saveSectionNotes, type SectionNotesSave } from '@/lib/sectionNotes';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
@@ -34,6 +36,23 @@ export type MomentSong = {
   liked?: boolean;
   /** The signed-in person added this song. */
   mine?: boolean;
+  requestedBy?: string | null;
+  requestedByLabel?: string | null;
+  /** Other members who liked this song. `label` is the server label, or null when the server sent none. */
+  likePeople?: { userId: string; label: string | null }[];
+};
+
+export type MomentSafety = {
+  userId: string | null;
+  canManage: boolean;
+  noteAuthorId: string | null;
+  noteAuthorLabel: string | null;
+  answerAuthors: Record<string, string | null>;
+  answerLabels: Record<string, string | null>;
+  onReport: (target: ModerationTarget) => void;
+  onBlock: (userId: string, label?: string | null) => void;
+  onHide: (target: ModerationTarget) => void;
+  onRemoveGuest: (userId: string, label?: string | null) => void;
 };
 
 type Tab = MomentTab;
@@ -75,6 +94,7 @@ export function MomentBody({
   notesReadOnly,
   initialNotes,
   initialStaffNotes,
+  safety,
 }: {
   backLabel: string;
   onBack: () => void;
@@ -112,6 +132,7 @@ export function MomentBody({
   initialNotes?: string | null;
   /** From the section row (`staff_notes`), staff only. */
   initialStaffNotes?: string | null;
+  safety?: MomentSafety;
 }) {
   const c = useC();
   const { t } = useT();
@@ -231,6 +252,7 @@ export function MomentBody({
                 onPersist={onPersist}
                 onPick={onPick}
                 onFocus={(id) => { setEditingAll(false); setReeditId(id); setFocusId(id); }}
+                safety={safety}
               />
             ) : null}
 
@@ -266,7 +288,13 @@ export function MomentBody({
             ) : null}
 
             {activeTab === 'notes' ? (
-              <NotesPane notes={noteField} staff={isStaff ? staffField : null} readOnly={!!notesReadOnly} />
+              <NotesPane
+                notes={noteField}
+                staff={isStaff ? staffField : null}
+                readOnly={!!notesReadOnly}
+                sectionId={sectionId}
+                safety={safety}
+              />
             ) : null}
           </>
         )}
@@ -303,6 +331,14 @@ export function MomentBody({
                 onPress={() => { setNoteFor(menu); setNoteDraft(menu.note ?? ''); setMenu(null); }}
               />
             ) : null}
+            {safety && !menu.mine ? (
+              <Button
+                label={t('safety.reportSong')}
+                variant="ghost"
+                onPress={() => { const song = menu; setMenu(null); safety.onReport({ targetType: 'song', targetId: song.id }); }}
+              />
+            ) : null}
+            {safety ? <SongMenuSafety song={menu} safety={safety} onDone={() => setMenu(null)} /> : null}
             {!guestMode || menu.mine ? (
               <Pressable onPress={() => { onRemove(menu); setMenu(null); }} style={{ alignItems: 'center', paddingVertical: 12 }}>
                 <Text style={[Type.button, { color: c.danger }]}>{t('moment.removeSong')}</Text>
@@ -315,6 +351,141 @@ export function MomentBody({
   );
 }
 
+function SongMenuSafety({ song, safety, onDone }: { song: MomentSong; safety: MomentSafety; onDone: () => void }) {
+  const c = useC();
+  const { t } = useT();
+  const likes = (song.likePeople ?? []).filter((person) => person.userId && person.userId !== safety.userId);
+  const labeledLikes = likes.filter((person) => person.label);
+  const unlabeled = likes.filter((person) => !person.label);
+  const requester = song.requestedBy && song.requestedBy !== safety.userId ? song.requestedBy : null;
+  const requesterLabel = requester ? song.requestedByLabel ?? null : null;
+  const people = new Map<string, string>();
+  if (requester && requesterLabel) people.set(requester, requesterLabel);
+  for (const like of labeledLikes) {
+    if (like.label) people.set(like.userId, like.label);
+  }
+  const singleUnlabeled = unlabeled.length === 1 && labeledLikes.length === 0 ? unlabeled[0] : null;
+  return (
+    <>
+      {unlabeled.length > 1 || (unlabeled.length > 0 && labeledLikes.length > 0) ? (
+        <Text style={[Type.footnote, { color: c.ink3, textAlign: 'center' }]}>{t('safety.namesUnavailable')}</Text>
+      ) : null}
+      {labeledLikes.map((like) => (
+        <Button
+          key={`like-${like.userId}`}
+          label={t('safety.reportLikeNamed', { name: like.label ?? '' })}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onReport({ targetType: 'song_like', targetId: song.id, targetUserId: like.userId }); }}
+        />
+      ))}
+      {singleUnlabeled ? (
+        <Button
+          label={t('safety.reportLike')}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onReport({ targetType: 'song_like', targetId: song.id, targetUserId: singleUnlabeled.userId }); }}
+        />
+      ) : null}
+      {[...people.entries()].map(([userId, label]) => (
+        <Button
+          key={`person-${userId}`}
+          label={t('safety.reportPersonNamed', { name: label })}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onReport({ targetType: 'user', targetUserId: userId }); }}
+        />
+      ))}
+      {requester && !requesterLabel ? (
+        <Button
+          label={t('safety.blockAdded')}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onBlock(requester, null); }}
+        />
+      ) : null}
+      {singleUnlabeled ? (
+        <Button
+          label={t('safety.block')}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onBlock(singleUnlabeled.userId, null); }}
+        />
+      ) : null}
+      {[...people.entries()].map(([userId, label]) => (
+        <Button
+          key={`block-${userId}`}
+          label={t('safety.blockNamed', { name: label })}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onBlock(userId, label); }}
+        />
+      ))}
+      {safety.canManage ? labeledLikes.map((like) => (
+        <Button
+          key={`hide-${like.userId}`}
+          label={t('safety.hideLikeNamed', { name: like.label ?? '' })}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onHide({ targetType: 'song_like', targetId: song.id, targetUserId: like.userId }); }}
+        />
+      )) : null}
+      {safety.canManage && singleUnlabeled ? (
+        <Button
+          label={t('safety.hideLike')}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onHide({ targetType: 'song_like', targetId: song.id, targetUserId: singleUnlabeled.userId }); }}
+        />
+      ) : null}
+      {safety.canManage ? [...people.entries()].map(([userId, label]) => (
+        <Button
+          key={`guest-${userId}`}
+          label={t('safety.removeGuestNamed', { name: label })}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onRemoveGuest(userId, label); }}
+        />
+      )) : null}
+      {safety.canManage && requester && !requesterLabel ? (
+        <Button
+          label={t('safety.removeGuest')}
+          variant="ghost"
+          onPress={() => { onDone(); safety.onRemoveGuest(requester, null); }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function AnswerSafety({
+  questionId,
+  authorId,
+  authorLabel,
+  safety,
+  reportKey = 'safety.reportAnswer',
+  targetType = 'answer',
+}: {
+  questionId: string;
+  authorId: string | null;
+  authorLabel?: string | null;
+  safety?: MomentSafety;
+  reportKey?: 'safety.reportAnswer' | 'safety.reportNote';
+  targetType?: 'answer' | 'section_note';
+}) {
+  const { t } = useT();
+  if (!safety) return null;
+  const mine = !!safety.userId && authorId === safety.userId;
+  const canHide = safety.canManage || mine;
+  const canReport = !mine;
+  const canBlock = !!authorId && !mine;
+  if (!canHide && !canReport && !canBlock) return null;
+  const name = authorLabel || null;
+  return (
+    <SafetyLinks
+      reportLabel={canReport ? t(reportKey) : undefined}
+      onReport={canReport ? () => safety.onReport({ targetType, targetId: questionId }) : undefined}
+      hideLabel={canHide ? t('safety.remove') : undefined}
+      onHide={canHide ? () => safety.onHide({ targetType, targetId: questionId }) : undefined}
+      blockLabel={canBlock ? (name ? t('safety.blockNamed', { name }) : t('safety.block')) : undefined}
+      onBlock={canBlock && authorId ? () => safety.onBlock(authorId, name) : undefined}
+      guestLabel={safety.canManage && canBlock ? (name ? t('safety.removeGuestNamed', { name }) : t('safety.removeGuest')) : undefined}
+      onRemoveGuest={safety.canManage && canBlock && authorId ? () => safety.onRemoveGuest(authorId, name) : undefined}
+    />
+  );
+}
+
 function QuestionPane({
   visible,
   answers,
@@ -324,6 +495,7 @@ function QuestionPane({
   onPersist,
   onPick,
   onFocus,
+  safety,
 }: {
   visible: QuestionRow[];
   answers: Record<string, string>;
@@ -333,6 +505,7 @@ function QuestionPane({
   onPersist: (id: string, value: string) => void;
   onPick: (id: string, value: string) => void;
   onFocus: (id: string) => void;
+  safety?: MomentSafety;
 }) {
   const c = useC();
   const { t } = useT();
@@ -360,6 +533,11 @@ function QuestionPane({
                     <Icon name="edit" size={16} color={c.ink3} />
                   </Pressable>
                 </View>
+                {(answers[q.id] ?? '').trim() ? (
+                  <View style={{ paddingLeft: 44, paddingBottom: 8 }}>
+                    <AnswerSafety questionId={q.id} authorId={safety?.answerAuthors[q.id] ?? null} authorLabel={safety?.answerLabels[q.id] ?? null} safety={safety} />
+                  </View>
+                ) : null}
               </View>
             );
           })}
@@ -377,6 +555,9 @@ function QuestionPane({
           onPersist={(v) => onPersist(q.id, v)}
           onPick={(v) => onPick(q.id, v)}
         />
+      ))}
+      {expanded.filter((q) => (answers[q.id] ?? '').trim()).map((q) => (
+        <AnswerSafety key={`safety-${q.id}`} questionId={q.id} authorId={safety?.answerAuthors[q.id] ?? null} authorLabel={safety?.answerLabels[q.id] ?? null} safety={safety} />
       ))}
 
       {rest.map((q) => {
@@ -667,7 +848,19 @@ type NoteField = { value: string; setValue: (v: string) => void; flush: () => vo
 
 const NOTE_SAVE_MS = 700;
 
-function NotesPane({ notes, staff, readOnly }: { notes: NoteField; staff: NoteField | null; readOnly?: boolean }) {
+function NotesPane({
+  notes,
+  staff,
+  readOnly,
+  sectionId,
+  safety,
+}: {
+  notes: NoteField;
+  staff: NoteField | null;
+  readOnly?: boolean;
+  sectionId?: string;
+  safety?: MomentSafety;
+}) {
   const c = useC();
   const { t } = useT();
 
@@ -676,6 +869,16 @@ function NotesPane({ notes, staff, readOnly }: { notes: NoteField; staff: NoteFi
       <Text style={[Type.callout, { color: c.ink2 }]}>{t('moment.notesHelp')}</Text>
       <NoteBox value={notes.value} onChange={notes.setValue} onBlur={notes.flush} editable={!readOnly && !notes.readOnly} />
       {readOnly ? null : <SaveLine state={notes.state} />}
+      {safety && sectionId && notes.value.trim() ? (
+        <AnswerSafety
+          questionId={sectionId}
+          authorId={safety.noteAuthorId}
+          authorLabel={safety.noteAuthorLabel}
+          safety={safety}
+          reportKey="safety.reportNote"
+          targetType="section_note"
+        />
+      ) : null}
       {staff ? (
         <View style={[styles.staffBlock, { borderTopColor: c.line }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
