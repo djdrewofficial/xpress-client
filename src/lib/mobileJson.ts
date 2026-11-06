@@ -13,7 +13,7 @@ export type MobileResult<T = unknown> = { ok: true; data: T } | MobileFailure;
 
 /** JSON call to XOS /api/mobile. Uses authorizedFetch so a 401 refreshes once. */
 export async function mobileJson(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PUT',
   path: string,
   body?: Record<string, unknown>,
 ): Promise<MobileResult> {

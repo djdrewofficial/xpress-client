@@ -49,6 +49,7 @@ export function MyEventView({
   onEmail,
   showInvite,
   onInvite,
+  hostTools,
   accountName,
   accountEmail,
   onPrivacy,
@@ -80,6 +81,8 @@ export function MyEventView({
   onEmail: () => void;
   showInvite: boolean;
   onInvite: () => void;
+  /** Host link, guest link, and the guest-access screen. Replaces the email invite. */
+  hostTools?: ReactNode;
   accountName: string;
   accountEmail: string | null;
   onPrivacy: () => void;
@@ -293,7 +296,8 @@ export function MyEventView({
               </View>
             ) : null}
 
-            {showInvite ? (
+            {hostTools}
+            {showInvite && !hostTools ? (
               <View style={{ gap: 8 }}>
                 <Text style={[Type.label, { color: c.ink3 }]}>{t('event.people')}</Text>
                 <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>

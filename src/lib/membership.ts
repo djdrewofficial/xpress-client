@@ -1,10 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
- * Role returned by event-link or join-code redeem, remembered on this device.
- * `event_guest` accounts are guests even when no redeem has been stored yet.
- * Hosts and partners are not filtered.
+ * Per-event role. One login can be a host of one event and a guest of another.
+ * A stored role wins. An event_guest account with no stored role for this event is a guest.
  */
+
+export type AppEventRole = 'host' | 'guest' | 'staff';
 
 const memory = new Map<string, string>();
 let accountType: string | null = null;
@@ -42,4 +43,29 @@ export async function rememberMembership(uid: string, eventId: string, role: str
 /** Guest when this event was joined as a guest, or the account itself is an event guest. */
 export function roleForEvent(eventId: string): string | null {
   return memory.get(eventId) ?? (accountType === 'event_guest' ? 'guest' : null);
+}
+
+/** Role for the event on screen. Staff stays staff on every event. */
+export function viewerRole(
+  event: { id: string; role?: string | null } | null | undefined,
+  accountType: string | null | undefined,
+): AppEventRole | null {
+  if (accountType === 'staff') return 'staff';
+  if (event?.role === 'host' || event?.role === 'guest') return event.role;
+  if (event) {
+    const stored = memory.get(event.id);
+    if (stored === 'host' || stored === 'guest') return stored;
+  }
+  if (accountType === 'event_guest') return 'guest';
+  if (accountType === 'client') return 'host';
+  return null;
+}
+
+/** Hosts and staff plan the event. Guests only fill open sections. */
+export function managesEvent(
+  event: { id: string; role?: string | null } | null | undefined,
+  accountType: string | null | undefined,
+): boolean {
+  const role = viewerRole(event, accountType);
+  return role === 'host' || role === 'staff';
 }

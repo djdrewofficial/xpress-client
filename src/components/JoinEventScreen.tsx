@@ -8,6 +8,7 @@ import { Button, useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
   clipboardOfferPending,
+  httpsJoinToken,
   markClipboardOffered,
   redeemEventLink,
   tokenFromJoinUrl,
@@ -43,32 +44,37 @@ export function JoinEventScreen({
     if (initialError) setError(initialError);
   }, [initialError]);
   const [busy, setBusy] = useState(false);
-  const [offer, setOffer] = useState(false);
+  const [offer, setOffer] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    clipboardOfferPending().then((pending) => {
-      if (!cancelled && pending) setOffer(true);
-    });
+    (async () => {
+      if (!(await clipboardOfferPending())) return;
+      const text = await Clipboard.getStringAsync().catch(() => '');
+      const token = httpsJoinToken(text);
+      if (cancelled) return;
+      if (token) setOffer(token);
+      else await markClipboardOffered();
+    })();
     return () => {
       cancelled = true;
     };
   }, []);
 
   async function dismissOffer() {
-    setOffer(false);
+    setOffer(null);
     await markClipboardOffered();
   }
 
   async function useClipboard() {
-    setOffer(false);
+    const token = offer;
+    setOffer(null);
     await markClipboardOffered();
-    const text = await Clipboard.getStringAsync().catch(() => '');
-    if (!text.trim()) {
+    if (!token) {
       setError('joinEvent.emptyClipboard');
       return;
     }
-    const next = formatJoinEntry(text);
+    const next = `https://xos.xpressdjs.com/j/${token}`;
     setValue(next);
     await submit(next);
   }

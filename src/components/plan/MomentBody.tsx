@@ -31,6 +31,9 @@ export type MomentSong = {
   note: string | null;
   provider?: string | null;
   previewUrl?: string | null;
+  liked?: boolean;
+  /** The signed-in person added this song. */
+  mine?: boolean;
 };
 
 type Tab = MomentTab;
@@ -61,7 +64,9 @@ export function MomentBody({
   onAddMusic,
   onForYou,
   onToggleMust,
+  onToggleLike,
   onRemove,
+  guestMode,
   onSaveNote,
   onPlay,
   playingId,
@@ -94,7 +99,10 @@ export function MomentBody({
   onAddMusic: () => void;
   onForYou: () => void;
   onToggleMust: (song: MomentSong) => void;
+  onToggleLike?: (song: MomentSong) => void;
   onRemove: (song: MomentSong) => void;
+  /** Guests fill open sections. They do not mark must-play or remove someone else's song. */
+  guestMode?: boolean;
   onSaveNote: (song: MomentSong, note: string) => void;
   onPlay: (song: MomentSong) => void;
   playingId: string | null;
@@ -102,7 +110,7 @@ export function MomentBody({
   intro?: string | null;
   sectionId?: string;
   isStaff?: boolean;
-  /** Guests can read notes but cannot write them. */
+  /** When true, the moment notes cannot be edited. Guests can edit notes on open sections. */
   notesReadOnly?: boolean;
   /** From the section row (`client_notes`). Undefined means the payload didn't include it. */
   initialNotes?: string | null;
@@ -283,21 +291,32 @@ export function MomentBody({
         {menu ? (
           <View style={{ gap: 10 }}>
             <Button label={playingId === menu.id ? t('moment.pause') : t('moment.play')} variant="ghost" onPress={() => { onPlay(menu); setMenu(null); }} />
-            {!menu.doNotPlay ? (
+            {onToggleLike ? (
+              <Button
+                label={menu.liked ? t('moment.unlike') : t('moment.like')}
+                variant="secondary"
+                onPress={() => { onToggleLike(menu); setMenu(null); }}
+              />
+            ) : null}
+            {!guestMode && !menu.doNotPlay ? (
               <Button
                 label={menu.mustPlay ? t('moment.removeMust') : t('moment.markMust')}
                 variant="secondary"
                 onPress={() => { onToggleMust(menu); setMenu(null); }}
               />
             ) : null}
-            <Button
-              label={menu.note ? t('moment.editNote') : t('moment.addNote')}
-              variant="ghost"
-              onPress={() => { setNoteFor(menu); setNoteDraft(menu.note ?? ''); setMenu(null); }}
-            />
-            <Pressable onPress={() => { onRemove(menu); setMenu(null); }} style={{ alignItems: 'center', paddingVertical: 12 }}>
-              <Text style={[Type.button, { color: c.danger }]}>{t('moment.removeSong')}</Text>
-            </Pressable>
+            {!guestMode || menu.mine ? (
+              <Button
+                label={menu.note ? t('moment.editNote') : t('moment.addNote')}
+                variant="ghost"
+                onPress={() => { setNoteFor(menu); setNoteDraft(menu.note ?? ''); setMenu(null); }}
+              />
+            ) : null}
+            {!guestMode || menu.mine ? (
+              <Pressable onPress={() => { onRemove(menu); setMenu(null); }} style={{ alignItems: 'center', paddingVertical: 12 }}>
+                <Text style={[Type.button, { color: c.danger }]}>{t('moment.removeSong')}</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
       </Sheet>

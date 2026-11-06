@@ -8,34 +8,66 @@ const CLIPBOARD_KEY = 'xpress.clipboardJoinOffered';
 
 const listeners = new Set<() => void>();
 
+export type JoinRole = 'host' | 'guest';
+
 export type RedeemedEventLink = {
   eventId: string;
-  role: string;
+  role: JoinRole;
+  alreadyMember: boolean;
 };
 
+export type JoinLink = {
+  role: JoinRole;
+  url: string;
+  expiresAt: string;
+};
+
+/** Path token from XOS: 22-character base64url, no padding. */
+const TOKEN = /^[A-Za-z0-9_-]{22}$/;
+
 /**
- * Redeem a host or guest link token.
- *
- * Expected XOS contract (align when that PR lands):
- * POST /api/mobile/event-links/redeem
- * body: { token: string }
- * 200: { eventId: string, role: string }
- *
- * `role` is `guest` for a guest link. Other roles (host, partner) see the full plan.
+ * POST /api/mobile/join-link/redeem
+ * body: { token } (path segment only, not the URL)
+ * 200: { ok: true, eventId, role: "host" | "guest", alreadyMember }
+ * 400 malformed, 401 no session, 403 staff, 404 unknown or expired,
+ * 429 with Retry-After seconds, 503 migration not applied.
  */
 export async function redeemEventLink(token: string): Promise<{ ok: true; data: RedeemedEventLink } | MobileFailure> {
   const clean = token.trim();
-  if (!clean) return { ok: false, status: 400, error: '', retryAfter: null };
-  const result = await mobileJson('POST', '/api/mobile/event-links/redeem', { token: clean });
+  if (!TOKEN.test(clean)) return { ok: false, status: 400, error: '', retryAfter: null };
+  const result = await mobileJson('POST', '/api/mobile/join-link/redeem', { token: clean });
   if (!result.ok) return result;
   const record = asRecord(result.data);
   const eventId = typeof record.eventId === 'string' ? record.eventId : '';
-  const role = typeof record.role === 'string' ? record.role : '';
+  const role = record.role === 'host' || record.role === 'guest' ? record.role : null;
   if (!eventId || !role) return { ok: false, status: 500, error: '', retryAfter: null };
-  return { ok: true, data: { eventId, role } };
+  return { ok: true, data: { eventId, role, alreadyMember: record.alreadyMember === true } };
 }
 
-const TOKEN = /^[A-Za-z0-9._~-]{8,200}$/;
+/** GET /api/mobile/events/:eventId/join-links. Host only. */
+export async function listJoinLinks(eventId: string): Promise<{ ok: true; links: JoinLink[] } | MobileFailure> {
+  const result = await mobileJson('GET', `/api/mobile/events/${encodeURIComponent(eventId)}/join-links`);
+  if (!result.ok) return result;
+  const links = asRecord(result.data).links;
+  const parsed = Array.isArray(links) ? links.map(parseLink).filter((link): link is JoinLink => !!link) : [];
+  return { ok: true, links: parsed };
+}
+
+/** POST /api/mobile/events/:eventId/join-links/reset { role }. Host only. */
+export async function resetJoinLink(eventId: string, role: JoinRole): Promise<{ ok: true; link: JoinLink } | MobileFailure> {
+  const result = await mobileJson('POST', `/api/mobile/events/${encodeURIComponent(eventId)}/join-links/reset`, { role });
+  if (!result.ok) return result;
+  const link = parseLink(result.data);
+  if (!link) return { ok: false, status: 500, error: '', retryAfter: null };
+  return { ok: true, link };
+}
+
+function parseLink(value: unknown): JoinLink | null {
+  const row = asRecord(value);
+  if (row.role !== 'host' && row.role !== 'guest') return null;
+  if (typeof row.url !== 'string' || !row.url) return null;
+  return { role: row.role, url: row.url, expiresAt: typeof row.expiresAt === 'string' ? row.expiresAt : '' };
+}
 
 /**
  * https://xos.xpressdjs.com/j/<token>
@@ -68,6 +100,13 @@ export function tokenFromJoinUrl(input: string): string | null {
     token = raw;
   }
   return TOKEN.test(token) ? token : null;
+}
+
+/** The landing page copies https://xos.xpressdjs.com/j/<token>. Other text is not a join link. */
+export function httpsJoinToken(input: string): string | null {
+  const text = input.trim();
+  if (!/^https:\/\/xos\.xpressdjs\.com\/j\//i.test(text)) return null;
+  return tokenFromJoinUrl(text);
 }
 
 export function onPendingLink(listener: () => void) {

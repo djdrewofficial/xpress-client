@@ -10,16 +10,19 @@ import { MomentBody, type MomentSong, type MomentTab } from '@/components/plan/M
 import { isDanceFloorSection, momentEyebrow, momentNumber } from '@/components/plan/model';
 import { Button, useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { guestCanSeeSection } from '@/lib/guestSections';
+import { isDoNotPlayTitle, sectionClosedToGuest } from '@/lib/guestSections';
 import { useT } from '@/lib/i18n';
+import { managesEvent, roleForEvent } from '@/lib/membership';
 import { resolvePreview } from '@/lib/musicSearch';
 import {
+  loadMyLikes,
   loadOverview,
   loadSection,
   removeSong,
   saveAnswer,
   setMustPlay,
   setSectionTime,
+  setSongLiked,
   updateSongNote,
   type QuestionRow,
   type SongRow,
@@ -64,6 +67,7 @@ export default function SectionScreen() {
   const [eventName, setEventName] = useState('');
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [songs, setSongs] = useState<SongRow[]>([]);
+  const [likes, setLikes] = useState<Set<string>>(new Set());
   const [momentNo, setMomentNo] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -89,20 +93,20 @@ export default function SectionScreen() {
 
   const load = useCallback(async () => {
     if (!id || !eventId) return;
-    const allowed = await guestCanSeeSection(eventId, id);
-    if (!allowed) {
-      setClosed(true);
-      setLoading(false);
-      return;
-    }
-    setClosed(false);
+    const guest = roleForEvent(eventId) === 'guest';
     const [{ data: m }, { data: ev }, sec, ov] = await Promise.all([
       supabase.from('planning_sections').select('*').eq('id', id).maybeSingle(),
       supabase.from('events').select('name').eq('id', eventId).maybeSingle(),
       loadSection(eventId, id),
       loadOverview(eventId),
     ]);
-    const sectionRow = (m ?? null) as Record<string, unknown> | null;
+    const sectionRow = (m ?? null) as (Record<string, unknown> & { title?: string | null; guest_enabled?: boolean | null }) | null;
+    if (guest && (sectionClosedToGuest(sectionRow) || isDoNotPlayTitle(sectionRow?.title ?? '') || !ov.sections.some((section) => section.id === id))) {
+      setClosed(true);
+      setLoading(false);
+      return;
+    }
+    setClosed(false);
     const nextMeta: Meta = {
       title: m?.title ?? 'Moment',
       icon: m?.icon ?? null,
@@ -119,18 +123,46 @@ export default function SectionScreen() {
     setMeta(nextMeta);
     setEventName(ev?.name ?? '');
     setQuestions(sec.questions);
-    setSongs(sec.songs);
+    const visibleSongs = guest ? sec.songs.filter((song) => !song.do_not_play) : sec.songs;
+    setSongs(visibleSongs);
+    if (session?.user.id) {
+      loadMyLikes(visibleSongs.map((song) => song.id), session.user.id).then(setLikes).catch(() => setLikes(new Set()));
+    } else {
+      setLikes(new Set());
+    }
     const a: Record<string, string> = {};
     for (const q of sec.questions) a[q.id] = q.answer ?? '';
     setAnswers(a);
     setMomentNo(momentNumber(ov.sections, id));
     setLoading(false);
-  }, [id, eventId]);
+  }, [id, eventId, session?.user.id]);
 
   useEffect(() => { load(); }, [load]);
 
-  const canManage = profile?.accountType === 'staff' || profile?.accountType === 'client';
+  const guest = roleForEvent(eventId) === 'guest';
+  const canManage = managesEvent({ id: eventId, role: guest ? 'guest' : null }, profile?.accountType);
   const danceFloor = meta ? isDanceFloorSection(meta) : false;
+
+  async function toggleLike(song: { id: string }) {
+    if (!session?.user.id) return;
+    const next = !likes.has(song.id);
+    setLikes((prev) => {
+      const copy = new Set(prev);
+      if (next) copy.add(song.id);
+      else copy.delete(song.id);
+      return copy;
+    });
+    const ok = await setSongLiked(song.id, session.user.id, next);
+    if (!ok) {
+      setLikes((prev) => {
+        const copy = new Set(prev);
+        if (next) copy.delete(song.id);
+        else copy.add(song.id);
+        return copy;
+      });
+      Alert.alert(t('common.couldntSave'), t('guest.closed'));
+    }
+  }
 
   function setLocal(qid: string, v: string) {
     setAnswers((prev) => ({ ...prev, [qid]: v }));
@@ -209,7 +241,7 @@ export default function SectionScreen() {
       ? <VendorTeam eventId={eventId} />
       : null;
 
-  const momentSongs = songs.map(toMoment);
+  const momentSongs = songs.map((song) => toMoment(song, likes.has(song.id), session?.user.id ?? null));
   const songTotal = danceFloor ? momentSongs.filter((s) => !s.doNotPlay).length : songs.length;
 
   return (
@@ -244,7 +276,9 @@ export default function SectionScreen() {
         special={special}
         sectionId={Array.isArray(id) ? id[0] : id}
         isStaff={profile?.accountType === 'staff'}
-        notesReadOnly={profile?.accountType === 'event_guest'}
+        guestMode={guest}
+        onToggleLike={toggleLike}
+        notesReadOnly={false}
         initialNotes={meta.clientNotes}
         initialStaffNotes={profile?.accountType === 'staff' ? meta.staffNotes : undefined}
       />
@@ -273,7 +307,7 @@ export default function SectionScreen() {
   );
 }
 
-function toMoment(s: SongRow): MomentSong {
+function toMoment(s: SongRow, liked: boolean, userId: string | null): MomentSong {
   return {
     id: s.id,
     title: s.title,
@@ -283,5 +317,7 @@ function toMoment(s: SongRow): MomentSong {
     note: s.note,
     provider: s.provider,
     previewUrl: s.preview_url,
+    liked,
+    mine: !!userId && s.requested_by === userId,
   };
 }

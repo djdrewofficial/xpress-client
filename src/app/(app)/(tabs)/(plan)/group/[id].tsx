@@ -7,6 +7,7 @@ import { GroupBody } from '@/components/plan/GroupBody';
 import { useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useT } from '@/lib/i18n';
+import { managesEvent } from '@/lib/membership';
 import {
   deleteSection,
   loadOverview,
@@ -32,7 +33,7 @@ export default function GroupScreen() {
   const [adding, setAdding] = useState(false);
 
   const isStaff = profile?.accountType === 'staff';
-  const canManage = isStaff || profile?.accountType === 'client';
+  const canManage = managesEvent({ id: eventId ?? '' }, profile?.accountType);
 
   const load = useCallback(async () => {
     if (!eventId) return;

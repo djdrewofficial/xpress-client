@@ -50,7 +50,7 @@ export function WelcomeScreen({
   const preliminary = coupleDisplayName(profile?.firstName ? [profile.firstName] : [], event?.name ?? null);
   const names = snap?.names || preliminary;
   const date = snap?.date ?? event?.event_date ?? null;
-  const venue = snap?.venue ?? null;
+  const venue = snap?.venue ?? event?.venueName ?? null;
   const progress = snap?.progress ?? null;
 
   const headline = names ? t('welcome.helloNames', { names }) : t('welcome.hello');

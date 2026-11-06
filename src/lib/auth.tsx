@@ -3,7 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type PropsWithChildren } from 'react';
 
 import { claimEventInvites } from '@/lib/claimInvites';
-import { clearGuestSectionCache } from '@/lib/guestSections';
 import { hydrateMembership, noteAccountType, resetMembershipMemory } from '@/lib/membership';
 import { supabase } from '@/lib/supabase';
 
@@ -173,7 +172,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
     if (!uid || !current) {
       profileReq.current += 1;
       resetMembershipMemory();
-      clearGuestSectionCache();
       setProfile(null);
       setReadyFor(null);
       if (hadSession.current) {
@@ -252,7 +250,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
         signOut: () => {
           profileReq.current += 1;
           resetMembershipMemory();
-          clearGuestSectionCache();
           setProfile(null);
           setReadyFor(null);
           setPendingPasswordReset(false);

@@ -35,6 +35,7 @@ export async function uploadCoverPhoto(eventId: string, asset: ImagePicker.Image
     body: form, // let fetch set the multipart boundary
   });
   const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+  if (res.status === 403) throw new Error(json.error || 'Guests cannot change the cover photo.');
   if (!res.ok) throw new Error(json.error || `Upload failed (${res.status})`);
   return json.url ?? '';
 }

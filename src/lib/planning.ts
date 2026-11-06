@@ -1,6 +1,7 @@
 import { apiBase, authorizedFetch } from '@/lib/api';
-import { applyGuestAllowList, loadGuestOpenSections } from '@/lib/guestSections';
-import { roleForEvent } from '@/lib/membership';
+import { fetchEventCard } from '@/lib/eventCard';
+import { restrictGuestOverview } from '@/lib/guestSections';
+import { rememberMembership, roleForEvent } from '@/lib/membership';
 import { supabase } from '@/lib/supabase';
 
 export type EventLite = {
@@ -8,6 +9,9 @@ export type EventLite = {
   name: string;
   event_date: string | null;
   cover_photo_url: string | null;
+  /** Per-event role. One login can be a host of one event and a guest of another. */
+  role?: 'host' | 'guest' | 'staff' | null;
+  venueName?: string | null;
   // Booking essentials the DJ already set — drive the endowed-progress seed below.
   venue_id?: string | null;
   package_id?: string | null;
@@ -54,6 +58,8 @@ export type SectionRow = {
   on_music: boolean | null; // per-event override; null = auto (vibe playlists: songs on + no single-song limit)
   time_enabled: boolean; // section supports a time
   time_label: string | null; // the time shown on the timeline, e.g. "5:00 PM"
+  /** Hosts turn this on so guests can see and fill out the section. */
+  guest_enabled?: boolean;
   locked: boolean;
   questionCount: number;
   answeredCount: number;
@@ -116,6 +122,8 @@ export type SongRow = {
   must_play: boolean;
   do_not_play: boolean;
   note: string | null;
+  /** Auth user who added the song. Guests can change only their own rows. */
+  requested_by?: string | null;
   provider?: string | null;
   provider_id?: string | null;
 };
@@ -133,6 +141,7 @@ function toSongRow(s: {
   note?: string | null;
   provider?: string | null;
   provider_id?: string | null;
+  requested_by?: string | null;
 }): SongRow {
   return {
     id: s.id,
@@ -145,35 +154,84 @@ function toSongRow(s: {
     note: s.note ?? null,
     provider: s.provider ?? null,
     provider_id: s.provider_id ?? null,
+    requested_by: s.requested_by ?? null,
   };
 }
 
-/** Events this client/guest can plan. */
+/** Events this login can open. Host events come from the client link. Guest events
+    come from event_app_members plus the safe event card, because guests cannot read `events`. */
 export async function getMyEvents(account: { clientId: string | null; eventGuestId: string | null }): Promise<EventLite[]> {
+  const out: EventLite[] = [];
+  const seen = new Set<string>();
+  const add = (event: EventLite, role: 'host' | 'guest') => {
+    const existing = out.find((row) => row.id === event.id);
+    if (existing) {
+      if (role === 'host') existing.role = 'host';
+      return;
+    }
+    seen.add(event.id);
+    out.push({ ...event, role });
+  };
+
   if (account.clientId) {
     const [{ data: primary }, { data: linked }] = await Promise.all([
       supabase.from('events').select('id, name, event_date, cover_photo_url, venue_id, package_id').eq('client_id', account.clientId).is('archived_at', null),
       supabase.from('event_clients').select('event:events(id, name, event_date, cover_photo_url, venue_id, package_id, archived_at)').eq('client_id', account.clientId),
     ]);
-    const seen = new Set<string>();
-    const out: EventLite[] = [];
-    for (const e of primary ?? []) if (!seen.has(e.id)) { seen.add(e.id); out.push(e as EventLite); }
+    for (const event of primary ?? []) add(event as EventLite, 'host');
     for (const row of linked ?? []) {
-      const e = (row as unknown as { event: (EventLite & { archived_at: string | null }) | null }).event;
-      if (e && !e.archived_at && !seen.has(e.id)) { seen.add(e.id); out.push(e); }
+      const event = (row as unknown as { event: (EventLite & { archived_at: string | null }) | null }).event;
+      if (event && !event.archived_at) add(event, 'host');
     }
-    return out.sort((a, b) => (a.event_date ?? '').localeCompare(b.event_date ?? ''));
   }
   if (account.eventGuestId) {
-    const { data: g } = await supabase
+    const { data: guest } = await supabase
       .from('event_guests')
       .select('event:events(id, name, event_date, cover_photo_url, venue_id, package_id)')
       .eq('id', account.eventGuestId)
       .maybeSingle();
-    const e = (g as unknown as { event: EventLite | null } | null)?.event;
-    return e ? [e] : [];
+    const event = (guest as unknown as { event: EventLite | null } | null)?.event;
+    if (event) add(event, 'guest');
   }
-  return [];
+
+  const { data: session } = await supabase.auth.getSession();
+  const uid = session.session?.user.id;
+  if (uid) {
+    const { data: members, error } = await supabase
+      .from('event_app_members')
+      .select('event_id, role')
+      .eq('auth_user_id', uid);
+    if (!error) {
+      for (const member of members ?? []) {
+        const role = member.role === 'guest' ? 'guest' : 'host';
+        await rememberMembership(uid, member.event_id, role);
+        if (seen.has(member.event_id)) {
+          if (role === 'host') {
+            const existing = out.find((row) => row.id === member.event_id);
+            if (existing) existing.role = 'host';
+          }
+          continue;
+        }
+        const card = await fetchEventCard(member.event_id);
+        const event: EventLite = card
+          ? {
+              id: card.id,
+              name: card.name,
+              event_date: card.eventDate,
+              cover_photo_url: card.coverPhotoUrl,
+              venueName: card.venueName,
+              role: card.role === 'staff' ? 'host' : card.role,
+            }
+          : { id: member.event_id, name: '', event_date: null, cover_photo_url: null, role };
+        add(event, role);
+      }
+    }
+    for (const event of out) {
+      if (event.role === 'host' || event.role === 'guest') await rememberMembership(uid, event.id, event.role);
+    }
+  }
+
+  return out.sort((a, b) => (a.event_date ?? '').localeCompare(b.event_date ?? ''));
 }
 
 export type StaffEvent = {
@@ -374,10 +432,7 @@ export async function loadOverview(eventId: string): Promise<Overview> {
   }
 
   const overview = { groups: groups.filter((g) => g.sections.length > 0), sections: flat, removed, totalQuestions, answeredQuestions };
-  if (roleForEvent(eventId) === 'guest') {
-    const open = await loadGuestOpenSections(eventId);
-    if (open.ready) return applyGuestAllowList(overview, open.sectionIds);
-  }
+  if (roleForEvent(eventId) === 'guest') return restrictGuestOverview(overview);
   return overview;
 }
 
@@ -492,7 +547,9 @@ export async function loadEventSongs(eventId: string): Promise<EventSong[]> {
     .select('id, section_id, title, artist, artwork_url, preview_url, must_play, do_not_play, note, provider, provider_id, sort_order')
     .eq('event_id', eventId)
     .order('sort_order');
-  return (data ?? []).map((s) => ({ ...toSongRow(s), section_id: s.section_id }));
+  const rows = (data ?? []).map((s) => ({ ...toSongRow(s), section_id: s.section_id }));
+  if (roleForEvent(eventId) === 'guest') return rows.filter((song) => !song.do_not_play);
+  return rows;
 }
 
 /** Toggle "must play" (clears "do not play" when on). Returns false if the write
@@ -515,6 +572,28 @@ export async function updateSongNote(songId: string, note: string): Promise<bool
 }
 
 /** Remove a song from a section. Returns false on failure. */
+export async function loadMyLikes(songIds: string[], userId: string): Promise<Set<string>> {
+  if (!songIds.length || !userId) return new Set();
+  const { data, error } = await supabase
+    .from('planning_song_likes')
+    .select('song_id')
+    .eq('account_id', userId)
+    .in('song_id', songIds);
+  if (error || !data) return new Set();
+  return new Set(data.map((row) => row.song_id as string));
+}
+
+/** Like or unlike a song. Returns false on failure, including a 403 on a closed section. */
+export async function setSongLiked(songId: string, userId: string, liked: boolean): Promise<boolean> {
+  if (!userId) return false;
+  if (liked) {
+    const { error } = await supabase.from('planning_song_likes').insert({ song_id: songId, account_id: userId });
+    return !error;
+  }
+  const { error } = await supabase.from('planning_song_likes').delete().eq('song_id', songId).eq('account_id', userId);
+  return !error;
+}
+
 export async function removeSong(songId: string): Promise<boolean> {
   const { error } = await supabase.from('planning_songs').delete().eq('id', songId);
   return !error;
@@ -548,6 +627,7 @@ export async function addSong(
     .from('planning_songs')
     .select('id', { count: 'exact', head: true })
     .eq('section_id', sectionId);
+  const { data: session } = await supabase.auth.getSession();
   const { data, error } = await supabase
     .from('planning_songs')
     .insert({
@@ -563,6 +643,8 @@ export async function addSong(
       provider_id: song.provider_id ?? null,
       must_play: false,
       sort_order: count ?? 0,
+      // Guests can insert only when this is their user id. Hosts use the same value.
+      requested_by: session.session?.user.id ?? null,
     })
     .select('*')
     .single();

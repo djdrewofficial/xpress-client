@@ -10,6 +10,7 @@ import { TimePickerSheet } from '@/components/TimePickerSheet';
 import { TimelineBoard, type TimelineArchived, type TimelineChapter, type TimelineMoment } from '@/components/TimelineBoard';
 import { Brand } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
+import { managesEvent } from '@/lib/membership';
 import { useEvent } from '@/lib/events';
 import { formatEventEyebrow } from '@/lib/eventDate';
 import { translate, useT, type Locale } from '@/lib/i18n';
@@ -91,7 +92,7 @@ export default function TimelineScreen() {
   const [ptBusy, setPtBusy] = useState(false);
   const [addingGroup, setAddingGroup] = useState<{ id: string; title: string } | null>(null);
 
-  const canManage = profile?.accountType === 'staff' || profile?.accountType === 'client';
+  const canManage = managesEvent(event, profile?.accountType);
 
   const load = useCallback(async () => {
     if (!eventId) {
