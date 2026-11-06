@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
+import { AiConsentSetting } from '@/components/AiConsentSetting';
 import { DeleteAccountSheet, InviteSentSheet } from '@/components/AccountSheets';
 import { HostEventTools } from '@/components/HostEventTools';
 import { InvitePersonSheet } from '@/components/InvitePersonSheet';
@@ -55,6 +56,7 @@ export default function AccountScreen() {
   const [accountName, setAccountName] = useState(profile?.firstName || 'Your account');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [consentReload, setConsentReload] = useState(0);
   const { locale, setLocale, t } = useT();
   const [marketing, setMarketing] = useState(false);
 
@@ -101,6 +103,7 @@ export default function AccountScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await load();
+    setConsentReload((n) => n + 1);
     setRefreshing(false);
   }, [load]);
 
@@ -213,6 +216,11 @@ export default function AccountScreen() {
         onLanguage={setLocale}
         marketing={marketing}
         onMarketing={onMarketing}
+        aiConsent={
+          viewerRole(event, profile?.accountType) === 'host' && eventId ? (
+            <AiConsentSetting eventId={eventId} reloadSignal={consentReload} onPrivacy={() => setLegal('privacy')} />
+          ) : null
+        }
       />
 
       {events.length > 1 ? <EventSwitcher visible={switcher} onClose={() => setSwitcher(false)} /> : null}

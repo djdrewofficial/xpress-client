@@ -62,6 +62,7 @@ export function MyEventView({
   onLanguage,
   marketing,
   onMarketing,
+  aiConsent,
 }: {
   loading: boolean;
   refreshing: boolean;
@@ -96,6 +97,8 @@ export function MyEventView({
   onLanguage: (language: AppLanguage) => void;
   marketing: boolean;
   onMarketing: (on: boolean) => void;
+  /** Host-only AI consent. Guests and staff omit this. */
+  aiConsent?: ReactNode;
 }) {
   const c = useC();
   const { t } = useT();
@@ -341,6 +344,7 @@ export function MyEventView({
             <LanguageCard label={t('event.english')} selected={language === 'en'} selectedLabel={t('event.selected')} onPress={() => onLanguage('en')} />
             <LanguageCard label={t('event.spanish')} selected={language === 'es'} selectedLabel={t('event.selectedEs')} onPress={() => onLanguage('es')} />
           </View>
+          {aiConsent}
           <View style={[styles.card, Shadow.card, { backgroundColor: c.surface, paddingHorizontal: 14, paddingVertical: 12 }]}>
             <View style={styles.marketRow}>
               <View style={[styles.bubble, { backgroundColor: c.accentTint }]}>
