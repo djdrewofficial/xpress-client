@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Xpress Entertainment",
+    "name": "Xpress DJs",
     "slug": "xpress-client",
     "version": "1.0.0",
     "icon": "./src/assets/icon.png",
@@ -24,6 +24,7 @@
         "applinks:xos.xpressdjs.com"
       ],
       "infoPlist": {
+        "CFBundleDisplayName": "Xpress DJs",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -58,7 +59,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Xpress to use your photos to set your event header photo.",
+          "photosPermission": "Allow Xpress DJs to use your photos to set your event header photo.",
           "cameraPermission": false,
           "microphonePermission": false
         }
