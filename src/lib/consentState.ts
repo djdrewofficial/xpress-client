@@ -68,15 +68,45 @@ export function consentFromRead(result: ConsentRead, kind: ConsentKind): Consent
 
 /**
  * A missing response (status 0) may already be saved.
+ * A 500 can be an upstream failure after the database call, on either route,
+ * so it does not prove the choice was unsaved.
  * AI consent saves first, then reads the row back. A 503 from that read means the
- * grant or withdrawal is already committed, so it is unconfirmed until GET succeeds.
- * SMS returns 503 before it writes, when the table is missing, so that 503 keeps
- * the last known switch and does not pretend the choice changed.
+ * grant or withdrawal is already committed.
+ * SMS returns 503 before it writes, when the table is missing. That 503 keeps
+ * the last known switch.
+ * 400 and 403 are rejected before a save.
  * `reconcile` means the caller should GET and then use `consentAfterReconcile`.
  */
 function writeMayHaveCommitted(kind: ConsentKind, status: number): boolean {
-  if (status === 0) return true;
+  if (status === 0 || status === 500) return true;
   return kind === 'ai' && status === 503;
+}
+
+const unconfirmedUi = (): ConsentUi => ({
+  phase: 'unknown',
+  granted: null,
+  canGrant: false,
+  canWithdraw: false,
+  notice: 'unconfirmed',
+});
+
+/** Runs the write, and a follow-up read when the response does not prove the outcome.
+    Returns null when a newer request or an unmount has taken over. */
+export async function settleConsentWrite(input: {
+  previous: ConsentUi;
+  kind: ConsentKind;
+  intent: 'grant' | 'withdraw';
+  write: () => Promise<ConsentRead>;
+  read: () => Promise<ConsentRead>;
+  isCurrent: () => boolean;
+}): Promise<ConsentUi | null> {
+  const written = await input.write();
+  if (!input.isCurrent()) return null;
+  const decided = consentAfterWrite(input.previous, written, input.kind, input.intent);
+  if (!decided.reconcile) return decided.ui;
+  const again = await input.read();
+  if (!input.isCurrent()) return null;
+  return consentAfterReconcile(again, input.kind);
 }
 
 export function consentAfterWrite(
@@ -87,10 +117,7 @@ export function consentAfterWrite(
 ): { ui: ConsentUi; reconcile: boolean } {
   if (!result.ok) {
     if (writeMayHaveCommitted(kind, result.status)) {
-      return {
-        ui: { phase: 'unknown', granted: null, canGrant: false, canWithdraw: false, notice: 'unconfirmed' },
-        reconcile: true,
-      };
+      return { ui: unconfirmedUi(), reconcile: true };
     }
     if (result.ineligible || result.status === 403) {
       return {
@@ -123,8 +150,6 @@ export function consentAfterWrite(
 
 /** After a lost write, a successful read replaces the unknown state. A failed read stays unknown. */
 export function consentAfterReconcile(result: ConsentRead, kind: ConsentKind): ConsentUi {
-  if (!result.ok) {
-    return { phase: 'unknown', granted: null, canGrant: false, canWithdraw: false, notice: 'unconfirmed' };
-  }
+  if (!result.ok) return unconfirmedUi();
   return knownFrom(result.record, kind);
 }

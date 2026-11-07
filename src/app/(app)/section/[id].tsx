@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Text, View } from 'react-native';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { SafetyLinks } from '@/components/moderation/SafetyLinks';
 import { useModeration } from '@/components/moderation/useModeration';
@@ -64,6 +64,7 @@ export default function SectionScreen() {
   const [noteAuthorId, setNoteAuthorId] = useState<string | null>(null);
   const [noteAuthorLabel, setNoteAuthorLabel] = useState<string | null>(null);
   const [noteSeed, setNoteSeed] = useState<{ skipLoad: boolean; text: string | null }>({ skipLoad: false, text: null });
+  const [contentReload, setContentReload] = useState(0);
   const [boothAuthor, setBoothAuthor] = useState<{ userId: string; label: string | null } | null>(null);
   const [momentNo, setMomentNo] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -88,7 +89,9 @@ export default function SectionScreen() {
   useEffect(() => () => { try { player.pause(); } catch { /* released */ } }, [player]);
   useEffect(() => { if (status.didJustFinish) setPlayingId(null); }, [status.didJustFinish]);
 
+  const loadGen = useRef(0);
   const load = useCallback(async () => {
+    const ticket = ++loadGen.current;
     if (!id || !eventId) return;
     const guest = roleForEvent(eventId) === 'guest';
     const [{ data: m }, sec, ov] = await Promise.all([
@@ -96,6 +99,7 @@ export default function SectionScreen() {
       loadSection(eventId, id),
       loadOverview(eventId),
     ]);
+    if (loadGen.current !== ticket) return;
     const sectionRow = (m ?? null) as (Record<string, unknown> & { title?: string | null; guest_enabled?: boolean | null }) | null;
     if (guest && (sectionClosedToGuest(sectionRow) || isDoNotPlayTitle(sectionRow?.title ?? '') || !ov.sections.some((section) => section.id === id))) {
       setClosed(true);
@@ -128,6 +132,7 @@ export default function SectionScreen() {
     setMomentNo(momentNumber(ov.sections, id));
     const sectionKey = Array.isArray(id) ? id[0] : id;
     const feed = await loadEventContent(eventId);
+    if (loadGen.current !== ticket) return;
     if (feed.ok) {
       const bySong: Record<string, { userId: string; label: string | null }[]> = {};
       for (const like of feed.data.likes) {
@@ -164,10 +169,11 @@ export default function SectionScreen() {
       setNoteAuthorId(null);
       setNoteAuthorLabel(null);
     }
+    setContentReload((n) => n + 1);
     setLoading(false);
   }, [id, eventId, session?.user.id]);
 
-  useEffect(() => { load(); }, [load]);
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const guest = roleForEvent(eventId) === 'guest';
   const canManage = managesEvent({ id: eventId, role: guest ? 'guest' : null }, profile?.accountType);
@@ -293,6 +299,7 @@ export default function SectionScreen() {
     ? (
       <PhotoBoothSection
         eventId={eventId}
+        reloadSignal={contentReload}
         safety={(
           <SafetyLinks
             reportLabel={t('safety.reportBooth')}

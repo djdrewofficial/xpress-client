@@ -1,13 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
 
 import { Button, Sheet, useC } from '@/components/ui';
 import { grantAiConsent, loadAiConsent, withdrawAiConsent, type AiConsentResult } from '@/lib/aiConsent';
 import {
-  consentAfterReconcile,
-  consentAfterWrite,
   consentFromRead,
   loadingConsent,
+  settleConsentWrite,
   type ConsentRead,
   type ConsentUi,
 } from '@/lib/consentState';
@@ -31,39 +30,39 @@ export function AiConsentSetting({
   const [ui, setUi] = useState<ConsentUi>(loadingConsent());
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const gen = useRef(0);
 
   useEffect(() => {
     if (preview) {
       setUi({ phase: 'known', granted: false, canGrant: true, canWithdraw: false, notice: null });
       return;
     }
-    let cancelled = false;
+    const ticket = ++gen.current;
     setUi(loadingConsent());
     loadAiConsent(eventId).then((result) => {
-      if (!cancelled) setUi(consentFromRead(asRead(result), 'ai'));
+      if (gen.current !== ticket) return;
+      setUi(consentFromRead(asRead(result), 'ai'));
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => { gen.current += 1; };
   }, [eventId, preview, reloadSignal]);
 
   async function write(intent: 'grant' | 'withdraw') {
     if (busy || preview || ui.phase !== 'known') return;
     if (intent === 'grant' && !ui.canGrant) return;
     if (intent === 'withdraw' && (!ui.granted || !ui.canWithdraw)) return;
+    const ticket = ++gen.current;
     setBusy(true);
-    const result = intent === 'grant' ? await grantAiConsent(eventId) : await withdrawAiConsent(eventId);
-    const decided = consentAfterWrite(ui, asRead(result), 'ai', intent);
-    if (!decided.reconcile) {
-      setUi(decided.ui);
-      setBusy(false);
-      setConfirm(false);
-      return;
-    }
-    setUi(decided.ui);
     setConfirm(false);
-    const again = await loadAiConsent(eventId);
-    setUi(consentAfterReconcile(asRead(again), 'ai'));
+    const next = await settleConsentWrite({
+      previous: ui,
+      kind: 'ai',
+      intent,
+      write: async () => asRead(intent === 'grant' ? await grantAiConsent(eventId) : await withdrawAiConsent(eventId)),
+      read: async () => asRead(await loadAiConsent(eventId)),
+      isCurrent: () => gen.current === ticket,
+    });
+    if (gen.current !== ticket) return;
+    if (next) setUi(next);
     setBusy(false);
   }
 
@@ -119,8 +118,11 @@ export function AiConsentSetting({
   );
 
   async function reload() {
+    const ticket = ++gen.current;
     setUi(loadingConsent());
-    setUi(consentFromRead(asRead(await loadAiConsent(eventId)), 'ai'));
+    const result = await loadAiConsent(eventId);
+    if (gen.current !== ticket) return;
+    setUi(consentFromRead(asRead(result), 'ai'));
   }
 }
 

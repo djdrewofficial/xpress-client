@@ -37,7 +37,7 @@ const PHOTO_COUNTS: Opt[] = [
   { value: '3images', label: '3 photos' },
 ];
 
-export function PhotoBoothSection({ eventId, safety }: { eventId: string; safety?: ReactNode }) {
+export function PhotoBoothSection({ eventId, safety, reloadSignal = 0 }: { eventId: string; safety?: ReactNode; reloadSignal?: number }) {
   const c = useC();
   const { width } = useWindowDimensions();
   const { session } = useAuth();
@@ -72,7 +72,7 @@ export function PhotoBoothSection({ eventId, safety }: { eventId: string; safety
       setDesign(sel?.design ?? null);
     })();
     return () => { alive = false; };
-  }, [eventId]);
+  }, [eventId, reloadSignal]);
 
   const loadDesigns = useCallback(
     async (nextPage: number) => {

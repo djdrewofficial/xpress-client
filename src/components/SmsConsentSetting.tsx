@@ -1,12 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
 
 import { useC } from '@/components/ui';
 import {
-  consentAfterReconcile,
-  consentAfterWrite,
   consentFromRead,
   loadingConsent,
+  settleConsentWrite,
   type ConsentRead,
   type ConsentUi,
 } from '@/lib/consentState';
@@ -32,37 +31,38 @@ export function SmsConsentSetting({
   const { t } = useT();
   const [ui, setUi] = useState<ConsentUi>(loadingConsent());
   const [busy, setBusy] = useState(false);
+  const gen = useRef(0);
 
   useEffect(() => {
     if (preview) {
       setUi({ phase: 'known', granted: false, canGrant: true, canWithdraw: false, notice: null });
       return;
     }
-    let cancelled = false;
+    const ticket = ++gen.current;
     setUi(loadingConsent());
     loadSmsConsent().then((result) => {
-      if (!cancelled) setUi(consentFromRead(asRead(result), 'sms'));
+      if (gen.current !== ticket) return;
+      setUi(consentFromRead(asRead(result), 'sms'));
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => { gen.current += 1; };
   }, [preview, reloadSignal]);
 
   async function write(intent: 'grant' | 'withdraw') {
     if (busy || preview || ui.phase !== 'known') return;
     if (intent === 'grant' && !ui.canGrant) return;
     if (intent === 'withdraw' && (!ui.granted || !ui.canWithdraw)) return;
+    const ticket = ++gen.current;
     setBusy(true);
-    const result = intent === 'grant' ? await grantSmsConsent(eventId) : await withdrawSmsConsent(eventId);
-    const decided = consentAfterWrite(ui, asRead(result), 'sms', intent);
-    if (!decided.reconcile) {
-      setUi(decided.ui);
-      setBusy(false);
-      return;
-    }
-    setUi(decided.ui);
-    const again = await loadSmsConsent();
-    setUi(consentAfterReconcile(asRead(again), 'sms'));
+    const next = await settleConsentWrite({
+      previous: ui,
+      kind: 'sms',
+      intent,
+      write: async () => asRead(intent === 'grant' ? await grantSmsConsent(eventId) : await withdrawSmsConsent(eventId)),
+      read: async () => asRead(await loadSmsConsent()),
+      isCurrent: () => gen.current === ticket,
+    });
+    if (gen.current !== ticket) return;
+    if (next) setUi(next);
     setBusy(false);
   }
 
@@ -114,8 +114,11 @@ export function SmsConsentSetting({
   );
 
   async function reload() {
+    const ticket = ++gen.current;
     setUi(loadingConsent());
-    setUi(consentFromRead(asRead(await loadSmsConsent()), 'sms'));
+    const result = await loadSmsConsent();
+    if (gen.current !== ticket) return;
+    setUi(consentFromRead(asRead(result), 'sms'));
   }
 }
 
