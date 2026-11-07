@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Switch, Text, View } from 'react-native';
+import { Pressable, Switch, Text, View } from 'react-native';
 
 import { Button, Sheet, useC } from '@/components/ui';
-import { grantAiConsent, loadAiConsent, withdrawAiConsent } from '@/lib/aiConsent';
+import { grantAiConsent, loadAiConsent, withdrawAiConsent, type AiConsentResult } from '@/lib/aiConsent';
+import {
+  consentAfterReconcile,
+  consentAfterWrite,
+  consentFromRead,
+  loadingConsent,
+  type ConsentRead,
+  type ConsentUi,
+} from '@/lib/consentState';
 import { useT } from '@/lib/i18n';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
 
-type Notice = 'unavailable' | 'blocked' | 'failed' | null;
-
-function noticeFor(status: number, ineligible: boolean): Notice {
-  if (ineligible) return 'blocked';
-  if (status === 503 || status === 0 || status === 400) return 'unavailable';
-  return 'failed';
-}
-
-/** Contract-client host only. Off until GET says this event is granted. */
+/** Contract-client host only. The switch appears only after a server read confirms it. */
 export function AiConsentSetting({
   eventId,
   reloadSignal = 0,
@@ -28,80 +28,47 @@ export function AiConsentSetting({
 }) {
   const c = useC();
   const { t } = useT();
-  const [granted, setGranted] = useState(false);
-  const [canGrant, setCanGrant] = useState(false);
-  const [canWithdraw, setCanWithdraw] = useState(false);
-  const [ready, setReady] = useState(preview);
-  const [notice, setNotice] = useState<Notice>(null);
+  const [ui, setUi] = useState<ConsentUi>(loadingConsent());
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (preview) return;
+    if (preview) {
+      setUi({ phase: 'known', granted: false, canGrant: true, canWithdraw: false, notice: null });
+      return;
+    }
     let cancelled = false;
-    setReady(false);
+    setUi(loadingConsent());
     loadAiConsent(eventId).then((result) => {
-      if (cancelled) return;
-      if (!result.ok) {
-        setGranted(false);
-        setCanGrant(false);
-        setCanWithdraw(false);
-        setNotice(noticeFor(result.status, result.ineligible));
-      } else {
-        apply(result.record);
-      }
-      setReady(true);
+      if (!cancelled) setUi(consentFromRead(asRead(result), 'ai'));
     });
     return () => {
       cancelled = true;
     };
   }, [eventId, preview, reloadSignal]);
 
-  async function turnOff() {
-    if (busy || !granted || !canWithdraw || preview) return;
+  async function write(intent: 'grant' | 'withdraw') {
+    if (busy || preview || ui.phase !== 'known') return;
+    if (intent === 'grant' && !ui.canGrant) return;
+    if (intent === 'withdraw' && (!ui.granted || !ui.canWithdraw)) return;
     setBusy(true);
-    setNotice(null);
-    const result = await withdrawAiConsent(eventId);
-    setBusy(false);
-    if (!result.ok) {
-      setNotice(noticeFor(result.status, result.ineligible));
+    const result = intent === 'grant' ? await grantAiConsent(eventId) : await withdrawAiConsent(eventId);
+    const decided = consentAfterWrite(ui, asRead(result), 'ai', intent);
+    if (!decided.reconcile) {
+      setUi(decided.ui);
+      setBusy(false);
+      setConfirm(false);
       return;
     }
-    if (result.record.granted === false) {
-      apply(result.record);
-      return;
-    }
-    setNotice('failed');
-  }
-
-  async function confirmOn() {
-    if (busy || preview) return;
-    setBusy(true);
-    setNotice(null);
-    const result = await grantAiConsent(eventId);
-    setBusy(false);
+    setUi(decided.ui);
     setConfirm(false);
-    if (!result.ok) {
-      setGranted(false);
-      setNotice(noticeFor(result.status, result.ineligible));
-      return;
-    }
-    if (result.record.granted === true) {
-      apply(result.record);
-      return;
-    }
-    setGranted(false);
-    setNotice(result.record.capability.reason === 'not_contract_client' ? 'blocked' : 'failed');
+    const again = await loadAiConsent(eventId);
+    setUi(consentAfterReconcile(asRead(again), 'ai'));
+    setBusy(false);
   }
 
-  function apply(record: { granted: boolean; capability: { canGrant: boolean; canWithdraw: boolean; reason: string | null } }) {
-    setGranted(record.granted === true);
-    setCanGrant(record.capability.canGrant);
-    setCanWithdraw(record.capability.canWithdraw);
-    setNotice(record.capability.reason === 'not_contract_client' ? 'blocked' : null);
-  }
-
-  const disabled = !ready || busy || notice === 'unavailable' || notice === 'blocked' || (granted ? !canWithdraw : !canGrant);
+  const known = ui.phase === 'known';
+  const disabled = !known || busy || ui.notice === 'blocked' || (ui.granted ? !ui.canWithdraw : !ui.canGrant);
 
   return (
     <View style={[card, Shadow.card, { backgroundColor: c.surface, paddingHorizontal: 14, paddingVertical: 12, gap: 8 }]}>
@@ -110,35 +77,64 @@ export function AiConsentSetting({
       <Text onPress={onPrivacy} style={[Type.footnote, { color: c.accent }]}>
         {t('legal.privacyTitle')}
       </Text>
-      <View style={row}>
-        <Text style={[Type.subhead, { color: c.ink, flex: 1 }]}>{t('ai.toggle')}</Text>
-        <Switch
-          value={granted}
-          disabled={disabled}
-          onValueChange={(next) => {
-            if (disabled) return;
-            if (next) setConfirm(true);
-            else void turnOff();
-          }}
-          trackColor={{ false: c.sunken, true: c.accent }}
-          thumbColor="#ffffff"
-          ios_backgroundColor={c.sunken}
-          accessibilityLabel={t('ai.toggle')}
-        />
-      </View>
-      {notice === 'unavailable' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('ai.unavailable')}</Text> : null}
-      {notice === 'blocked' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('ai.notContractClient')}</Text> : null}
-      {notice === 'failed' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('ai.failed')}</Text> : null}
+      {known ? (
+        <View style={row}>
+          <Text style={[Type.subhead, { color: c.ink, flex: 1 }]}>{t('ai.toggle')}</Text>
+          <Switch
+            value={ui.granted === true}
+            disabled={disabled}
+            onValueChange={(next) => {
+              if (disabled) return;
+              if (next) setConfirm(true);
+              else void write('withdraw');
+            }}
+            trackColor={{ false: c.sunken, true: c.accent }}
+            thumbColor="#ffffff"
+            ios_backgroundColor={c.sunken}
+            accessibilityLabel={t('ai.toggle')}
+          />
+        </View>
+      ) : (
+        <Text style={[Type.footnote, { color: c.ink2 }]}>
+          {ui.phase === 'loading' ? t('ai.checking') : ui.notice === 'unconfirmed' ? t('ai.unconfirmed') : t('ai.unread')}
+        </Text>
+      )}
+      {ui.notice === 'unavailable' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('ai.unavailable')}</Text> : null}
+      {ui.notice === 'blocked' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('ai.notContractClient')}</Text> : null}
+      {ui.notice === 'failed' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('ai.failed')}</Text> : null}
+      {ui.phase === 'unknown' ? (
+        <Pressable onPress={() => void reload()} accessibilityRole="button">
+          <Text style={[Type.footnote, { color: c.accent }]}>{t('common.tryAgain')}</Text>
+        </Pressable>
+      ) : null}
 
       <Sheet visible={confirm} onClose={() => { if (!busy) setConfirm(false); }} title={t('ai.confirmTitle')}>
         <Text style={[Type.footnote, { color: c.ink2 }]}>{t('ai.body')}</Text>
         <View style={{ height: 12 }} />
-        <Button label={busy ? t('ai.saving') : t('ai.allow')} onPress={() => void confirmOn()} disabled={busy} />
+        <Button label={busy ? t('ai.saving') : t('ai.allow')} onPress={() => void write('grant')} disabled={busy} />
         <View style={{ height: 8 }} />
         <Button label={t('ai.notNow')} variant="ghost" onPress={() => setConfirm(false)} disabled={busy} />
       </Sheet>
     </View>
   );
+
+  async function reload() {
+    setUi(loadingConsent());
+    setUi(consentFromRead(asRead(await loadAiConsent(eventId)), 'ai'));
+  }
+}
+
+function asRead(result: AiConsentResult): ConsentRead {
+  if (!result.ok) return { ok: false, status: result.status, ineligible: result.ineligible };
+  return {
+    ok: true,
+    record: {
+      granted: result.record.granted === true,
+      canGrant: result.record.capability.canGrant,
+      canWithdraw: result.record.capability.canWithdraw,
+      reason: result.record.capability.reason,
+    },
+  };
 }
 
 const card = { borderRadius: Radius.lg, gap: 8 };
