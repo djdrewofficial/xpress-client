@@ -16,6 +16,7 @@ import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
 import { blendedProgress, loadOverview, setupMilestones, type Group, type Overview, type SectionRow } from '@/lib/planning';
 import { managesEvent } from '@/lib/membership';
+import { visibleCoverUrl } from '@/lib/moderatedDisplay';
 import { loadEventContent } from '@/lib/moderation';
 import { supabase } from '@/lib/supabase';
 
@@ -61,12 +62,16 @@ export default function HomeScreen() {
     void loadEventContent(event.id).then((res) => {
       if (cancel) return;
       if (!res.ok) {
-        setCoverFromFeed(undefined);
+        setCoverFromFeed(visibleCoverUrl({ ok: false }));
         setCoverAuthor(null);
         return;
       }
       const cover = res.data.coverPhoto;
-      setCoverFromFeed(cover?.hidden ? null : cover?.url ?? null);
+      setCoverFromFeed(visibleCoverUrl({
+        ok: true,
+        url: cover?.url ?? null,
+        hidden: cover?.hidden === true,
+      }));
       setCoverAuthor(cover && !cover.hidden && cover.updatedBy
         ? { userId: cover.updatedBy, label: cover.updatedByLabel }
         : null);
@@ -141,8 +146,8 @@ export default function HomeScreen() {
         <HomeBody
           greeting={greeting(profile?.firstName, locale)}
           eventName={event.name || t('home.yourEventTitle')}
-          coverUrl={coverFromFeed === undefined ? event.cover_photo_url : coverFromFeed}
-          coverActions={(coverFromFeed === undefined ? event.cover_photo_url : coverFromFeed) ? (
+          coverUrl={coverFromFeed ?? null}
+          coverActions={coverFromFeed ? (
             <SafetyLinks
               tone="onDark"
               reportLabel={t('safety.reportCover')}

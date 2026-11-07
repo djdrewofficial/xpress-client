@@ -14,6 +14,7 @@ import { Button, useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { isDoNotPlayTitle, sectionClosedToGuest } from '@/lib/guestSections';
 import { useT } from '@/lib/i18n';
+import { noteSeedFromFeed } from '@/lib/moderatedDisplay';
 import { hideContent, loadEventContent } from '@/lib/moderation';
 import { managesEvent, roleForEvent } from '@/lib/membership';
 import { resolvePreview } from '@/lib/musicSearch';
@@ -42,19 +43,7 @@ type Meta = {
   time_label: string | null;
   time_enabled: boolean;
   locked: boolean;
-  /** Undefined when the section row has no client_notes column yet. */
-  clientNotes?: string | null;
-  /** Undefined when the row has no staff_notes column, or the caller is not staff. */
-  staffNotes?: string | null;
 };
-
-function payloadNote(row: Record<string, unknown> | null, key: string): string | null | undefined {
-  if (!row || !(key in row)) return undefined;
-  const value = row[key];
-  if (typeof value === 'string') return value;
-  if (value == null) return null;
-  return undefined;
-}
 
 export default function SectionScreen() {
   const c = useC();
@@ -74,6 +63,7 @@ export default function SectionScreen() {
   const [answerLabels, setAnswerLabels] = useState<Record<string, string | null>>({});
   const [noteAuthorId, setNoteAuthorId] = useState<string | null>(null);
   const [noteAuthorLabel, setNoteAuthorLabel] = useState<string | null>(null);
+  const [noteSeed, setNoteSeed] = useState<{ skipLoad: boolean; text: string | null }>({ skipLoad: false, text: null });
   const [boothAuthor, setBoothAuthor] = useState<{ userId: string; label: string | null } | null>(null);
   const [momentNo, setMomentNo] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -102,7 +92,7 @@ export default function SectionScreen() {
     if (!id || !eventId) return;
     const guest = roleForEvent(eventId) === 'guest';
     const [{ data: m }, sec, ov] = await Promise.all([
-      supabase.from('planning_sections').select('*').eq('id', id).maybeSingle(),
+      supabase.from('planning_sections').select('id, title, icon, intro, songs_enabled, module, time_label, time_enabled, locked, guest_enabled').eq('id', id).maybeSingle(),
       loadSection(eventId, id),
       loadOverview(eventId),
     ]);
@@ -122,8 +112,6 @@ export default function SectionScreen() {
       time_label: m?.time_label ?? null,
       time_enabled: m?.time_enabled ?? false,
       locked: m?.locked ?? false,
-      clientNotes: payloadNote(sectionRow, 'client_notes'),
-      staffNotes: payloadNote(sectionRow, 'staff_notes'),
     };
     setMeta(nextMeta);
     setQuestions(sec.questions);
@@ -155,17 +143,26 @@ export default function SectionScreen() {
       }
       const labels: Record<string, string | null> = {};
       for (const song of feed.data.songs) labels[song.id] = song.requestedByLabel;
-      const note = feed.data.sectionNotes.find((item) => item.sectionId === sectionKey && !item.hidden);
+      const note = feed.data.sectionNotes.find((item) => item.sectionId === sectionKey) ?? null;
+      const showAuthor = !!note && (!note.hidden || !!note.notes);
       setLikePeople(bySong);
       setSongLabels(labels);
       setAnswerAuthors(authors);
       setAnswerLabels(authorLabels);
-      setNoteAuthorId(note?.updatedBy ?? null);
-      setNoteAuthorLabel(note?.updatedByLabel ?? null);
+      setNoteSeed(noteSeedFromFeed({
+        ok: true,
+        note: note ? { notes: note.notes, hidden: note.hidden } : null,
+      }));
+      setNoteAuthorId(showAuthor ? note?.updatedBy ?? null : null);
+      setNoteAuthorLabel(showAuthor ? note?.updatedByLabel ?? null : null);
       const booth = feed.data.boothSelection;
       setBoothAuthor(booth && !booth.hidden && booth.updatedBy
         ? { userId: booth.updatedBy, label: booth.updatedByLabel }
         : null);
+    } else {
+      setNoteSeed(noteSeedFromFeed({ ok: false }));
+      setNoteAuthorId(null);
+      setNoteAuthorLabel(null);
     }
     setLoading(false);
   }, [id, eventId, session?.user.id]);
@@ -364,8 +361,7 @@ export default function SectionScreen() {
         guestMode={guest}
         onToggleLike={toggleLike}
         notesReadOnly={false}
-        initialNotes={meta.clientNotes}
-        initialStaffNotes={profile?.accountType === 'staff' ? meta.staffNotes : undefined}
+        initialNotes={noteSeed.skipLoad ? noteSeed.text : undefined}
         safety={{
           userId,
           canManage,
