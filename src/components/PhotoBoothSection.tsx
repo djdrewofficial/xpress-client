@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 
-import { Icon, useC } from '@/components/ui';
+import { ContentColumn, Icon, useC } from '@/components/ui';
+import { frameFor } from '@/lib/frame';
 import { Brand, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import {
@@ -128,9 +129,12 @@ export function PhotoBoothSection({ eventId, safety }: { eventId: string; safety
 
   // Two-column grid sized to the screen (the section sits inside a ScrollView,
   // so we lay items out with flex-wrap rather than a nested FlatList).
-  const cardW = Math.floor((width - Space.lg * 2 - GAP) / 2);
+  const frame = frameFor(width);
+  const usable = frame.form === 'tablet' ? frame.contentWidth : width;
+  const cardW = Math.floor((usable - Space.lg * 2 - GAP * (frame.columns - 1)) / frame.columns);
 
   return (
+    <ContentColumn>
     <View style={{ gap: Space.xl }}>
       <View style={[styles.why, { backgroundColor: Brand.purple + '14', borderColor: Brand.purple + '33' }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -272,6 +276,7 @@ export function PhotoBoothSection({ eventId, safety }: { eventId: string; safety
         </Pressable>
       </Modal>
     </View>
+    </ContentColumn>
   );
 }
 

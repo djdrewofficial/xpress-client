@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { frameFor } from '@/lib/frame';
 import { useT } from '@/lib/i18n';
 import { Type } from '@/lib/theme';
 import { Icon, type IconName } from './Icon';
@@ -35,6 +36,8 @@ export function TabBar({
   const c = useC();
   const { t } = useT();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const frame = frameFor(width);
   const bottom = Math.max(insets.bottom, 12);
   const labels = {
     home: t('tab.home'),
@@ -50,6 +53,7 @@ export function TabBar({
     <View
       style={[styles.bar, { backgroundColor: c.surface, borderTopColor: c.line, paddingBottom: bottom }]}
       accessibilityRole="tablist">
+      <View style={[styles.row, frame.form === 'tablet' ? { width: frame.contentWidth, alignSelf: 'center' } : null]}>
       {items.map((tab) => {
         const selected = tab.key === active;
         const color = selected ? c.accent : c.ink3;
@@ -65,11 +69,13 @@ export function TabBar({
           </Pressable>
         );
       })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bar: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8 },
+  bar: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8 },
+  row: { flexDirection: 'row', width: '100%' },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 49 },
 });

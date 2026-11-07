@@ -6,7 +6,7 @@ import { reorderItems, type ReorderableListReorderEvent } from 'react-native-reo
 
 import { SafetyLinks } from '@/components/moderation/SafetyLinks';
 import { useModeration } from '@/components/moderation/useModeration';
-import { useC } from '@/components/ui';
+import { ContentColumn, useC } from '@/components/ui';
 import { AddSectionSheet } from '@/components/AddSectionSheet';
 import { TimePickerSheet } from '@/components/TimePickerSheet';
 import { TimelineBoard, type TimelineArchived, type TimelineChapter, type TimelineMoment } from '@/components/TimelineBoard';
@@ -274,6 +274,7 @@ export default function TimelineScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      <ContentColumn fill>
       <TimelineBoard
         dateLabel={formatTimelineDate(event?.event_date, locale)}
         chapters={chapters}
@@ -325,6 +326,7 @@ export default function TimelineScreen() {
           </View>
         ) : null}
       />
+      </ContentColumn>
       <TimePickerSheet
         visible={timeEditing !== null}
         initial={timeEditing?.timeLabel ?? null}

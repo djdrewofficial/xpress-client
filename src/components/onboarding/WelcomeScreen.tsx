@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { AiConsentSetting } from '@/components/AiConsentSetting';
 import { SmsConsentSetting } from '@/components/SmsConsentSetting';
-import { Button, CountdownHero, LanguageCard, LegalLine, useC, useScheme } from '@/components/ui';
+import { Button, ContentColumn, CountdownHero, LanguageCard, LegalLine, useC, useScheme } from '@/components/ui';
 import { LegalSheet } from '@/components/onboarding/LegalSheet';
 import { coupleDisplayName } from '@/lib/coupleName';
 import { formatEventEyebrow } from '@/lib/eventDate';
@@ -81,6 +81,7 @@ export function WelcomeScreen({
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'bottom']}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, gap: 18 }}>
+        <ContentColumn>
         <View style={{ gap: 8 }}>
           <Text style={[Type.largeTitle, { color: c.ink }]}>
             {nameAt >= 0 ? headline.slice(0, nameAt) : headline}
@@ -132,12 +133,15 @@ export function WelcomeScreen({
           onTerms={() => setSheet('terms')}
           preview={!!preview}
         />
+        </ContentColumn>
       </ScrollView>
 
+      <ContentColumn>
       <View style={{ paddingHorizontal: 20, gap: 12, paddingBottom: 8 }}>
         <LegalLine language={locale} onTerms={() => setSheet('terms')} onPrivacy={() => setSheet('privacy')} />
         <Button label={t('welcome.continue')} onPress={finish} />
       </View>
+      </ContentColumn>
 
       <LegalSheet visible={sheet != null} doc={sheet} onClose={() => setSheet(null)} />
     </SafeAreaView>
