@@ -1,22 +1,10 @@
-import { Linking, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, Icon, Sheet, useC } from '@/components/ui';
-import { useT, type TranslationKey } from '@/lib/i18n';
-import { LEGAL_URLS, type LegalDoc } from '@/lib/legal';
+import { Icon, useC } from '@/components/ui';
+import { useT } from '@/lib/i18n';
+import { legalDocument, type LegalDoc } from '@/lib/legalCopy';
 import { Type } from '@/lib/theme';
-
-const PRIVACY: { title: TranslationKey; body: TranslationKey }[] = [
-  { title: 'legal.collectTitle', body: 'legal.collectBody' },
-  { title: 'legal.useTitle', body: 'legal.useBody' },
-  { title: 'legal.shareTitle', body: 'legal.shareBody' },
-  { title: 'legal.choicesTitle', body: 'legal.choicesBody' },
-];
-
-const TERMS: { title: TranslationKey; body: TranslationKey }[] = [
-  { title: 'legal.termsServiceTitle', body: 'legal.termsServiceBody' },
-  { title: 'legal.termsAccountTitle', body: 'legal.termsAccountBody' },
-  { title: 'legal.termsSmsTitle', body: 'legal.termsSmsBody' },
-];
 
 export function LegalSheet({
   visible,
@@ -28,30 +16,29 @@ export function LegalSheet({
   onClose: () => void;
 }) {
   const c = useC();
-  const { t } = useT();
-  const { height } = useWindowDimensions();
+  const { t, locale } = useT();
+  const insets = useSafeAreaInsets();
   const kind = doc ?? 'privacy';
-  const sections = kind === 'terms' ? TERMS : PRIVACY;
-  const title = kind === 'terms' ? t('legal.termsTitle') : t('legal.privacyTitle');
+  const document = legalDocument(kind, locale);
 
   return (
-    <Sheet visible={visible} onClose={onClose}>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        <Text style={[Type.largeTitle, { color: c.ink, fontSize: 28, lineHeight: 32, flex: 1 }]}>{title}</Text>
-        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
-          <Icon name="close" size={22} color={c.ink2} />
-        </Pressable>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen">
+      <View style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top + 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, paddingHorizontal: 20 }}>
+          <Text style={[Type.largeTitle, { color: c.ink, fontSize: 28, lineHeight: 32, flex: 1 }]}>{document.title}</Text>
+          <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
+            <Icon name="close" size={22} color={c.ink2} />
+          </Pressable>
+        </View>
+        <ScrollView contentContainerStyle={{ gap: 18, paddingHorizontal: 20, paddingTop: 16, paddingBottom: insets.bottom + 28 }}>
+          {document.sections.map((section) => (
+            <View key={section.heading} style={{ gap: 6 }}>
+              <Text style={[Type.headline, { color: c.ink }]}>{section.heading}</Text>
+              <Text style={[Type.body, { color: c.ink2 }]}>{section.body}</Text>
+            </View>
+          ))}
+        </ScrollView>
       </View>
-      <ScrollView style={{ maxHeight: height * 0.55 }} contentContainerStyle={{ gap: 16, paddingTop: 8, paddingBottom: 8 }}>
-        <Text style={[Type.footnote, { color: c.red }]}>{t('legal.placeholder')}</Text>
-        {sections.map((section) => (
-          <View key={section.title} style={{ gap: 4 }}>
-            <Text style={[Type.headline, { color: c.ink }]}>{t(section.title)}</Text>
-            <Text style={[Type.body, { color: c.ink2 }]}>{t(section.body)}</Text>
-          </View>
-        ))}
-        <Button label={t('legal.openWeb')} variant="ghost" onPress={() => Linking.openURL(LEGAL_URLS[kind])} />
-      </ScrollView>
-    </Sheet>
+    </Modal>
   );
 }

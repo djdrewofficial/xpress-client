@@ -1,11 +1,9 @@
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Sheet } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { Type } from '@/lib/theme';
 import { useC } from '@/components/ui/useC';
-
-const SUPPORT_EMAIL = 'Events@xpressdjs.com';
 
 export function DeleteAccountSheet({
   visible,
@@ -26,11 +24,7 @@ export function DeleteAccountSheet({
   const title =
     phase === 'done' ? t('event.deletedTitle') : phase === 'error' ? t('event.deleteError') : t('event.deleteTitle');
   const body =
-    phase === 'done'
-      ? t('event.deletedBody', { email: SUPPORT_EMAIL })
-      : phase === 'error'
-        ? t('event.deleteFailBody', { email: SUPPORT_EMAIL })
-        : t('event.deleteBody', { email: SUPPORT_EMAIL });
+    phase === 'done' ? t('event.deletedBody') : phase === 'error' ? t('event.deleteFailBody') : t('event.deleteBody');
 
   const dismiss = () => {
     if (working) return;
@@ -40,12 +34,14 @@ export function DeleteAccountSheet({
 
   return (
     <Sheet visible={visible} onClose={dismiss} title={title}>
-      <Text style={[Type.footnote, styles.body, { color: c.ink2 }]}>{body}</Text>
+      <ScrollView style={{ maxHeight: 360 }} contentContainerStyle={{ paddingBottom: 8 }}>
+        <Text style={[Type.footnote, styles.body, { color: c.ink2 }]}>{body}</Text>
+      </ScrollView>
       <View style={styles.actions}>
         {phase === 'confirm' || phase === 'working' ? (
           <>
+            <Button label={t('event.keepAccount')} variant="ghost" onPress={onClose} disabled={working} />
             <Button label={working ? t('event.deleting') : t('event.deleteBtn')} onPress={onConfirm} disabled={working} />
-            <Button label={t('common.cancel')} variant="ghost" onPress={onClose} disabled={working} />
             {working ? <ActivityIndicator color={c.red} style={styles.spin} /> : null}
           </>
         ) : (

@@ -4,7 +4,9 @@ import { useRouter } from 'expo-router';
 
 import { AuthFrame } from '@/components/sign-in/AuthFrame';
 import { PasswordField, TextField } from '@/components/sign-in/fields';
-import { Button, useC } from '@/components/ui';
+import { LegalSheet } from '@/components/onboarding/LegalSheet';
+import { Button, PolicyLinks, useC } from '@/components/ui';
+import type { LegalDoc } from '@/lib/legal';
 import { usePendingEventLink } from '@/lib/eventLinks';
 import { resendConfirmation, signInWithEmail, type EmailAuthError } from '@/lib/emailAuth';
 import { useT, type TranslationKey } from '@/lib/i18n';
@@ -47,6 +49,7 @@ export function SignInScreen() {
   const [error, setError] = useState<TranslationKey | null>(null);
   const [notice, setNotice] = useState<TranslationKey | null>(null);
   const [busy, setBusy] = useState<'social' | 'email' | null>(null);
+  const [legal, setLegal] = useState<LegalDoc | null>(null);
 
   function back() {
     setStep('choices');
@@ -145,6 +148,8 @@ export function SignInScreen() {
           <Text style={[Type.subhead, { color: c.ink, textAlign: 'center' }]}>{t('login.create')}</Text>
         </Pressable>
         <Button label={t('login.backChoices')} variant="ghost" onPress={back} disabled={busy != null} />
+        <PolicyLinks onPrivacy={() => setLegal('privacy')} onTerms={() => setLegal('terms')} />
+        <LegalSheet visible={legal != null} doc={legal} onClose={() => setLegal(null)} />
       </AuthFrame>
     );
   }
@@ -158,6 +163,8 @@ export function SignInScreen() {
         <Button label={t('login.choiceGoogle')} variant="ghost" onPress={() => chooseSocial('google')} disabled={busy != null} />
         <Button label={t('login.choiceApple')} variant="ghost" onPress={() => chooseSocial('apple')} disabled={busy != null} />
       </View>
+      <PolicyLinks note onPrivacy={() => setLegal('privacy')} onTerms={() => setLegal('terms')} />
+      <LegalSheet visible={legal != null} doc={legal} onClose={() => setLegal(null)} />
     </AuthFrame>
   );
 }

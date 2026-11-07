@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 
-import { Icon, useC } from '@/components/ui';
+import { ContentColumn, Icon, useC } from '@/components/ui';
+import { frameFor } from '@/lib/frame';
 import { Brand, Radius, Shadow, Space } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import {
@@ -37,7 +38,7 @@ const PHOTO_COUNTS: Opt[] = [
   { value: '3images', label: '3 photos' },
 ];
 
-export function PhotoBoothSection({ eventId }: { eventId: string }) {
+export function PhotoBoothSection({ eventId, safety, reloadSignal = 0 }: { eventId: string; safety?: ReactNode; reloadSignal?: number }) {
   const c = useC();
   const { width } = useWindowDimensions();
   const { session } = useAuth();
@@ -72,7 +73,7 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
       setDesign(sel?.design ?? null);
     })();
     return () => { alive = false; };
-  }, [eventId]);
+  }, [eventId, reloadSignal]);
 
   const loadDesigns = useCallback(
     async (nextPage: number) => {
@@ -128,9 +129,12 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
 
   // Two-column grid sized to the screen (the section sits inside a ScrollView,
   // so we lay items out with flex-wrap rather than a nested FlatList).
-  const cardW = Math.floor((width - Space.lg * 2 - GAP) / 2);
+  const frame = frameFor(width);
+  const usable = frame.form === 'tablet' ? frame.contentWidth : width;
+  const cardW = Math.floor((usable - Space.lg * 2 - GAP * (frame.columns - 1)) / frame.columns);
 
   return (
+    <ContentColumn>
     <View style={{ gap: Space.xl }}>
       <View style={[styles.why, { backgroundColor: Brand.purple + '14', borderColor: Brand.purple + '33' }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -140,6 +144,7 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
         <Text style={{ color: c.textSecondary, fontSize: 13, lineHeight: 19 }}>
           Browse our backdrops and photo-strip designs, then tap to pick your favorites. Your choices go straight to our team.
         </Text>
+        {safety && (backdropId || design) ? safety : null}
       </View>
 
       {/* ── Backdrops ── */}
@@ -271,6 +276,7 @@ export function PhotoBoothSection({ eventId }: { eventId: string }) {
         </Pressable>
       </Modal>
     </View>
+    </ContentColumn>
   );
 }
 

@@ -5,7 +5,9 @@ import { useRouter } from 'expo-router';
 import { AuthFrame } from '@/components/sign-in/AuthFrame';
 import { PasswordField, TextField } from '@/components/sign-in/fields';
 import { SocialButtons } from '@/components/sign-in/SocialButtons';
-import { Button, useC } from '@/components/ui';
+import { LegalSheet } from '@/components/onboarding/LegalSheet';
+import { Button, PolicyLinks, useC } from '@/components/ui';
+import type { LegalDoc } from '@/lib/legal';
 import { usePendingEventLink } from '@/lib/eventLinks';
 import { signUpWithEmail, type EmailAuthError } from '@/lib/emailAuth';
 import { useT, type TranslationKey } from '@/lib/i18n';
@@ -38,6 +40,7 @@ export function SignUpScreen() {
   const [error, setError] = useState<TranslationKey | null>(null);
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [legal, setLegal] = useState<LegalDoc | null>(null);
 
   async function submit() {
     if (busy) return;
@@ -60,6 +63,8 @@ export function SignUpScreen() {
     return (
       <AuthFrame title={t('signup.checkTitle')} subtitle={t('signup.checkBody', { email: email.trim() })}>
         <Button label={t('signup.back')} onPress={() => router.replace('/login')} />
+        <PolicyLinks onPrivacy={() => setLegal('privacy')} onTerms={() => setLegal('terms')} />
+        <LegalSheet visible={legal != null} doc={legal} onClose={() => setLegal(null)} />
       </AuthFrame>
     );
   }
@@ -116,6 +121,8 @@ export function SignUpScreen() {
           setError(key);
         }}
       />
+      <PolicyLinks note onPrivacy={() => setLegal('privacy')} onTerms={() => setLegal('terms')} />
+      <LegalSheet visible={legal != null} doc={legal} onClose={() => setLegal(null)} />
     </AuthFrame>
   );
 }

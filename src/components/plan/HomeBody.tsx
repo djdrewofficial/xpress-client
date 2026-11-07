@@ -1,9 +1,10 @@
+import type { ReactNode } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, CountdownHero, EmojiIcon, Icon, useC } from '@/components/ui';
+import { Button, ContentColumn, CountdownHero, EmojiIcon, Icon, useC } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { Brand, Fonts, Gradients, Radius, Shadow, Space, Type } from '@/lib/theme';
 
@@ -44,6 +45,7 @@ export function HomeBody({
   refreshing,
   onRefresh,
   emptyMessage,
+  coverActions,
 }: {
   greeting: string;
   eventName: string;
@@ -62,6 +64,7 @@ export function HomeBody({
   refreshing?: boolean;
   onRefresh?: () => void;
   emptyMessage?: string | null;
+  coverActions?: ReactNode;
 }) {
   const c = useC();
   const { t, locale } = useT();
@@ -85,6 +88,7 @@ export function HomeBody({
           locations={[0, 0.45, 1]}
           style={StyleSheet.absoluteFill}
         />
+        <ContentColumn>
         <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 20 }}>
           <Text style={[Type.overline, { color: Gradients.countdownHero.glow }]}>{greeting}</Text>
           <Pressable
@@ -99,15 +103,20 @@ export function HomeBody({
             {canSwitch ? <Icon name="chev-d" size={18} color="#fff" /> : null}
           </Pressable>
         </View>
+        </ContentColumn>
         <View style={{ flex: 1 }} />
+        <ContentColumn>
         <View style={{ paddingHorizontal: 20, paddingBottom: 36 }}>
           {date ? (
             <CountdownHero bare size="compact" date={date} dateLabel={dateLabel} venue={venue} progress={progress} locale={locale} />
           ) : null}
+          {coverUrl && coverActions ? <View style={{ marginTop: 12 }}>{coverActions}</View> : null}
         </View>
+        </ContentColumn>
       </View>
 
       <View style={[styles.sheet, { backgroundColor: c.bg }]}>
+        <ContentColumn>
         {emptyMessage ? (
           <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
             <Text style={[Type.callout, { color: c.ink2 }]}>{emptyMessage}</Text>
@@ -173,6 +182,7 @@ export function HomeBody({
             </View>
           </>
         )}
+        </ContentColumn>
       </View>
     </ScrollView>
   );
