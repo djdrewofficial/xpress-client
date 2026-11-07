@@ -16,7 +16,7 @@ import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
 import { blendedProgress, loadOverview, setupMilestones, type Group, type Overview, type SectionRow } from '@/lib/planning';
 import { managesEvent } from '@/lib/membership';
-import { visibleCoverUrl } from '@/lib/moderatedDisplay';
+import { coverFromFeed as applyCoverFeed, coverOnScope, type CoverView } from '@/lib/moderatedDisplay';
 import { loadEventContent } from '@/lib/moderation';
 import { supabase } from '@/lib/supabase';
 
@@ -34,9 +34,11 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showTour, setShowTour] = useState(false);
   const [switcher, setSwitcher] = useState(false);
-  const [coverFromFeed, setCoverFromFeed] = useState<string | null | undefined>(undefined);
+  const [coverFromFeed, setCoverFromFeed] = useState<string | null>(null);
   const [coverAuthor, setCoverAuthor] = useState<{ userId: string; label: string | null } | null>(null);
   const [coverTick, setCoverTick] = useState(0);
+  const coverView = useRef<CoverView>({ eventId: null, url: null, author: null });
+  const coverGen = useRef(0);
   const tourChecked = useRef(false);
   const moderation = useModeration(event?.id ?? null, () => setCoverTick((n) => n + 1));
 
@@ -54,29 +56,30 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    if (!event?.id) {
-      setCoverFromFeed(undefined);
-      return;
-    }
-    let cancel = false;
-    void loadEventContent(event.id).then((res) => {
-      if (cancel) return;
-      if (!res.ok) {
-        setCoverFromFeed(visibleCoverUrl({ ok: false }));
-        setCoverAuthor(null);
-        return;
-      }
-      const cover = res.data.coverPhoto;
-      setCoverFromFeed(visibleCoverUrl({
-        ok: true,
-        url: cover?.url ?? null,
-        hidden: cover?.hidden === true,
-      }));
-      setCoverAuthor(cover && !cover.hidden && cover.updatedBy
-        ? { userId: cover.updatedBy, label: cover.updatedByLabel }
-        : null);
+    const eventId = event?.id ?? null;
+    const ticket = ++coverGen.current;
+    const cleared = coverOnScope(coverView.current, eventId);
+    coverView.current = cleared;
+    setCoverFromFeed(cleared.url);
+    setCoverAuthor(cleared.author);
+    if (!eventId) return;
+    void loadEventContent(eventId).then((res) => {
+      if (coverGen.current !== ticket) return;
+      const cover = res.ok ? res.data.coverPhoto : null;
+      const next = applyCoverFeed(coverView.current, { eventId, active: true }, res.ok
+        ? {
+            ok: true,
+            url: cover?.url ?? null,
+            hidden: cover?.hidden === true,
+            updatedBy: cover?.updatedBy ?? null,
+            updatedByLabel: cover?.updatedByLabel ?? null,
+          }
+        : { ok: false });
+      coverView.current = next;
+      setCoverFromFeed(next.url);
+      setCoverAuthor(next.author);
     });
-    return () => { cancel = true; };
+    return () => { coverGen.current += 1; };
   }, [event?.id, coverTick]);
 
   const load = useCallback(async () => {
@@ -84,8 +87,16 @@ export default function HomeScreen() {
     setLoading(false);
   }, [event]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
-  const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+  useFocusEffect(useCallback(() => {
+    load();
+    setCoverTick((n) => n + 1);
+  }, [load]));
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setCoverTick((n) => n + 1);
+    setRefreshing(false);
+  }, [load]);
 
   useEffect(() => {
     let cancelled = false;

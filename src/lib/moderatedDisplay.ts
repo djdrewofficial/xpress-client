@@ -32,3 +32,34 @@ export function visibleCoverUrl(
   if (!feed.ok || feed.hidden) return null;
   return feed.url;
 }
+
+export type CoverAuthor = { userId: string; label: string | null };
+
+export type CoverView = {
+  eventId: string | null;
+  url: string | null;
+  author: CoverAuthor | null;
+};
+
+/** Drop the previous event's photo as soon as the open event changes. A refresh of the same event keeps the current photo until the new read returns. */
+export function coverOnScope(previous: CoverView, eventId: string | null): CoverView {
+  if (previous.eventId === eventId) return previous;
+  return { eventId, url: null, author: null };
+}
+
+export type CoverFeed =
+  | { ok: true; url: string | null; hidden: boolean; updatedBy: string | null; updatedByLabel: string | null }
+  | { ok: false };
+
+/** Ignore a response that belongs to an older event or an unmounted request. */
+export function coverFromFeed(
+  current: CoverView,
+  request: { eventId: string | null; active: boolean },
+  feed: CoverFeed,
+): CoverView {
+  if (!request.active || current.eventId !== request.eventId) return current;
+  if (!feed.ok) return { eventId: request.eventId, url: null, author: null };
+  const url = visibleCoverUrl(feed);
+  const author = url && feed.updatedBy ? { userId: feed.updatedBy, label: feed.updatedByLabel } : null;
+  return { eventId: request.eventId, url, author };
+}
