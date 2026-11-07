@@ -102,7 +102,7 @@ const phaseEn = {
 
   'welcome.hello': 'Welcome',
   'welcome.helloNames': 'Welcome, {{names}}',
-  'welcome.sub': 'Plan your event with Xpress. Save song requests, answer planning questions and coordinate with your event team. Information in shared event sections is available to authorized participants and staff. Cover photos use public links.',
+  'welcome.sub': 'Plan your event with Xpress DJs. Save song requests, answer planning questions and coordinate with your event team. Information in shared event sections is available to authorized participants and staff. Cover photos use public links.',
   'welcome.langPrompt': 'English or Español?',
   'welcome.english': 'English',
   'welcome.spanish': 'Español',
@@ -240,7 +240,7 @@ const phaseEs: Record<keyof typeof phaseEn, string> = {
 
   'welcome.hello': 'Bienvenidos',
   'welcome.helloNames': 'Bienvenidos, {{names}}',
-  'welcome.sub': 'Planifique su evento con Xpress. Guarde solicitudes de canciones, responda preguntas y coordínese con su equipo. La información de las secciones compartidas está disponible para participantes autorizados y personal. Las portadas utilizan enlaces públicos.',
+  'welcome.sub': 'Planifique su evento con Xpress DJs. Guarde solicitudes de canciones, responda preguntas y coordínese con su equipo. La información de las secciones compartidas está disponible para participantes autorizados y personal. Las portadas utilizan enlaces públicos.',
   'welcome.langPrompt': '¿Inglés o Español?',
   'welcome.english': 'Inglés',
   'welcome.spanish': 'Español',

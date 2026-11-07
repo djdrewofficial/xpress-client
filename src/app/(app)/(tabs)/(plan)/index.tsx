@@ -4,6 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { SafetyLinks } from '@/components/moderation/SafetyLinks';
+import { useModeration } from '@/components/moderation/useModeration';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { EventSwitcher } from '@/components/EventSwitcher';
 import { HomeBody } from '@/components/plan/HomeBody';
@@ -13,6 +15,9 @@ import { useT } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
 import { blendedProgress, loadOverview, setupMilestones, type Group, type Overview, type SectionRow } from '@/lib/planning';
+import { managesEvent } from '@/lib/membership';
+import { coverFromFeed as applyCoverFeed, coverOnScope, type CoverView } from '@/lib/moderatedDisplay';
+import { loadEventContent } from '@/lib/moderation';
 import { supabase } from '@/lib/supabase';
 
 const TOUR_KEY = 'onboarding_seen_v1';
@@ -21,7 +26,7 @@ export default function HomeScreen() {
   const c = useC();
   const { t, locale } = useT();
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const { event, events, loading: eventLoading } = useEvent();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [venue, setVenue] = useState<string | null>(null);
@@ -29,7 +34,13 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showTour, setShowTour] = useState(false);
   const [switcher, setSwitcher] = useState(false);
+  const [coverFromFeed, setCoverFromFeed] = useState<string | null>(null);
+  const [coverAuthor, setCoverAuthor] = useState<{ userId: string; label: string | null } | null>(null);
+  const [coverTick, setCoverTick] = useState(0);
+  const coverView = useRef<CoverView>({ eventId: null, url: null, author: null });
+  const coverGen = useRef(0);
   const tourChecked = useRef(false);
+  const moderation = useModeration(event?.id ?? null, () => setCoverTick((n) => n + 1));
 
   // Couples finish Welcome in OnboardingGate, which marks this seen.
   // If the flag is still empty (staff opening an event, or an interrupted
@@ -44,13 +55,48 @@ export default function HomeScreen() {
     AsyncStorage.setItem(TOUR_KEY, '1').catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const eventId = event?.id ?? null;
+    const ticket = ++coverGen.current;
+    const cleared = coverOnScope(coverView.current, eventId);
+    coverView.current = cleared;
+    setCoverFromFeed(cleared.url);
+    setCoverAuthor(cleared.author);
+    if (!eventId) return;
+    void loadEventContent(eventId).then((res) => {
+      if (coverGen.current !== ticket) return;
+      const cover = res.ok ? res.data.coverPhoto : null;
+      const next = applyCoverFeed(coverView.current, { eventId, active: true }, res.ok
+        ? {
+            ok: true,
+            url: cover?.url ?? null,
+            hidden: cover?.hidden === true,
+            updatedBy: cover?.updatedBy ?? null,
+            updatedByLabel: cover?.updatedByLabel ?? null,
+          }
+        : { ok: false });
+      coverView.current = next;
+      setCoverFromFeed(next.url);
+      setCoverAuthor(next.author);
+    });
+    return () => { coverGen.current += 1; };
+  }, [event?.id, coverTick]);
+
   const load = useCallback(async () => {
     setOverview(event ? await loadOverview(event.id) : null);
     setLoading(false);
   }, [event]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
-  const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+  useFocusEffect(useCallback(() => {
+    load();
+    setCoverTick((n) => n + 1);
+  }, [load]));
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setCoverTick((n) => n + 1);
+    setRefreshing(false);
+  }, [load]);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,7 +157,28 @@ export default function HomeScreen() {
         <HomeBody
           greeting={greeting(profile?.firstName, locale)}
           eventName={event.name || t('home.yourEventTitle')}
-          coverUrl={event.cover_photo_url}
+          coverUrl={coverFromFeed ?? null}
+          coverActions={coverFromFeed ? (
+            <SafetyLinks
+              tone="onDark"
+              reportLabel={t('safety.reportCover')}
+              onReport={() => moderation.openReport({ targetType: 'cover_photo', targetId: event.id })}
+              hideLabel={t('safety.remove')}
+              onHide={() => moderation.askHide({ targetType: 'cover_photo', targetId: event.id })}
+              blockLabel={coverAuthor && coverAuthor.userId !== session?.user.id
+                ? (coverAuthor.label ? t('safety.blockNamed', { name: coverAuthor.label }) : t('safety.block'))
+                : undefined}
+              onBlock={coverAuthor && coverAuthor.userId !== session?.user.id
+                ? () => moderation.askBlock(coverAuthor.userId, coverAuthor.label)
+                : undefined}
+              guestLabel={managesEvent(event, profile?.accountType) && coverAuthor && coverAuthor.userId !== session?.user.id
+                ? (coverAuthor.label ? t('safety.removeGuestNamed', { name: coverAuthor.label }) : t('safety.removeGuest'))
+                : undefined}
+              onRemoveGuest={managesEvent(event, profile?.accountType) && coverAuthor && coverAuthor.userId !== session?.user.id
+                ? () => moderation.askRemoveGuest(coverAuthor.userId, coverAuthor.label)
+                : undefined}
+            />
+          ) : null}
           date={event.event_date}
           dateLabel={event.event_date ? heroDateLabel(event.event_date, locale) : undefined}
           venue={venue}
@@ -149,6 +216,7 @@ export default function HomeScreen() {
       )}
       <OnboardingTour visible={showTour} onClose={closeTour} />
       {events.length > 1 ? <EventSwitcher visible={switcher} onClose={() => setSwitcher(false)} /> : null}
+      {moderation.sheet}
     </View>
   );
 }

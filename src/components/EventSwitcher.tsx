@@ -1,5 +1,4 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { Icon, Sheet, useC } from '@/components/ui';
@@ -48,11 +47,7 @@ export function EventSwitchSheet({
               onPress={() => onSelect(e)}
               style={[styles.row, { backgroundColor: active ? c.accentTint : c.surface2 }]}>
               <View style={styles.thumb}>
-                {e.cover_photo_url ? (
-                  <Image source={{ uri: e.cover_photo_url }} style={StyleSheet.absoluteFill} contentFit="cover" />
-                ) : (
-                  <LinearGradient colors={[Brand.purple, Brand.purpleLight]} style={StyleSheet.absoluteFill} />
-                )}
+                <LinearGradient colors={[Brand.purple, Brand.purpleLight]} style={StyleSheet.absoluteFill} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text numberOfLines={1} style={[styles.name, { color: c.ink }]}>{e.name || t('home.yourEventTitle')}</Text>
