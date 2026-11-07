@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Logo } from '@/components/Logo';
-import { Icon, LanguageCard, NavBar, useC, type IconName } from '@/components/ui';
+import { ContentColumn, Icon, LanguageCard, NavBar, useC, type IconName } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { Brand, Fonts, Radius, Shadow, Space, Type } from '@/lib/theme';
 import type { AppLanguage } from '@/lib/language';
@@ -137,6 +137,7 @@ export function MyEventView({
           paddingHorizontal: 20,
           gap: 22,
         }}>
+        <ContentColumn>
         <View style={{ gap: 2 }}>
           {eyebrow ? (
             <Pressable onPress={onSwitch} disabled={!onSwitch} style={styles.eyebrowRow}>
@@ -354,6 +355,7 @@ export function MyEventView({
         <View style={styles.logo}>
           <Logo variant="full" height={28} />
         </View>
+        </ContentColumn>
       </ScrollView>
     </View>
   );

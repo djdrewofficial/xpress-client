@@ -6,6 +6,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
   Button,
+  ContentColumn,
   EmojiIcon,
   Icon,
   NavBar,
@@ -217,6 +218,7 @@ export function MomentBody({
         />
       </SafeAreaView>
 
+      <ContentColumn fill>
       <KeyboardAwareScrollView
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: bottom ? 24 : 48, gap: 16 }}
         keyboardShouldPersistTaps="handled"
@@ -305,6 +307,7 @@ export function MomentBody({
           <Button label={bottom.label} arrow={bottom.arrow || undefined} onPress={bottom.onPress} />
         </View>
       ) : null}
+      </ContentColumn>
 
       <Sheet visible={menu != null} onClose={() => setMenu(null)} title={menu?.title}>
         {menu ? (

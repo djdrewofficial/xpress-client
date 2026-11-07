@@ -3,6 +3,7 @@ import { Alert, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { MusicRecord } from '@/components/music/MusicRecord';
+import { ContentColumn } from '@/components/ui';
 import { useAddMusic } from '@/components/music/AddMusicSheet';
 import { buildMusicRecord, defaultMoment, type MusicMoment } from '@/components/music/model';
 import { EventSwitcher } from '@/components/EventSwitcher';
@@ -70,6 +71,7 @@ export default function MusicScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      <ContentColumn fill>
       <MusicRecord
         moments={moments ?? []}
         loading={eventLoading || moments === null}
@@ -80,6 +82,7 @@ export default function MusicScreen() {
         onSearch={() => requireMoment((moment) => music.open({ sectionId: moment.id, segment: 'search' }))}
         onSwitchEvent={canSwitch ? () => (isStaff ? router.push('/events') : setSwitcher(true)) : undefined}
       />
+      </ContentColumn>
       {music.sheet}
       {events.length > 1 ? <EventSwitcher visible={switcher} onClose={() => setSwitcher(false)} /> : null}
     </View>

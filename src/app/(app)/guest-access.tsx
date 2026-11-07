@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, Vie
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, useC } from '@/components/ui';
+import { ContentColumn, Icon, useC } from '@/components/ui';
 import { listGuestAccess, setGuestAccess, type GuestAccessSection } from '@/lib/guestSections';
 import { useT } from '@/lib/i18n';
 import { Radius, Type } from '@/lib/theme';
@@ -53,6 +53,7 @@ export default function GuestAccessScreen() {
         <Text style={[Type.largeTitle, { color: c.ink, flex: 1 }]}>{t('links.access')}</Text>
       </View>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 24, gap: 12 }}>
+        <ContentColumn>
         <Text style={[Type.body, { color: c.ink2 }]}>{t('links.accessHelp')}</Text>
         {sections == null ? <ActivityIndicator color={c.accent} /> : null}
         {notice ? <Text style={[Type.footnote, { color: c.redInk }]}>{notice}</Text> : null}
@@ -69,6 +70,7 @@ export default function GuestAccessScreen() {
             </View>
           ))}
         </View>
+        </ContentColumn>
       </ScrollView>
     </View>
   );
