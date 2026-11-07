@@ -96,3 +96,49 @@ test('a definite server refusal keeps the last known switch', () => {
   assert.equal(decided.ui.granted, true);
   assert.equal(decided.ui.notice, 'unavailable');
 });
+
+test('an AI save error before commit keeps the last known switch', () => {
+  const decided = consentAfterWrite(knownOff, { ok: false, status: 500, ineligible: false }, 'ai', 'grant');
+  assert.equal(decided.reconcile, false);
+  assert.equal(decided.ui.granted, false);
+  assert.equal(decided.ui.notice, 'failed');
+});
+
+test('SMS 503 on grant is pre-write and stays the known off choice', () => {
+  const decided = consentAfterWrite(knownOff, { ok: false, status: 503, ineligible: false }, 'sms', 'grant');
+  assert.equal(decided.reconcile, false);
+  assert.equal(decided.ui.phase, 'known');
+  assert.equal(decided.ui.granted, false);
+  assert.equal(decided.ui.notice, 'unavailable');
+});
+
+test('AI 503 after a grant is a committed save whose read failed', () => {
+  const decided = consentAfterWrite(knownOff, { ok: false, status: 503, ineligible: false }, 'ai', 'grant');
+  assert.equal(decided.reconcile, true);
+  assert.equal(decided.ui.phase, 'unknown');
+  assert.equal(decided.ui.granted, null);
+  assert.notEqual(decided.ui.granted, false);
+});
+
+test('AI 503 after a withdrawal is a committed save whose read failed', () => {
+  const decided = consentAfterWrite(knownOn, { ok: false, status: 503, ineligible: false }, 'ai', 'withdraw');
+  assert.equal(decided.reconcile, true);
+  assert.equal(decided.ui.phase, 'unknown');
+  assert.equal(decided.ui.granted, null);
+  assert.notEqual(decided.ui.granted, true);
+});
+
+test('a later unavailable read does not restore the stale switch', () => {
+  const afterGrant = consentAfterWrite(knownOff, { ok: false, status: 503, ineligible: false }, 'ai', 'grant');
+  const reread = consentAfterReconcile({ ok: false, status: 503, ineligible: false }, 'ai');
+  assert.equal(afterGrant.reconcile, true);
+  assert.equal(reread.phase, 'unknown');
+  assert.equal(reread.granted, null);
+  assert.equal(reread.notice, 'unconfirmed');
+
+  const afterWithdraw = consentAfterWrite(knownOn, { ok: false, status: 503, ineligible: false }, 'ai', 'withdraw');
+  const rereadWithdraw = consentAfterReconcile({ ok: false, status: 503, ineligible: false }, 'ai');
+  assert.equal(afterWithdraw.reconcile, true);
+  assert.equal(rereadWithdraw.granted, null);
+  assert.notEqual(rereadWithdraw.granted, true);
+});

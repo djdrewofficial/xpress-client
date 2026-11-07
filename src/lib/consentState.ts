@@ -67,10 +67,18 @@ export function consentFromRead(result: ConsentRead, kind: ConsentKind): Consent
 }
 
 /**
- * Status 0 means the app got no response. The server may already have saved the
- * change, so the switch must not be shown as off and the copy must not say nothing was recorded.
+ * A missing response (status 0) may already be saved.
+ * AI consent saves first, then reads the row back. A 503 from that read means the
+ * grant or withdrawal is already committed, so it is unconfirmed until GET succeeds.
+ * SMS returns 503 before it writes, when the table is missing, so that 503 keeps
+ * the last known switch and does not pretend the choice changed.
  * `reconcile` means the caller should GET and then use `consentAfterReconcile`.
  */
+function writeMayHaveCommitted(kind: ConsentKind, status: number): boolean {
+  if (status === 0) return true;
+  return kind === 'ai' && status === 503;
+}
+
 export function consentAfterWrite(
   previous: ConsentUi,
   result: ConsentRead,
@@ -78,7 +86,7 @@ export function consentAfterWrite(
   intent: 'grant' | 'withdraw',
 ): { ui: ConsentUi; reconcile: boolean } {
   if (!result.ok) {
-    if (result.status === 0) {
+    if (writeMayHaveCommitted(kind, result.status)) {
       return {
         ui: { phase: 'unknown', granted: null, canGrant: false, canWithdraw: false, notice: 'unconfirmed' },
         reconcile: true,
