@@ -11,7 +11,7 @@ import {
   useReorderableDrag,
 } from 'react-native-reorderable-list';
 
-import { CoachMark, EmojiIcon, Icon, ListCell, MomentRow, Sheet, useC } from '@/components/ui';
+import { CoachMark, EmojiIcon, FocusedStatusBar, Icon, ListCell, MomentRow, Sheet, useC } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { Fonts, Radius, Shadow, Space, Status, Type } from '@/lib/theme';
 
@@ -118,7 +118,8 @@ export function TimelineBoard({
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <View style={{ paddingTop: Math.max(insets.top, 12), paddingHorizontal: 20, paddingBottom: 8 }}>
+      <FocusedStatusBar />
+      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 20, paddingBottom: 8 }}>
         {dateLabel ? (
           <Text style={[Type.overline, { color: c.red, letterSpacing: 1.6 }]} numberOfLines={1}>
             {dateLabel}
@@ -470,7 +471,7 @@ function splitClock(time?: string | null): { main: string; suffix: string | null
 }
 
 const styles = StyleSheet.create({
-  titleRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
   plus: {
     width: 40,
     height: 40,

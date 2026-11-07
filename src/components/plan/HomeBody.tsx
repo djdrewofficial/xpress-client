@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, ContentColumn, CountdownHero, EmojiIcon, Icon, useC } from '@/components/ui';
+import { Button, ContentColumn, CountdownHero, EmojiIcon, FocusedStatusBar, Icon, useC } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { Brand, Fonts, Gradients, Radius, Shadow, Space, Type } from '@/lib/theme';
 
@@ -77,6 +77,7 @@ export function HomeBody({
       refreshControl={
         onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={c.accent} /> : undefined
       }>
+      <FocusedStatusBar variant="hero" />
       <View style={styles.hero}>
         {coverUrl ? (
           <Image source={{ uri: coverUrl }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
@@ -104,9 +105,8 @@ export function HomeBody({
           </Pressable>
         </View>
         </ContentColumn>
-        <View style={{ flex: 1 }} />
         <ContentColumn>
-        <View style={{ paddingHorizontal: 20, paddingBottom: 36 }}>
+        <View style={{ paddingHorizontal: 20, paddingBottom: 36, marginTop: 32 }}>
           {date ? (
             <CountdownHero bare size="compact" date={date} dateLabel={dateLabel} venue={venue} progress={progress} locale={locale} />
           ) : null}
@@ -117,6 +117,7 @@ export function HomeBody({
 
       <View style={[styles.sheet, { backgroundColor: c.bg }]}>
         <ContentColumn>
+        <View style={styles.stack}>
         {emptyMessage ? (
           <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
             <Text style={[Type.callout, { color: c.ink2 }]}>{emptyMessage}</Text>
@@ -182,6 +183,7 @@ export function HomeBody({
             </View>
           </>
         )}
+        </View>
         </ContentColumn>
       </View>
     </ScrollView>
@@ -189,8 +191,10 @@ export function HomeBody({
 }
 
 const styles = StyleSheet.create({
-  hero: { minHeight: 400 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  // Content height, not a 400pt minimum. The old minimum plus a flex spacer
+  // opened a large empty band between the title and the date.
+  hero: {},
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
   eventName: { fontFamily: Fonts.display, fontSize: 34, lineHeight: 38, color: '#fff' },
   sheet: {
     marginTop: -28,
@@ -198,8 +202,11 @@ const styles = StyleSheet.create({
     borderTopRightRadius: Radius.xl,
     paddingHorizontal: 20,
     paddingTop: 20,
-    gap: 18,
   },
+  // Gap lives here. The sheet's only child is the centered column, so a gap
+  // on the sheet never separated the resume card from the chapter label.
+  // 24pt clears the card shadow so the label is not crowded against it.
+  stack: { gap: 24 },
   card: { borderRadius: Radius.lg, padding: 16 },
   resumeRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   bubble: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },

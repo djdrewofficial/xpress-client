@@ -52,19 +52,24 @@ export function TimePickerSheet({
       </View>
 
       {Platform.OS === 'ios' ? (
-        <DateTimePicker
-          mode="time"
-          display="spinner"
-          locale={localeTag(locale)}
-          value={date}
-          minuteInterval={5}
-          themeVariant={scheme}
-          textColor={c.ink}
-          onChange={(_event, next) => {
-            if (next) setDate(next);
-          }}
-          style={{ height: 216 }}
-        />
+        // The native wheel reports a compact width and draws the columns and
+        // the selection highlight inside it. Stretched across the sheet, that
+        // block stays on the leading edge. Center the picker itself.
+        <View style={styles.pickerWell}>
+          <DateTimePicker
+            mode="time"
+            display="spinner"
+            locale={localeTag(locale)}
+            value={date}
+            minuteInterval={5}
+            themeVariant={scheme}
+            textColor={c.ink}
+            onChange={(_event, next) => {
+              if (next) setDate(next);
+            }}
+            style={styles.picker}
+          />
+        </View>
       ) : (
         <TimeWheel date={date} onChange={setDate} />
       )}
@@ -172,6 +177,8 @@ function WheelColumn({ items, selected, onSelect }: { items: string[]; selected:
 
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 8 },
+  pickerWell: { width: '100%', alignItems: 'center' },
+  picker: { height: 216, alignSelf: 'center' },
   wheel: { height: ROW * 5, justifyContent: 'center', marginVertical: 8 },
   selection: { position: 'absolute', left: 0, right: 0, height: ROW, borderRadius: 12 },
   cols: { flexDirection: 'row', justifyContent: 'center', gap: 8 },

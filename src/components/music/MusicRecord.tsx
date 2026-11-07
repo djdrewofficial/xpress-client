@@ -2,7 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, TrackRow, useC } from '@/components/ui';
+import { FocusedStatusBar, Icon, TrackRow, useC } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
 import {
@@ -68,7 +68,8 @@ export function MusicRecord({
 
   return (
     <View style={{ flex: 1, minHeight: 0, backgroundColor: c.bg }}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <FocusedStatusBar />
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <View style={{ flex: 1 }}>
           <Text style={[Type.overline, { color: c.red }]}>{t('record.eyebrow')}</Text>
           <Pressable
@@ -219,7 +220,7 @@ function MomentBlock({ moment, onOpen, onAdd }: { moment: MusicMoment; onOpen: (
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 20, paddingBottom: 12, gap: 12 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
   search: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   card: { borderRadius: Radius.lg, padding: 18, overflow: 'hidden', minHeight: 228 },
   vinyl: { position: 'absolute', right: -36, top: -8 },
