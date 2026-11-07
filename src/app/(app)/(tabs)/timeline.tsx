@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -96,6 +96,8 @@ export default function TimelineScreen() {
   const [addingGroup, setAddingGroup] = useState<{ id: string; title: string } | null>(null);
   const [plannerFile, setPlannerFile] = useState<{ id: string; name: string | null; uploadedBy: string | null; uploadedByLabel: string | null } | null>(null);
   const [fileTick, setFileTick] = useState(0);
+  const fileGen = useRef(0);
+  const fileEvent = useRef<string | null>(null);
 
   const canManage = managesEvent(event, profile?.accountType);
   const moderation = useModeration(eventId, () => setFileTick((n) => n + 1));
@@ -129,14 +131,16 @@ export default function TimelineScreen() {
   }, [load]));
 
   useEffect(() => {
-    if (!eventId) {
+    const ticket = ++fileGen.current;
+    const scope = eventId ?? null;
+    if (fileEvent.current !== scope) {
+      fileEvent.current = scope;
       setPlannerFile(null);
-      return;
     }
-    let cancel = false;
+    if (!eventId) return;
     void (async () => {
       const feed = await loadEventContent(eventId);
-      if (cancel) return;
+      if (fileGen.current !== ticket) return;
       if (feed.ok) {
         const file = feed.data.timelineFile;
         setPlannerFile(file && !file.hidden && file.id
@@ -145,10 +149,10 @@ export default function TimelineScreen() {
         return;
       }
       const legacy = await getPlannerTimeline(eventId);
-      if (cancel) return;
+      if (fileGen.current !== ticket) return;
       setPlannerFile(legacy ? { id: legacy.id, name: legacy.name, uploadedBy: null, uploadedByLabel: null } : null);
     })();
-    return () => { cancel = true; };
+    return () => { fileGen.current += 1; };
   }, [eventId, fileTick]);
 
   // First visit, per signed-in user. Guests have no plus, so they never see it.

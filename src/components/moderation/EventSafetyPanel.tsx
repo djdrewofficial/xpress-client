@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 import { useC } from '@/components/ui';
@@ -34,23 +35,37 @@ export function EventSafetyPanel({
   const [blocked, setBlocked] = useState<ModerationPerson[]>([]);
   const [content, setContent] = useState<EventContent | null>(null);
   const [tick, setTick] = useState(0);
+  const seenEvent = useRef(eventId);
   const moderation = useModeration(eventId, () => setTick((n) => n + 1));
 
   const load = useCallback(async () => {
     const [blocks, feed] = await Promise.all([listBlocks(eventId), loadEventContent(eventId)]);
-    if (!blocks.ok && blocks.kind === 'unavailable') setNotice('unavailable');
-    else if (!feed.ok && feed.kind === 'unavailable') setNotice('unavailable');
-    else setNotice(!blocks.ok && !feed.ok ? blocks.kind : null);
-    setBlockedIds(blocks.ok ? blocks.data.blockedUserIds : []);
-    setBlocked(blocks.ok ? blocks.data.blocked : []);
-    setContent(feed.ok ? feed.data : null);
-    setLoading(false);
+    return { blocks, feed };
   }, [eventId]);
 
+  useFocusEffect(useCallback(() => { setTick((n) => n + 1); }, []));
+
   useEffect(() => {
+    let cancel = false;
+    if (seenEvent.current !== eventId) {
+      seenEvent.current = eventId;
+      setContent(null);
+      setBlocked([]);
+      setBlockedIds([]);
+    }
     setLoading(true);
-    void load();
-  }, [load, reloadSignal, tick]);
+    void load().then(({ blocks, feed }) => {
+      if (cancel) return;
+      if (!blocks.ok && blocks.kind === 'unavailable') setNotice('unavailable');
+      else if (!feed.ok && feed.kind === 'unavailable') setNotice('unavailable');
+      else setNotice(!blocks.ok && !feed.ok ? blocks.kind : null);
+      setBlockedIds(blocks.ok ? blocks.data.blockedUserIds : []);
+      setBlocked(blocks.ok ? blocks.data.blocked : []);
+      setContent(feed.ok ? feed.data : null);
+      setLoading(false);
+    });
+    return () => { cancel = true; };
+  }, [load, reloadSignal, tick, eventId]);
 
   const visible = (hidden: boolean) => !hidden;
   const songs = content?.songs.filter((song) => visible(song.hidden)) ?? [];
