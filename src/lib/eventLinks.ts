@@ -34,13 +34,13 @@ const TOKEN = /^[A-Za-z0-9_-]{22}$/;
  */
 export async function redeemEventLink(token: string): Promise<{ ok: true; data: RedeemedEventLink } | MobileFailure> {
   const clean = token.trim();
-  if (!TOKEN.test(clean)) return { ok: false, status: 400, error: '', retryAfter: null };
+  if (!TOKEN.test(clean)) return { ok: false, status: 400, error: '', retryAfter: null, payload: null };
   const result = await mobileJson('POST', '/api/mobile/join-link/redeem', { token: clean });
   if (!result.ok) return result;
   const record = asRecord(result.data);
   const eventId = typeof record.eventId === 'string' ? record.eventId : '';
   const role = record.role === 'host' || record.role === 'guest' ? record.role : null;
-  if (!eventId || !role) return { ok: false, status: 500, error: '', retryAfter: null };
+  if (!eventId || !role) return { ok: false, status: 500, error: '', retryAfter: null, payload: null };
   return { ok: true, data: { eventId, role, alreadyMember: record.alreadyMember === true } };
 }
 
@@ -58,7 +58,7 @@ export async function resetJoinLink(eventId: string, role: JoinRole): Promise<{ 
   const result = await mobileJson('POST', `/api/mobile/events/${encodeURIComponent(eventId)}/join-links/reset`, { role });
   if (!result.ok) return result;
   const link = parseLink(result.data);
-  if (!link) return { ok: false, status: 500, error: '', retryAfter: null };
+  if (!link) return { ok: false, status: 500, error: '', retryAfter: null, payload: null };
   return { ok: true, link };
 }
 

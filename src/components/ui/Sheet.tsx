@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { frameFor } from '@/lib/frame';
 import { Radius, Type } from '@/lib/theme';
 import { useC } from './useC';
 
@@ -23,11 +24,24 @@ export function Sheet({
 }) {
   const c = useC();
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const frame = frameFor(width);
+  const wide = frame.sheetWidth != null;
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={styles.scrim} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
         <Pressable
-          style={[styles.sheet, { backgroundColor: c.surface, paddingBottom: Math.max(insets.bottom, 16) }]}
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: c.surface,
+              paddingBottom: Math.max(insets.bottom, 16),
+              width: wide ? frame.sheetWidth! : '100%',
+              maxHeight: height * 0.85,
+              marginBottom: wide ? Math.max(insets.bottom, 24) : 0,
+              borderRadius: wide ? Radius.xl : undefined,
+            },
+          ]}
           onPress={(e) => e.stopPropagation()}>
           <View style={[styles.handle, { backgroundColor: c.ink3 }]} />
           {title ? <Text style={[Type.headline, { color: c.ink, marginBottom: 12 }]}>{title}</Text> : null}

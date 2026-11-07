@@ -7,18 +7,20 @@ export type MobileFailure = {
   status: number;
   error: string;
   retryAfter: number | null;
+  /** Response JSON, including capability on a 403. Null when there was no response. */
+  payload: unknown;
 };
 
 export type MobileResult<T = unknown> = { ok: true; data: T } | MobileFailure;
 
 /** JSON call to XOS /api/mobile. Uses authorizedFetch so a 401 refreshes once. */
 export async function mobileJson(
-  method: 'GET' | 'POST' | 'PUT',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   path: string,
   body?: Record<string, unknown>,
 ): Promise<MobileResult> {
   const base = apiBase();
-  if (!base) return { ok: false, status: 0, error: '', retryAfter: null };
+  if (!base) return { ok: false, status: 0, error: '', retryAfter: null, payload: null };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
@@ -36,11 +38,12 @@ export async function mobileJson(
         status: res.status,
         error: typeof record.error === 'string' ? record.error : '',
         retryAfter: retryAfterSeconds(res),
+        payload: json,
       };
     }
     return { ok: true, data: json as never };
   } catch {
-    return { ok: false, status: 0, error: '', retryAfter: null };
+    return { ok: false, status: 0, error: '', retryAfter: null, payload: null };
   } finally {
     clearTimeout(timer);
   }

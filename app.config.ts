@@ -17,7 +17,7 @@ function googleIosUrlScheme(): string {
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: config.name ?? 'Xpress Entertainment',
+  name: config.name ?? 'Xpress DJs',
   slug: config.slug ?? 'xpress-client',
   plugins: [
     ...(config.plugins ?? []),

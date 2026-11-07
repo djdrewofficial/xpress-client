@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 
 import { Logo } from '@/components/Logo';
+import { ContentColumn } from '@/components/ui';
 import { MovingBlobs } from '@/components/MovingBlobs';
 import { useC } from '@/components/ui';
 import { useT } from '@/lib/i18n';
@@ -63,6 +64,7 @@ export function AuthFrame({
           </SafeAreaView>
         </View>
         <View style={[styles.panel, { backgroundColor: c.bg, paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <ContentColumn fill>
           <ScrollView
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
@@ -74,6 +76,7 @@ export function AuthFrame({
             {children}
             {footer}
           </ScrollView>
+          </ContentColumn>
         </View>
       </KeyboardAvoidingView>
     </View>
