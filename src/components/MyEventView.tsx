@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Logo } from '@/components/Logo';
-import { ContentColumn, Icon, LanguageCard, NavBar, useC, type IconName } from '@/components/ui';
+import { ContentColumn, FocusedStatusBar, Icon, LanguageCard, NavBar, useC, type IconName } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { Brand, Fonts, Radius, Shadow, Space, Type } from '@/lib/theme';
 import type { AppLanguage } from '@/lib/language';
@@ -118,6 +118,7 @@ export function MyEventView({
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <FocusedStatusBar />
       {compact ? (
         <View style={[styles.compact, { paddingTop: insets.top, backgroundColor: c.bg, borderBottomColor: c.line }]}>
           <NavBar
@@ -132,13 +133,13 @@ export function MyEventView({
         scrollEventThrottle={16}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
         contentContainerStyle={{
-          paddingTop: insets.top + 8,
+          paddingTop: insets.top + 16,
           paddingBottom: insets.bottom + 120,
           paddingHorizontal: 20,
           gap: 22,
         }}>
         <ContentColumn>
-        <View style={{ gap: 2 }}>
+        <View style={{ gap: 12 }}>
           {eyebrow ? (
             <Pressable onPress={onSwitch} disabled={!onSwitch} style={styles.eyebrowRow}>
               <Text style={[Type.overline, styles.eyebrow, { color: c.red }]} numberOfLines={1}>

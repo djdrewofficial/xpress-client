@@ -29,7 +29,7 @@ export function Sheet({
   const wide = frame.sheetWidth != null;
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable style={styles.scrim} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
+      <Pressable style={[styles.scrim, wide && styles.scrimWide]} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
         <Pressable
           style={[
             styles.sheet,
@@ -54,6 +54,7 @@ export function Sheet({
 
 const styles = StyleSheet.create({
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  scrimWide: { alignItems: 'center' },
   sheet: {
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,

@@ -28,6 +28,7 @@ export { TrackRow } from './TrackRow';
 export { ListCell } from './ListCell';
 export { Sheet } from './Sheet';
 export { ContentColumn } from './ContentColumn';
+export { FocusedStatusBar } from './FocusedStatusBar';
 export { CoachMark } from './CoachMark';
 export { CodeInput } from './CodeInput';
 export { LanguageCard } from './LanguageCard';

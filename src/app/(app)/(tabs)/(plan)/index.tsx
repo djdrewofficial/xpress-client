@@ -2,8 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-
 import { SafetyLinks } from '@/components/moderation/SafetyLinks';
 import { useModeration } from '@/components/moderation/useModeration';
 import { OnboardingTour } from '@/components/OnboardingTour';
@@ -138,7 +136,6 @@ export default function HomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <StatusBar style="light" />
       {!event ? (
         <HomeBody
           greeting={greeting(profile?.firstName, locale)}
