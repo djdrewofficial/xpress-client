@@ -20,14 +20,13 @@ const supabaseAuth: AuthExchange = {
   exchangeCodeForSession: (code) => supabase.auth.exchangeCodeForSession(code),
   verifyOtp: (args) => supabase.auth.verifyOtp(args),
   getSession: () => supabase.auth.getSession(),
-  setSession: (tokens) => supabase.auth.setSession(tokens),
 };
 
 /**
  * Join links are stashed and redeemed after a session exists.
  * Recovery links exchange a code or token hash. A recovery outcome is the only
  * one that opens the new-password screen, and only for the user id it established.
- * Implicit tokens never replace a session that is already on this device.
+ * access_token fragments are ignored. They are not a sign-in path.
  */
 export async function adoptIncomingUrl(url: string, client: AuthExchange = supabaseAuth): Promise<AdoptOutcome> {
   const joinToken = tokenFromJoinUrl(url);

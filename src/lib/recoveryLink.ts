@@ -52,9 +52,6 @@ export type AuthExchange = {
     error: { message?: string; code?: string } | null;
   }>;
   getSession(): Promise<{ data: { session: object | null } }>;
-  setSession(tokens: { access_token: string; refresh_token: string }): Promise<{
-    error: { message?: string; code?: string } | null;
-  }>;
 };
 
 export function recoveryRedirectUrl(): string {
@@ -195,6 +192,9 @@ export function classifyAuthUrl(input: string): AuthLink {
 export async function applyAuthLink(link: AuthLink, client: AuthExchange): Promise<AuthAdoptResult> {
   if (link.kind === 'none') return 'ignored';
   if (link.kind === 'failed') return 'expired';
+  // Password recovery uses a token hash. Sign-in uses a PKCE code or an ID token.
+  // An access_token fragment is not one of those, signed in or out, on any path.
+  if (link.mode === 'implicit') return 'ignored';
   const recovery = expectsRecovery(link.path, link.type);
   try {
     if (link.mode === 'code' && link.code) {
@@ -206,19 +206,6 @@ export async function applyAuthLink(link: AuthLink, client: AuthExchange): Promi
       const { data, error } = await client.verifyOtp({ token_hash: link.tokenHash, type: link.type });
       if (error || !data.session) return recovery ? 'expired' : 'ignored';
       return link.type === 'recovery' || link.path === 'reset' ? 'recovery' : 'session';
-    }
-    if (link.mode === 'implicit' && link.accessToken && link.refreshToken) {
-      const existing = await client.getSession();
-      // A link can carry any tokens. Never replace the session already on this device,
-      // and never adopt tokens that are not on an auth route.
-      if (existing.data.session) return 'ignored';
-      if (link.path !== 'reset' && link.path !== 'confirm' && link.path !== 'set-password') return 'ignored';
-      const { error } = await client.setSession({
-        access_token: link.accessToken,
-        refresh_token: link.refreshToken,
-      });
-      if (error) return recovery ? 'expired' : 'ignored';
-      return recovery ? 'recovery' : 'session';
     }
   } catch {
     return recovery ? 'expired' : 'ignored';

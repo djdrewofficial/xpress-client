@@ -13,7 +13,6 @@ import {
   recoveryTemplateHref,
   startAuthAdopt,
   type AuthExchange,
-  type AuthLink,
 } from './recoveryLink.ts';
 
 const HTTPS_RESET = 'https://xos.xpressdjs.com/auth/reset';
@@ -40,10 +39,6 @@ function client(partial: Partial<AuthExchange> = {}): AuthExchange & {
     getSession: async () => {
       calls.push('getSession');
       return { data: { session: null } };
-    },
-    setSession: async () => {
-      calls.push('setSession');
-      return { error: null };
     },
     ...partial,
     calls,
@@ -238,87 +233,37 @@ test('an expired query does not call the auth client', async () => {
   assert.deepEqual(fake.calls, []);
 });
 
-test('implicit recovery leaves the live session in place', async () => {
-  const link = classifyAuthUrl(
+test('signed-out auth-route fragments are not adopted', async () => {
+  const fragments = [
+    'xpressclient://auth/reset#access_token=access-fixture&refresh_token=refresh-fixture',
+    'xpressclient://auth/reset#access_token=access-fixture&refresh_token=refresh-fixture&type=recovery',
     'xpressclient:///auth/reset#access_token=access-fixture&refresh_token=refresh-fixture&type=recovery',
-  );
-  const calls: string[] = [];
-  const fake = client({
-    getSession: async () => {
-      calls.push('getSession');
-      return { data: { session: { user: { id: 'staff-user' } } } };
-    },
-    setSession: async () => {
-      calls.push('setSession');
-      return { error: null };
-    },
-  });
-  assert.equal(await applyAuthLink(link, fake), 'ignored');
-  assert.deepEqual(calls, ['getSession']);
+    'xpressclient://auth/confirm#access_token=access-fixture&refresh_token=refresh-fixture',
+    'xpressclient://auth/confirm#access_token=access-fixture&refresh_token=refresh-fixture&type=signup',
+    'xpressclient://auth/set-password#access_token=access-fixture&refresh_token=refresh-fixture',
+    'xpressclient://auth/set-password#access_token=access-fixture&refresh_token=refresh-fixture&type=recovery',
+  ];
+  for (const url of fragments) {
+    const fake = client();
+    const link = classifyAuthUrl(url);
+    assert.equal(link.kind, 'credentials', url);
+    if (link.kind !== 'credentials') continue;
+    assert.equal(link.mode, 'implicit', url);
+    assert.equal(await applyAuthLink(link, fake), 'ignored', url);
+    assert.deepEqual(fake.calls, [], url);
+  }
 });
 
-test('an arbitrary implicit URL does not replace a live session', async () => {
-  const link = classifyAuthUrl(
-    'xpressclient://attacker#access_token=attacker-access&refresh_token=attacker-refresh&type=recovery',
-  );
-  const calls: string[] = [];
-  const fake = client({
-    getSession: async () => {
-      calls.push('getSession');
-      return { data: { session: { user: { id: 'staff-user' } } } };
-    },
-    setSession: async () => {
-      calls.push('setSession');
-      return { error: null };
-    },
+test('a non-route fragment is a separate rejection from a signed-in session', async () => {
+  const url = 'xpressclient://attacker#access_token=attacker-access&refresh_token=attacker-refresh&type=recovery';
+  const signedOut = client();
+  assert.equal(await applyAuthLink(classifyAuthUrl(url), signedOut), 'ignored');
+  assert.deepEqual(signedOut.calls, []);
+  const signedIn = client({
+    getSession: async () => ({ data: { session: { user: { id: 'staff-user' } } } }),
   });
-  assert.equal(await applyAuthLink(link, fake), 'ignored');
-  assert.deepEqual(calls, ['getSession']);
-});
-
-test('an arbitrary implicit URL is not adopted when signed out', async () => {
-  const link = classifyAuthUrl(
-    'xpressclient://attacker#access_token=attacker-access&refresh_token=attacker-refresh',
-  );
-  const calls: string[] = [];
-  const fake = client({
-    getSession: async () => {
-      calls.push('getSession');
-      return { data: { session: null } };
-    },
-    setSession: async () => {
-      calls.push('setSession');
-      return { error: null };
-    },
-  });
-  assert.equal(await applyAuthLink(link, fake), 'ignored');
-  assert.deepEqual(calls, ['getSession']);
-});
-
-test('a non-recovery implicit link does not replace a live session', async () => {
-  const link: AuthLink = {
-    kind: 'credentials',
-    path: 'confirm',
-    mode: 'implicit',
-    code: null,
-    tokenHash: null,
-    accessToken: 'access-fixture',
-    refreshToken: 'refresh-fixture',
-    type: 'signup',
-  };
-  const calls: string[] = [];
-  const fake = client({
-    getSession: async () => {
-      calls.push('getSession');
-      return { data: { session: session() } };
-    },
-    setSession: async () => {
-      calls.push('setSession');
-      return { error: null };
-    },
-  });
-  assert.equal(await applyAuthLink(link, fake), 'ignored');
-  assert.deepEqual(calls, ['getSession']);
+  assert.equal(await applyAuthLink(classifyAuthUrl(url), signedIn), 'ignored');
+  assert.deepEqual(signedIn.calls, []);
 });
 
 test('new password rules reject a mismatch, a short value, and a missing number', () => {
