@@ -9,12 +9,14 @@ import {
   finishAuthAdopt,
   isRecoverySessionFailure,
   recoveryRedirectUrl,
+  recoveryTemplateHref,
   startAuthAdopt,
   type AuthExchange,
   type AuthLink,
 } from './recoveryLink.ts';
 
-const REDIRECT = 'https://xos.xpressdjs.com/auth/reset';
+const HTTPS_RESET = 'https://xos.xpressdjs.com/auth/reset';
+const TRIPLE_SLASH = 'xpressclient:///auth/reset';
 
 function session() {
   return { user: { id: 'fixture-user' } };
@@ -47,12 +49,25 @@ function client(partial: Partial<AuthExchange> = {}): AuthExchange & {
   };
 }
 
-test('recovery redirect is the https universal link, not a custom scheme', () => {
-  assert.equal(recoveryRedirectUrl(), REDIRECT);
+test('recovery redirect is the allow-listed double-slash URL', () => {
+  assert.equal(recoveryRedirectUrl(), 'xpressclient://auth/reset');
+  assert.notEqual(recoveryRedirectUrl(), TRIPLE_SLASH);
+  assert.notEqual(recoveryRedirectUrl(), HTTPS_RESET);
+});
+
+test('the saved template href on that redirect is a token-hash recovery', () => {
+  const link = classifyAuthUrl(recoveryTemplateHref('hash-fixture'));
+  assert.equal(link.kind, 'credentials');
+  if (link.kind !== 'credentials') return;
+  assert.equal(link.mode, 'otp');
+  assert.equal(link.path, 'reset');
+  assert.equal(link.tokenHash, 'hash-fixture');
+  assert.equal(link.type, 'recovery');
+  assert.equal(recoveryTemplateHref('hash-fixture'), 'xpressclient://auth/reset?token_hash=hash-fixture&type=recovery');
 });
 
 test('classifies a token hash recovery link on the associated host', () => {
-  const link = classifyAuthUrl(`${REDIRECT}?token_hash=hash-fixture&type=recovery`);
+  const link = classifyAuthUrl(`${HTTPS_RESET}?token_hash=hash-fixture&type=recovery`);
   assert.equal(link.kind, 'credentials');
   if (link.kind !== 'credentials') return;
   assert.equal(link.mode, 'otp');
@@ -88,15 +103,42 @@ test('classifies an implicit recovery fragment', () => {
 
 test('expired and used links are failures, including plus-encoded descriptions', () => {
   assert.equal(
-    classifyAuthUrl(`${REDIRECT}?error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired`).kind,
+    classifyAuthUrl(`${HTTPS_RESET}?error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired`).kind,
     'failed',
   );
   assert.equal(classifyAuthUrl('xpressclient:///auth/reset?error_code=flow_state_expired').kind, 'failed');
-  assert.equal(classifyAuthUrl(`${REDIRECT}?error_code=flow_state_not_found`).kind, 'failed');
+  assert.equal(classifyAuthUrl(`${HTTPS_RESET}?error_code=flow_state_not_found`).kind, 'failed');
 });
 
 test('a reset path with no credentials is a failed link', () => {
-  assert.equal(classifyAuthUrl(REDIRECT).kind, 'failed');
+  assert.equal(classifyAuthUrl(HTTPS_RESET).kind, 'failed');
+  assert.equal(classifyAuthUrl('xpressclient://auth/reset').kind, 'failed');
+});
+
+test('the site-root fallback is not the reset route', () => {
+  const link = classifyAuthUrl('https://xos.xpressdjs.com?token_hash=hash-fixture&type=recovery');
+  assert.equal(link.kind, 'credentials');
+  if (link.kind !== 'credentials') return;
+  assert.equal(link.path, null);
+  assert.equal(link.mode, 'otp');
+  assert.equal(link.type, 'recovery');
+});
+
+test('the allow-listed set-password page is a recovery token hash', async () => {
+  const link = classifyAuthUrl('https://xos.xpressdjs.com/auth/set-password?token_hash=hash-fixture&type=recovery');
+  assert.equal(link.kind, 'credentials');
+  if (link.kind !== 'credentials') return;
+  assert.equal(link.path, 'set-password');
+  assert.equal(link.type, 'recovery');
+  assert.equal(await applyAuthLink(link, client()), 'recovery');
+});
+
+test('a triple-slash token hash is still a reset link if it arrives', () => {
+  const link = classifyAuthUrl(`${TRIPLE_SLASH}?token_hash=hash-fixture&type=recovery`);
+  assert.equal(link.kind, 'credentials');
+  if (link.kind !== 'credentials') return;
+  assert.equal(link.path, 'reset');
+  assert.equal(link.mode, 'otp');
 });
 
 test('join links and other hosts are not auth callbacks', () => {
@@ -114,14 +156,14 @@ test('a confirmation code is not a password recovery', () => {
 });
 
 test('PKCE redirectType recovery opens the new-password flow when the URL omits type', async () => {
-  const link = classifyAuthUrl(`${REDIRECT}?code=code-fixture`);
+  const link = classifyAuthUrl(`${HTTPS_RESET}?code=code-fixture`);
   const fake = client();
   assert.equal(await applyAuthLink(link, fake), 'recovery');
   assert.deepEqual(fake.calls, ['exchange']);
 });
 
 test('a stored signup redirect is a normal session even on the reset path', async () => {
-  const link = classifyAuthUrl(`${REDIRECT}?code=code-fixture`);
+  const link = classifyAuthUrl(`${HTTPS_RESET}?code=code-fixture`);
   const fake = client({
     exchangeCodeForSession: async () => ({ data: { session: session(), redirectType: 'signup' }, error: null }),
   });
@@ -137,7 +179,7 @@ test('a confirmation code exchange is a session, not a recovery', async () => {
 });
 
 test('a used or missing recovery code does not become a session', async () => {
-  const link = classifyAuthUrl(`${REDIRECT}?code=code-fixture`);
+  const link = classifyAuthUrl(`${HTTPS_RESET}?code=code-fixture`);
   const calls: string[] = [];
   const fake = client({
     exchangeCodeForSession: async () => {
@@ -161,7 +203,7 @@ test('a failed confirmation code stays ignored', async () => {
 });
 
 test('token hash recovery verifies and a rejected hash stays expired', async () => {
-  const link = classifyAuthUrl(`${REDIRECT}?token_hash=hash-fixture&type=recovery`);
+  const link = classifyAuthUrl(`${HTTPS_RESET}?token_hash=hash-fixture&type=recovery`);
   const ok = client();
   assert.equal(await applyAuthLink(link, ok), 'recovery');
   assert.deepEqual(ok.calls, ['verify']);
@@ -173,7 +215,7 @@ test('token hash recovery verifies and a rejected hash stays expired', async () 
 });
 
 test('a reset token hash without a type is still recovery', async () => {
-  const link = classifyAuthUrl(`${REDIRECT}?token_hash=hash-fixture`);
+  const link = classifyAuthUrl(`${HTTPS_RESET}?token_hash=hash-fixture`);
   assert.equal(link.kind, 'credentials');
   if (link.kind === 'credentials') assert.equal(link.type, 'recovery');
   const fake = client();
@@ -181,7 +223,7 @@ test('a reset token hash without a type is still recovery', async () => {
 });
 
 test('an expired query does not call the auth client', async () => {
-  const link = classifyAuthUrl(`${REDIRECT}?error_code=otp_expired`);
+  const link = classifyAuthUrl(`${HTTPS_RESET}?error_code=otp_expired`);
   const fake = client();
   assert.equal(await applyAuthLink(link, fake), 'expired');
   assert.deepEqual(fake.calls, []);

@@ -1,14 +1,23 @@
 /**
- * Password recovery has to come back to an https URL on the associated domain.
- * TestFlight builds otherwise send Supabase `xpressclient:///auth/reset`
- * (`Linking.createURL`). The email button is an https verify link, and iOS Mail
- * drops the redirect into that custom scheme, so the tap never opens the app.
+ * The saved recovery template is
+ * `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery`.
+ * GoTrue keeps RedirectTo only when it matches the Site URL origin or the
+ * redirect allow list. The allow list has `xpressclient://auth/reset`.
+ * `Linking.createURL('auth/reset')` emits `xpressclient:///auth/reset`, which
+ * does not match, so GoTrue substitutes Site URL `https://xos.xpressdjs.com`
+ * and the email opens the website.
  *
- * The app still accepts the custom scheme, a `?code=` PKCE redirect, and a
- * `token_hash` link. Join links are not auth callbacks.
+ * Request the allow-listed double-slash URL with no query. The template adds
+ * the token hash. Incoming https reset links, the triple-slash form, and
+ * PKCE codes are still accepted. Join links are not auth callbacks.
  */
 
-export const RECOVERY_REDIRECT_URL = 'https://xos.xpressdjs.com/auth/reset';
+export const RECOVERY_REDIRECT_URL = 'xpressclient://auth/reset';
+
+/** Build the saved template's href for a fixture hash. No network call. */
+export function recoveryTemplateHref(tokenHash: string): string {
+  return `${RECOVERY_REDIRECT_URL}?token_hash=${encodeURIComponent(tokenHash)}&type=recovery`;
+}
 
 const AUTH_HOST = 'xos.xpressdjs.com';
 const APP_SCHEME = 'xpressclient';
