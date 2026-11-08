@@ -1,6 +1,5 @@
-import { Component, useEffect, useState, type ReactNode } from 'react';
+import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Stack, useRouter, useSegments, type ErrorBoundaryProps } from 'expo-router';
-import * as Linking from 'expo-linking';
 import { LogBox, Pressable, ScrollView, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -15,7 +14,9 @@ import {
 } from '@expo-google-fonts/montserrat';
 
 import { adoptIncomingUrl } from '@/lib/authCallback';
+import { subscribeAuthUrls } from '@/lib/authLinkQueue';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { finishAuthAdopt, startAuthAdopt } from '@/lib/recoveryLink';
 import { LocaleProvider } from '@/lib/i18n';
 import { BrandSplash } from '@/components/BrandSplash';
 import { patchTextFonts } from '@/lib/fontPatch';
@@ -82,24 +83,32 @@ class RootBoundary extends Component<{ children: ReactNode }, { error: unknown }
   }
 }
 
+const adoptedUrls = new Set<string>();
+
 function IncomingLinks() {
   const { markPasswordReset } = useAuth();
+  const router = useRouter();
+  const markReset = useRef(markPasswordReset);
+  const routerRef = useRef(router);
+  markReset.current = markPasswordReset;
+  routerRef.current = router;
   useEffect(() => {
-    let cancelled = false;
-    const handle = async (url: string | null) => {
-      if (!url || cancelled) return;
-      const result = await adoptIncomingUrl(url);
-      if (!cancelled && result === 'recovery') markPasswordReset();
+    const handle = async (url: string) => {
+      if (adoptedUrls.has(url)) return;
+      adoptedUrls.add(url);
+      startAuthAdopt();
+      try {
+        const result = await adoptIncomingUrl(url);
+        if (result.status === 'recovery' && result.userId) markReset.current(result.userId);
+        if (result.status === 'expired') routerRef.current.replace('/auth/reset');
+      } finally {
+        finishAuthAdopt();
+      }
     };
-    Linking.getInitialURL().then(handle).catch(() => {});
-    const sub = Linking.addEventListener('url', (event) => {
-      handle(event.url);
+    return subscribeAuthUrls((url) => {
+      handle(url).catch(() => {});
     });
-    return () => {
-      cancelled = true;
-      sub.remove();
-    };
-  }, [markPasswordReset]);
+  }, []);
   return null;
 }
 

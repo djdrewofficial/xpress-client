@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useT } from '@/lib/i18n';
+import { authAdoptInflight, subscribeAuthAdopt } from '@/lib/recoveryLink';
 import { Type } from '@/lib/theme';
 
 /**
@@ -16,9 +17,12 @@ export default function SetPasswordScreen() {
   const c = useC();
   const { t } = useT();
   const { session, loading, pendingPasswordReset } = useAuth();
+  const [adopting, setAdopting] = useState(() => authAdoptInflight());
+
+  useEffect(() => subscribeAuthAdopt(() => setAdopting(authAdoptInflight())), []);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || adopting) return;
     if (pendingPasswordReset) {
       router.replace('/auth/reset');
       return;
@@ -29,7 +33,7 @@ export default function SetPasswordScreen() {
     }
     const timer = setTimeout(() => router.replace('/login'), 4000);
     return () => clearTimeout(timer);
-  }, [loading, session, pendingPasswordReset, router]);
+  }, [loading, adopting, session, pendingPasswordReset, router]);
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
