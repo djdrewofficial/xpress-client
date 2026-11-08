@@ -16,7 +16,7 @@ import {
 import { adoptIncomingUrl } from '@/lib/authCallback';
 import { subscribeAuthUrls } from '@/lib/authLinkQueue';
 import { AuthProvider, useAuth } from '@/lib/auth';
-import { rootAuthDestination } from '@/lib/recoveryGate';
+import { resetNavigationAction, rootAuthDestination } from '@/lib/recoveryGate';
 import { finishAuthAdopt, startAuthAdopt } from '@/lib/recoveryLink';
 import { LocaleProvider } from '@/lib/i18n';
 import { BrandSplash } from '@/components/BrandSplash';
@@ -86,13 +86,29 @@ class RootBoundary extends Component<{ children: ReactNode }, { error: unknown }
 
 const adoptedUrls = new Set<string>();
 
+let queuedReset = false;
+const resetQueue = new Set<() => void>();
+
+function queueResetScreen() {
+  queuedReset = true;
+  resetQueue.forEach((notify) => notify());
+}
+
+function clearQueuedReset() {
+  queuedReset = false;
+}
+
+function subscribeResetQueue(notify: () => void) {
+  resetQueue.add(notify);
+  return () => {
+    resetQueue.delete(notify);
+  };
+}
+
 function IncomingLinks() {
   const { markPasswordReset } = useAuth();
-  const router = useRouter();
   const markReset = useRef(markPasswordReset);
-  const routerRef = useRef(router);
   markReset.current = markPasswordReset;
-  routerRef.current = router;
   useEffect(() => {
     const handle = async (url: string) => {
       if (adoptedUrls.has(url)) return;
@@ -101,7 +117,7 @@ function IncomingLinks() {
       try {
         const result = await adoptIncomingUrl(url);
         if (result.status === 'recovery' && result.userId) markReset.current(result.userId);
-        if (result.status === 'expired') routerRef.current.replace('/auth/reset');
+        if (result.status === 'expired') queueResetScreen();
       } finally {
         finishAuthAdopt();
       }
@@ -114,14 +130,27 @@ function IncomingLinks() {
 }
 
 function RecoveryRedirect() {
-  const { session, pendingPasswordReset } = useAuth();
+  const { session, loading, pendingPasswordReset } = useAuth();
   const router = useRouter();
   const segments = useSegments();
+  const [queued, setQueued] = useState(queuedReset);
+  useEffect(() => subscribeResetQueue(() => setQueued(queuedReset)), []);
+  const destination = rootAuthDestination({
+    loading,
+    hasSession: !!session,
+    pendingPasswordReset,
+  });
   useEffect(() => {
-    if (!session || !pendingPasswordReset) return;
-    const onReset = segments.join('/') === 'auth/reset';
-    if (!onReset) router.replace('/auth/reset');
-  }, [session, pendingPasswordReset, segments, router]);
+    const action = resetNavigationAction({
+      destination,
+      currentPath: segments.join('/'),
+      queued,
+    });
+    if (action !== 'replace') return;
+    clearQueuedReset();
+    setQueued(false);
+    router.replace('/auth/reset');
+  }, [destination, queued, segments, router]);
   return null;
 }
 

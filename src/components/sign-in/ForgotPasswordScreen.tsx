@@ -16,7 +16,7 @@ const ERROR_KEY: Record<EmailAuthError, TranslationKey> = {
   badCredentials: 'login.genericError',
   unconfirmed: 'login.unconfirmed',
   exists: 'login.genericError',
-  weak: 'signup.short',
+  weak: 'signup.weak',
   rate: 'login.rateLimited',
   generic: 'login.genericError',
   expired: 'login.genericError',

@@ -16,11 +16,12 @@ export default function ConfirmRoute() {
   useEffect(() => subscribeAuthAdopt(() => setAdopting(authAdoptInflight())), []);
 
   useEffect(() => {
-    if (loading || adopting) return;
+    if (adopting) return;
     if (pendingPasswordReset) {
       router.replace('/auth/reset');
       return;
     }
+    if (loading) return;
     const timer = setTimeout(() => {
       router.replace(session ? '/' : '/login');
     }, session ? 0 : 2500);

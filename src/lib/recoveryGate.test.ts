@@ -5,8 +5,11 @@ import { passwordChangeAllowed } from './recoveryLink.ts';
 import {
   applyLocalSignOutHold,
   authLoading,
+  navigatorRoutes,
   recoveryUserIdForAuthEvent,
   resetExitAction,
+  resetNavigationAction,
+  resetReplaceAllowed,
   rootAuthDestination,
   type RootAuthDestination,
 } from './recoveryGate.ts';
@@ -50,8 +53,16 @@ test('a recovery verify does not open home before the password is saved', () => 
   // markPasswordReset has not run. The profile read has not run.
   sim = applyEvent(sim, 'PASSWORD_RECOVERY', USER);
   assert.equal(recoveryUserIdForAuthEvent('PASSWORD_RECOVERY', USER), USER);
-  assert.equal(destination(sim), 'splash');
+  assert.equal(destination(sim), 'reset');
   assert.notEqual(destination(sim), 'home');
+  assert.notEqual(destination(sim), 'splash');
+  assert.equal(resetReplaceAllowed(destination(sim)), true);
+  assert.equal(navigatorRoutes(destination(sim))?.includes('(app)'), false);
+  assert.equal(resetNavigationAction({
+    destination: destination(sim),
+    currentPath: 'auth/forgot-password',
+    queued: false,
+  }), 'replace');
 
   // Worst case: the profile read finishes before the screen calls markPasswordReset.
   // The notification already stored this user, so home stays closed.
@@ -128,4 +139,50 @@ test('the splash holds home until the session and the profile agree', () => {
   assert.equal(authLoading(true, USER, null), true);
   assert.equal(authLoading(true, USER, USER), false);
   assert.equal(rootAuthDestination({ loading: true, hasSession: true, pendingPasswordReset: false }), 'splash');
+  assert.equal(resetReplaceAllowed('splash'), false);
+  assert.equal(resetNavigationAction({ destination: 'splash', currentPath: 'auth/forgot-password', queued: false }), 'none');
+});
+
+test('a successful code opens the new-password route and does not dispatch during splash', () => {
+  let sim = applyEvent(signedOut(), 'PASSWORD_RECOVERY', USER);
+  assert.equal(resetNavigationAction({
+    destination: destination(sim),
+    currentPath: 'auth/forgot-password',
+    queued: false,
+  }), 'replace');
+  assert.equal(navigatorRoutes('reset')?.includes('auth/reset'), true);
+  assert.equal(navigatorRoutes('reset')?.includes('(app)'), false);
+  sim = { ...sim, readyForUserId: USER };
+  assert.equal(destination(sim), 'reset');
+  assert.equal(resetNavigationAction({
+    destination: destination(sim),
+    currentPath: 'auth/reset',
+    queued: false,
+  }), 'none');
+});
+
+test('sign-out, a normal sign-in, and an old link keep their routes', () => {
+  const signedIn = { ...applyEvent(signedOut(), 'SIGNED_IN', USER), readyForUserId: USER };
+  assert.equal(destination(signedIn), 'home');
+  assert.equal(navigatorRoutes('home')?.includes('(app)'), true);
+  assert.equal(navigatorRoutes('home')?.includes('auth/reset'), true);
+  assert.equal(resetNavigationAction({ destination: 'home', currentPath: '(app)', queued: false }), 'none');
+
+  assert.equal(resetNavigationAction({ destination: 'signed-out', currentPath: 'auth/forgot-password', queued: true }), 'replace');
+  assert.equal(resetNavigationAction({ destination: 'splash', currentPath: '', queued: true }), 'none');
+
+  let sim: Sim = {
+    sessionReady: true,
+    sessionUserId: USER,
+    recoveryUserId: USER,
+    readyForUserId: USER,
+  };
+  const held = applyLocalSignOutHold();
+  sim = { ...sim, recoveryUserId: held.recoveryUserId, readyForUserId: held.readyForUserId };
+  assert.equal(destination(sim), 'splash');
+  assert.equal(resetNavigationAction({ destination: destination(sim), currentPath: 'auth/reset', queued: false }), 'none');
+  sim = applyEvent(sim, 'SIGNED_OUT', null);
+  assert.equal(destination(sim), 'signed-out');
+  assert.equal(navigatorRoutes('signed-out')?.includes('auth/reset'), true);
+  assert.equal(navigatorRoutes('signed-out')?.includes('(app)'), false);
 });

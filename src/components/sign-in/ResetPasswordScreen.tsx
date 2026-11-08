@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -8,7 +8,7 @@ import { Button, useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { saveNewPassword, type EmailAuthError } from '@/lib/emailAuth';
 import { useT, type TranslationKey } from '@/lib/i18n';
-import { newPasswordIssue } from '@/lib/passwords';
+import { passwordErrorAfterEdit, passwordFieldsIssue, valuesForPasswordSubmit, type PasswordFormIssue } from '@/lib/passwords';
 import { resetExitAction } from '@/lib/recoveryGate';
 import { authAdoptInflight, subscribeAuthAdopt } from '@/lib/recoveryLink';
 import { Type } from '@/lib/theme';
@@ -19,7 +19,7 @@ const ERROR_KEY: Record<EmailAuthError, TranslationKey> = {
   badCredentials: 'login.genericError',
   unconfirmed: 'login.unconfirmed',
   exists: 'login.genericError',
-  weak: 'signup.short',
+  weak: 'signup.weak',
   rate: 'login.rateLimited',
   generic: 'login.genericError',
   expired: 'reset.invalid',
@@ -40,25 +40,67 @@ export function ResetPasswordScreen() {
   const { session, loading, pendingPasswordReset, clearPasswordReset, signOut } = useAuth();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [error, setError] = useState<TranslationKey | null>(null);
+  const [shown, setShown] = useState<PasswordFormIssue | { field: 'form'; key: TranslationKey } | null>(null);
+  const passwordRef = useRef('');
+  const confirmRef = useRef('');
   const [busy, setBusy] = useState(false);
   const [adopting, setAdopting] = useState(() => authAdoptInflight());
 
   useEffect(() => subscribeAuthAdopt(() => setAdopting(authAdoptInflight())), []);
 
-  async function submit() {
+  function messageFor(issue: NonNullable<ReturnType<typeof passwordFieldsIssue>>): TranslationKey {
+    if (issue.issue === 'mismatch') return 'signup.mismatch';
+    return ERROR_KEY[issue.issue];
+  }
+
+  function followText(passwordValue: string, confirmValue: string) {
+    setShown((current) => {
+      if (!current) return null;
+      if ('key' in current) return null;
+      return passwordErrorAfterEdit(current, passwordValue, confirmValue, session?.user.email ?? '');
+    });
+  }
+
+  function notePassword(value: string) {
+    passwordRef.current = value;
+    setPassword(value);
+    followText(value, confirmRef.current);
+  }
+
+  function noteConfirm(value: string) {
+    confirmRef.current = value;
+    setConfirm(value);
+    followText(passwordRef.current, value);
+  }
+
+  async function submit(confirmFromKeyboard?: string | null) {
     if (busy || !session || !pendingPasswordReset) return;
-    const issue = newPasswordIssue(password, confirm, session.user.email ?? '');
+    const values = valuesForPasswordSubmit({
+      password: passwordRef.current,
+      confirm: confirmRef.current,
+      confirmFromKeyboard,
+    });
+    passwordRef.current = values.password;
+    confirmRef.current = values.confirm;
+    setPassword(values.password);
+    setConfirm(values.confirm);
+    const issue = passwordFieldsIssue(values.password, values.confirm, session.user.email ?? '');
     if (issue) {
-      setError(issue === 'mismatch' ? 'signup.mismatch' : ERROR_KEY[issue]);
+      setShown(issue);
       return;
     }
     setBusy(true);
-    setError(null);
+    setShown(null);
     try {
-      const result = await saveNewPassword(password, session.user.email ?? '');
+      const result = await saveNewPassword(values.password, session.user.email ?? '');
       if (!result.ok) {
-        setError(ERROR_KEY[result.error]);
+        if (result.error === 'short' || result.error === 'letter' || result.error === 'number' || result.error === 'email' || result.error === 'long') {
+          setShown({ field: 'password', issue: result.error });
+        } else if (result.error === 'weak') {
+          setShown({ field: 'form', key: 'signup.weak' });
+        } else {
+          setShown({ field: 'form', key: ERROR_KEY[result.error] });
+        }
         return;
       }
       clearPasswordReset();
@@ -98,29 +140,27 @@ export function ResetPasswordScreen() {
       <PasswordField
         label={t('login.passwordLabel')}
         value={password}
-        onChangeText={(value) => {
-          setPassword(value);
-          setError(null);
-        }}
+        onChangeText={notePassword}
         placeholder={t('signup.passwordPh')}
         textContentType="newPassword"
         autoComplete="password-new"
         returnKeyType="next"
+        error={shown?.field === 'password'}
       />
+      {shown?.field === 'password' && 'issue' in shown ? <Text style={[Type.footnote, { color: c.redInk }]}>{t(messageFor(shown))}</Text> : null}
       <PasswordField
         label={t('signup.confirmLabel')}
         value={confirm}
-        onChangeText={(value) => {
-          setConfirm(value);
-          setError(null);
-        }}
+        onChangeText={noteConfirm}
         placeholder={t('signup.passwordPh')}
         textContentType="newPassword"
         autoComplete="password-new"
-        onSubmitEditing={submit}
+        onSubmitEditing={(text) => void submit(text)}
+        error={shown?.field === 'confirm'}
       />
-      {error ? <Text style={[Type.footnote, { color: c.redInk }]}>{t(error)}</Text> : null}
-      <Button label={busy ? t('reset.saving') : t('reset.submit')} onPress={submit} disabled={busy} />
+      {shown?.field === 'confirm' && 'issue' in shown ? <Text style={[Type.footnote, { color: c.redInk }]}>{t(messageFor(shown))}</Text> : null}
+      {shown && 'key' in shown ? <Text style={[Type.footnote, { color: c.redInk }]}>{t(shown.key)}</Text> : null}
+      <Button label={busy ? t('reset.saving') : t('reset.submit')} onPress={() => void submit()} disabled={busy} />
       <Pressable onPress={() => signOut()} hitSlop={8} disabled={busy}>
         <Text style={[Type.subhead, { color: c.ink3, textAlign: 'center' }]}>{t('event.signOut')}</Text>
       </Pressable>

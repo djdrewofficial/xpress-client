@@ -22,11 +22,12 @@ export default function SetPasswordScreen() {
   useEffect(() => subscribeAuthAdopt(() => setAdopting(authAdoptInflight())), []);
 
   useEffect(() => {
-    if (loading || adopting) return;
+    if (adopting) return;
     if (pendingPasswordReset) {
       router.replace('/auth/reset');
       return;
     }
+    if (loading) return;
     if (session) {
       router.replace('/');
       return;
