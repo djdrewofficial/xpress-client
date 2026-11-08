@@ -32,10 +32,42 @@ export function rootAuthDestination(input: {
   hasSession: boolean;
   pendingPasswordReset: boolean;
 }): RootAuthDestination {
-  if (input.loading) return 'splash';
-  if (input.hasSession && input.pendingPasswordReset) return 'reset';
+  const recovering = input.hasSession && input.pendingPasswordReset;
+  // The profile read is still in flight when a recovery session arrives.
+  // Replacing the navigator with the splash removes auth/reset, so the
+  // following REPLACE has no navigator to handle it.
+  if (input.loading && !recovering) return 'splash';
+  if (recovering) return 'reset';
   if (input.hasSession) return 'home';
   return 'signed-out';
+}
+
+/** Routes mounted for this destination. Null means the navigator itself is unmounted. */
+export function navigatorRoutes(destination: RootAuthDestination): readonly string[] | null {
+  if (destination === 'splash') return null;
+  const shared = ['auth/reset', 'auth/confirm', 'auth/set-password', 'j/[token]'] as const;
+  if (destination === 'home') return ['(app)', ...shared];
+  if (destination === 'signed-out') return ['login', 'signup', 'auth/forgot-password', ...shared];
+  return shared;
+}
+
+export function resetReplaceAllowed(destination: RootAuthDestination): boolean {
+  return navigatorRoutes(destination)?.includes('auth/reset') ?? false;
+}
+
+/**
+ * The only REPLACE to auth/reset. It is refused while the navigator is unmounted,
+ * including the splash that follows a recovery session before the profile loads.
+ */
+export function resetNavigationAction(input: {
+  destination: RootAuthDestination;
+  currentPath: string;
+  queued: boolean;
+}): 'replace' | 'none' {
+  if (!resetReplaceAllowed(input.destination)) return 'none';
+  if (input.currentPath === 'auth/reset') return 'none';
+  if (input.destination === 'reset' || input.queued) return 'replace';
+  return 'none';
 }
 
 /** Recovery cancel. Does not clear the session; `SIGNED_OUT` does that. */

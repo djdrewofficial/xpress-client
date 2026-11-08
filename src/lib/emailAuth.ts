@@ -2,7 +2,7 @@ import type { AuthError } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 
 import { emailLooksValid } from '@/lib/phone';
-import { passwordIssue, type PasswordIssue } from '@/lib/passwords';
+import { passwordIssue, passwordServerIssue, type PasswordIssue } from '@/lib/passwords';
 import {
   authFailureFrom,
   isNetworkFailure,
@@ -48,7 +48,8 @@ export function mapAuthError(error: AuthError | AuthFailure): EmailAuthError {
   if (/not confirmed|email_not_confirmed/.test(blob)) return 'unconfirmed';
   if (/already registered|already been registered|user_already_exists|already exists/.test(blob)) return 'exists';
   if (/invalid login|invalid_credentials|invalid email or password/.test(blob)) return 'badCredentials';
-  if (/password/.test(blob) && /weak|short|at least|should be/.test(blob)) return 'weak';
+  const passwordServer = passwordServerIssue(blob);
+  if (passwordServer) return passwordServer;
   if (isRecoverySessionFailure(failure.code, failure.message)) return 'expired';
   return 'generic';
 }

@@ -54,7 +54,7 @@ export function PasswordField({
   placeholder: string;
   textContentType: 'password' | 'newPassword';
   autoComplete: 'password' | 'password-new';
-  onSubmitEditing?: () => void;
+  onSubmitEditing?: (text: string) => void;
   returnKeyType?: 'go' | 'next' | 'done';
   error?: boolean;
 }) {
@@ -78,7 +78,7 @@ export function PasswordField({
           autoComplete={autoComplete}
           textContentType={textContentType}
           returnKeyType={returnKeyType}
-          onSubmitEditing={onSubmitEditing}
+          onSubmitEditing={onSubmitEditing ? (event) => onSubmitEditing(event.nativeEvent.text) : undefined}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={[styles.input, { color: c.ink }]}

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Pressable, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
 
 import { AuthFrame } from '@/components/sign-in/AuthFrame';
 import { OneTimeCodeField } from '@/components/sign-in/fields';
@@ -13,7 +12,6 @@ import {
   recoveryCodeReady,
   resendCooldownRemaining,
 } from '@/lib/recoveryCode';
-import { finishAuthAdopt, startAuthAdopt } from '@/lib/recoveryLink';
 import { Type } from '@/lib/theme';
 
 const CODE_ERROR: Record<EmailAuthError, TranslationKey> = {
@@ -39,7 +37,6 @@ const CODE_ERROR: Record<EmailAuthError, TranslationKey> = {
 export function ResetCodeScreen({ email, onChangeEmail }: { email: string; onChangeEmail: () => void }) {
   const c = useC();
   const { t } = useT();
-  const router = useRouter();
   const { markPasswordReset } = useAuth();
   const [code, setCode] = useState('');
   const [error, setError] = useState<TranslationKey | null>(null);
@@ -88,13 +85,7 @@ export function ResetCodeScreen({ email, onChangeEmail }: { email: string; onCha
         setError(CODE_ERROR[result.error]);
         return;
       }
-      startAuthAdopt();
-      try {
-        markPasswordReset(result.userId);
-        router.replace('/auth/reset');
-      } finally {
-        setTimeout(() => finishAuthAdopt(), 600);
-      }
+      markPasswordReset(result.userId);
     } catch {
       if (alive.current) setError('login.network');
     } finally {
