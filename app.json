@@ -35,7 +35,31 @@
         "backgroundColor": "#4b328e"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": []
+      "permissions": [],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "xos.xpressdjs.com",
+              "pathPrefix": "/auth/reset"
+            },
+            {
+              "scheme": "https",
+              "host": "xos.xpressdjs.com",
+              "pathPrefix": "/auth/confirm"
+            },
+            {
+              "scheme": "https",
+              "host": "xos.xpressdjs.com",
+              "pathPrefix": "/auth/set-password"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "output": "static"

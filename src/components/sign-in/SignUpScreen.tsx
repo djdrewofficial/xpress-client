@@ -22,6 +22,7 @@ const ERROR_KEY: Record<EmailAuthError, TranslationKey> = {
   weak: 'signup.short',
   rate: 'login.rateLimited',
   generic: 'login.genericError',
+  expired: 'login.genericError',
   short: 'signup.short',
   letter: 'signup.letter',
   number: 'signup.number',

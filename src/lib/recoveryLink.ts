@@ -1,0 +1,241 @@
+/**
+ * Password recovery has to come back to an https URL on the associated domain.
+ * TestFlight builds otherwise send Supabase `xpressclient:///auth/reset`
+ * (`Linking.createURL`). The email button is an https verify link, and iOS Mail
+ * drops the redirect into that custom scheme, so the tap never opens the app.
+ *
+ * The app still accepts the custom scheme, a `?code=` PKCE redirect, and a
+ * `token_hash` link. Join links are not auth callbacks.
+ */
+
+export const RECOVERY_REDIRECT_URL = 'https://xos.xpressdjs.com/auth/reset';
+
+const AUTH_HOST = 'xos.xpressdjs.com';
+const APP_SCHEME = 'xpressclient';
+
+const HASH_TYPES = ['signup', 'invite', 'magiclink', 'recovery', 'email_change', 'email'] as const;
+type HashType = (typeof HASH_TYPES)[number];
+
+export type AuthPath = 'reset' | 'confirm' | 'set-password';
+
+export type AuthCredentials = {
+  kind: 'credentials';
+  path: AuthPath | null;
+  mode: 'code' | 'otp' | 'implicit';
+  code: string | null;
+  tokenHash: string | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  type: string | null;
+};
+
+export type AuthLink = { kind: 'none' } | { kind: 'failed' } | AuthCredentials;
+
+export type AuthAdoptResult = 'recovery' | 'session' | 'expired' | 'ignored';
+
+export type AuthExchange = {
+  exchangeCodeForSession(code: string): Promise<{
+    data: { session: object | null; redirectType?: string | null };
+    error: { message?: string; code?: string } | null;
+  }>;
+  verifyOtp(args: { token_hash: string; type: HashType }): Promise<{
+    data: { session: object | null };
+    error: { message?: string; code?: string } | null;
+  }>;
+  getSession(): Promise<{ data: { session: object | null } }>;
+  setSession(tokens: { access_token: string; refresh_token: string }): Promise<{
+    error: { message?: string; code?: string } | null;
+  }>;
+};
+
+export function recoveryRedirectUrl(): string {
+  return RECOVERY_REDIRECT_URL;
+}
+
+function isHashType(value: string): value is HashType {
+  return (HASH_TYPES as readonly string[]).includes(value);
+}
+
+function decodeParam(value: string): string {
+  try {
+    return decodeURIComponent(value.replace(/\+/g, ' '));
+  } catch {
+    return value;
+  }
+}
+
+export function authQuery(url: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const hash = url.includes('#') ? url.split('#')[1] ?? '' : '';
+  const withoutHash = url.split('#')[0] ?? '';
+  const query = withoutHash.includes('?') ? withoutHash.split('?')[1] ?? '' : '';
+  for (const raw of [query, hash]) {
+    if (!raw) continue;
+    for (const pair of raw.split('&')) {
+      const [key, value] = pair.split('=');
+      if (!key) continue;
+      out[decodeParam(key)] = decodeParam(value ?? '');
+    }
+  }
+  return out;
+}
+
+function authPath(parts: string[]): AuthPath | null {
+  const marker = parts.findIndex((part) => part === 'auth');
+  const next = marker >= 0 ? parts[marker + 1] : undefined;
+  if (next === 'reset' || next === 'confirm' || next === 'set-password') return next;
+  return null;
+}
+
+function partsFor(url: URL): string[] | null {
+  const protocol = url.protocol.replace(/:$/, '').toLowerCase();
+  const host = url.hostname.toLowerCase();
+  if (protocol === 'https') {
+    if (host !== AUTH_HOST) return null;
+    return url.pathname.split('/').filter(Boolean);
+  }
+  if (protocol !== APP_SCHEME) return null;
+  const pathParts = url.pathname.split('/').filter(Boolean);
+  const hostPart = host && host !== 'localhost' ? [host] : [];
+  return [...hostPart, ...pathParts];
+}
+
+function expectsRecovery(path: AuthPath | null, type: string | null): boolean {
+  return path === 'reset' || type === 'recovery';
+}
+
+function asRecovery(path: AuthPath | null, type: string | null, redirectType: string | null | undefined): boolean {
+  if (type === 'recovery' || redirectType === 'recovery') return true;
+  return path === 'reset' && (redirectType == null || redirectType === '');
+}
+
+/** Classify an incoming URL. Fixture values only; this does not contact Supabase. */
+export function classifyAuthUrl(input: string): AuthLink {
+  const text = input.trim();
+  if (!text) return { kind: 'none' };
+  let url: URL;
+  try {
+    url = new URL(text);
+  } catch {
+    return { kind: 'none' };
+  }
+  const parts = partsFor(url);
+  if (!parts) return { kind: 'none' };
+  const path = authPath(parts);
+  const params = authQuery(text);
+  const type = params.type || null;
+  const errorBlob = `${params.error ?? ''} ${params.error_code ?? ''} ${params.error_description ?? ''}`.toLowerCase();
+  const recoveryError =
+    path === 'reset' ||
+    path === 'set-password' ||
+    type === 'recovery' ||
+    /otp_expired|flow_state_expired|flow_state_not_found/.test(errorBlob);
+  if ((params.error || params.error_code || params.error_description) && recoveryError) {
+    return { kind: 'failed' };
+  }
+  if (params.code) {
+    return {
+      kind: 'credentials',
+      path,
+      mode: 'code',
+      code: params.code,
+      tokenHash: null,
+      accessToken: null,
+      refreshToken: null,
+      type,
+    };
+  }
+  const otpType = isHashType(type ?? '') ? type : path === 'reset' ? 'recovery' : null;
+  if (params.token_hash && otpType && isHashType(otpType)) {
+    return {
+      kind: 'credentials',
+      path,
+      mode: 'otp',
+      code: null,
+      tokenHash: params.token_hash,
+      accessToken: null,
+      refreshToken: null,
+      type: otpType,
+    };
+  }
+  if (params.access_token && params.refresh_token) {
+    return {
+      kind: 'credentials',
+      path,
+      mode: 'implicit',
+      code: null,
+      tokenHash: null,
+      accessToken: params.access_token,
+      refreshToken: params.refresh_token,
+      type,
+    };
+  }
+  if (path === 'reset') return { kind: 'failed' };
+  return { kind: 'none' };
+}
+
+/**
+ * Turn a classified link into a session outcome.
+ * A recovery result is the only one that may open the new-password screen.
+ * Expired and used links do not replace a session that is already on the device.
+ */
+export async function applyAuthLink(link: AuthLink, client: AuthExchange): Promise<AuthAdoptResult> {
+  if (link.kind === 'none') return 'ignored';
+  if (link.kind === 'failed') return 'expired';
+  const recovery = expectsRecovery(link.path, link.type);
+  try {
+    if (link.mode === 'code' && link.code) {
+      const { data, error } = await client.exchangeCodeForSession(link.code);
+      if (error || !data.session) return recovery ? 'expired' : 'ignored';
+      return asRecovery(link.path, link.type, data.redirectType) ? 'recovery' : 'session';
+    }
+    if (link.mode === 'otp' && link.tokenHash && link.type && isHashType(link.type)) {
+      const { data, error } = await client.verifyOtp({ token_hash: link.tokenHash, type: link.type });
+      if (error || !data.session) return recovery ? 'expired' : 'ignored';
+      return link.type === 'recovery' || link.path === 'reset' ? 'recovery' : 'session';
+    }
+    if (link.mode === 'implicit' && link.accessToken && link.refreshToken) {
+      const tokens = { access_token: link.accessToken, refresh_token: link.refreshToken };
+      if (recovery) {
+        const { error } = await client.setSession(tokens);
+        return error ? 'expired' : 'recovery';
+      }
+      const existing = await client.getSession();
+      if (existing.data.session) return 'session';
+      const { error } = await client.setSession(tokens);
+      return error ? 'ignored' : 'session';
+    }
+  } catch {
+    return recovery ? 'expired' : 'ignored';
+  }
+  return 'ignored';
+}
+
+export function isRecoverySessionFailure(code: string | undefined, message: string | undefined): boolean {
+  const blob = `${code ?? ''} ${message ?? ''}`.toLowerCase();
+  return /auth session missing|session_not_found|otp_expired|flow_state_expired|flow_state_not_found/.test(blob);
+}
+
+let authAdopts = 0;
+const adoptWatchers = new Set<() => void>();
+
+export function authAdoptInflight(): boolean {
+  return authAdopts > 0;
+}
+
+export function startAuthAdopt(): void {
+  authAdopts += 1;
+  adoptWatchers.forEach((notify) => notify());
+}
+
+export function finishAuthAdopt(): void {
+  authAdopts = Math.max(0, authAdopts - 1);
+  adoptWatchers.forEach((notify) => notify());
+}
+
+export function subscribeAuthAdopt(notify: () => void): () => void {
+  adoptWatchers.add(notify);
+  return () => {
+    adoptWatchers.delete(notify);
+  };
+}

@@ -3,6 +3,7 @@ import * as Linking from 'expo-linking';
 
 import { emailLooksValid } from '@/lib/phone';
 import { passwordIssue, type PasswordIssue } from '@/lib/passwords';
+import { isRecoverySessionFailure, recoveryRedirectUrl } from '@/lib/recoveryLink';
 import { supabase } from '@/lib/supabase';
 
 export function confirmRedirectUrl(): string {
@@ -10,7 +11,7 @@ export function confirmRedirectUrl(): string {
 }
 
 export function resetRedirectUrl(): string {
-  return Linking.createURL('auth/reset');
+  return recoveryRedirectUrl();
 }
 
 export type EmailAuthError =
@@ -21,6 +22,7 @@ export type EmailAuthError =
   | 'exists'
   | 'weak'
   | 'rate'
+  | 'expired'
   | 'generic'
   | PasswordIssue;
 
@@ -31,6 +33,7 @@ export function mapAuthError(error: AuthError): EmailAuthError {
   if (/already registered|already been registered|user_already_exists|already exists/.test(blob)) return 'exists';
   if (/invalid login|invalid_credentials|invalid email or password/.test(blob)) return 'badCredentials';
   if (/password/.test(blob) && /weak|short|at least|should be/.test(blob)) return 'weak';
+  if (isRecoverySessionFailure(error.code, error.message)) return 'expired';
   return 'generic';
 }
 

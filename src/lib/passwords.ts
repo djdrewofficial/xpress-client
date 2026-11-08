@@ -13,3 +13,12 @@ export function passwordIssue(password: string, email: string): PasswordIssue | 
   if (normalized && password.toLowerCase() === normalized) return 'email';
   return null;
 }
+
+export function newPasswordIssue(
+  password: string,
+  confirm: string,
+  email: string,
+): PasswordIssue | 'mismatch' | null {
+  if (password !== confirm) return 'mismatch';
+  return passwordIssue(password, email);
+}

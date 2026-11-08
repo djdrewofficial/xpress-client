@@ -80,6 +80,7 @@ const phaseEn = {
   'reset.subtitle': 'Use at least 8 characters, with a letter and a number.',
   'reset.submit': 'Save password',
   'reset.saving': 'Saving…',
+  'reset.checking': 'Checking your link.',
   'reset.invalid': 'This link is invalid or expired. Request a new one.',
   'reset.request': 'Request a new link',
 
@@ -218,6 +219,7 @@ const phaseEs: Record<keyof typeof phaseEn, string> = {
   'reset.subtitle': 'Usa al menos 8 caracteres, con una letra y un número.',
   'reset.submit': 'Guardar contraseña',
   'reset.saving': 'Guardando…',
+  'reset.checking': 'Revisando tu enlace.',
   'reset.invalid': 'Este enlace no es válido o expiró. Pide uno nuevo.',
   'reset.request': 'Pedir un enlace nuevo',
 
