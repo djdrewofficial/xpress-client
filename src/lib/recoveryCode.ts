@@ -1,7 +1,10 @@
 /**
- * Codes typed on the reset screen. Supabase OTP length is a project setting,
- * so a code is 6 to 10 digits. The app checks it with
+ * Codes typed on the reset screen. The project OTP is 6 digits and expires
+ * after 600 seconds. The app checks it with
  * `verifyOtp({ email, token, type: 'recovery' })`.
+ *
+ * Emails that already went out with a reset link still open through
+ * `recoveryLink.ts`. That path uses a token hash, not this 6-digit field.
  *
  * GoTrue reports a wrong code and an expired code with one message:
  * "Token has expired or is invalid" (`otp_expired`). That stays separate from
@@ -12,8 +15,7 @@
  * whether the address is registered.
  */
 
-export const RECOVERY_CODE_MIN = 6;
-export const RECOVERY_CODE_MAX = 10;
+export const RECOVERY_CODE_LENGTH = 6;
 export const RESEND_COOLDOWN_SEC = 60;
 
 export type AuthFailure = {
@@ -26,12 +28,11 @@ export type AuthFailure = {
 export type RecoveryCodeError = 'wrongCode' | 'expired' | 'codeRejected' | 'rate' | 'network' | 'generic';
 
 export function normalizeRecoveryCode(input: string): string {
-  return input.replace(/\D/g, '').slice(0, RECOVERY_CODE_MAX);
+  return input.replace(/\D/g, '').slice(0, RECOVERY_CODE_LENGTH);
 }
 
 export function recoveryCodeReady(input: string): boolean {
-  const code = normalizeRecoveryCode(input);
-  return code.length >= RECOVERY_CODE_MIN && code.length <= RECOVERY_CODE_MAX;
+  return normalizeRecoveryCode(input).length === RECOVERY_CODE_LENGTH;
 }
 
 /** Seconds left before another reset email can be requested. */

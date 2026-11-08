@@ -12,16 +12,17 @@ import {
   RESEND_COOLDOWN_SEC,
 } from './recoveryCode.ts';
 
-test('a recovery code keeps 6 to 10 digits', () => {
+test('a recovery code is 6 digits', () => {
   assert.equal(normalizeRecoveryCode('12 34-56'), '123456');
-  assert.equal(normalizeRecoveryCode('abc1234567'), '1234567');
-  assert.equal(normalizeRecoveryCode('1234567890123'), '1234567890');
+  assert.equal(normalizeRecoveryCode('abc1234567'), '123456');
+  assert.equal(normalizeRecoveryCode('1234567890123'), '123456');
   assert.equal(recoveryCodeReady('12345'), false);
   assert.equal(recoveryCodeReady('123456'), true);
   assert.equal(recoveryCodeReady('1234567890'), true);
-  assert.equal(recoveryCodeReady('12 34 56 78'), true);
+  assert.equal(recoveryCodeReady('12 34 56'), true);
   assert.equal(recoveryCodeReady(''), false);
   assert.equal(recoveryCodeReady('abcdef'), false);
+  assert.equal(recoveryCodeReady('hash-fixture'), false);
 });
 
 test('resend waits 60 seconds from the send', () => {

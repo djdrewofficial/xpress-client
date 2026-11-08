@@ -16,6 +16,7 @@ import {
 import { adoptIncomingUrl } from '@/lib/authCallback';
 import { subscribeAuthUrls } from '@/lib/authLinkQueue';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { rootAuthDestination } from '@/lib/recoveryGate';
 import { finishAuthAdopt, startAuthAdopt } from '@/lib/recoveryLink';
 import { LocaleProvider } from '@/lib/i18n';
 import { BrandSplash } from '@/components/BrandSplash';
@@ -126,14 +127,19 @@ function RecoveryRedirect() {
 
 function RootNavigator() {
   const { session, loading, pendingPasswordReset } = useAuth();
-  if (loading) return <Splash label="Connecting…" />;
+  const destination = rootAuthDestination({
+    loading,
+    hasSession: !!session,
+    pendingPasswordReset,
+  });
+  if (destination === 'splash') return <Splash label="Connecting…" />;
   return (
     <>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
-        <Stack.Protected guard={!!session && !pendingPasswordReset}>
+        <Stack.Protected guard={destination === 'home'}>
           <Stack.Screen name="(app)" />
         </Stack.Protected>
-        <Stack.Protected guard={!session}>
+        <Stack.Protected guard={destination === 'signed-out'}>
           <Stack.Screen name="login" />
           <Stack.Screen name="signup" />
           <Stack.Screen name="auth/forgot-password" />

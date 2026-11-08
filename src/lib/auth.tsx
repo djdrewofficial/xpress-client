@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 
 import { claimEventInvites } from '@/lib/claimInvites';
 import { hydrateMembership, noteAccountType, resetMembershipMemory } from '@/lib/membership';
+import { applyLocalSignOutHold, authLoading, recoveryUserIdForAuthEvent } from '@/lib/recoveryGate';
 import { passwordChangeAllowed } from '@/lib/recoveryLink';
 import { supabase } from '@/lib/supabase';
 
@@ -138,9 +139,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
     // failure mode with AsyncStorage): force past the splash after 8s.
     const timer = setTimeout(finish, 8000);
     const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
-      if (event === 'PASSWORD_RECOVERY' && next?.user.id) {
-        setRecoveryUserId(next.user.id);
-        AsyncStorage.setItem(RESET_KEY, next.user.id).catch(() => {});
+      const marked = recoveryUserIdForAuthEvent(event, next?.user.id ?? null);
+      if (marked) {
+        setRecoveryUserId(marked);
+        AsyncStorage.setItem(RESET_KEY, marked).catch(() => {});
       }
       if (event === 'SIGNED_OUT') setSession(null);
       else if (next) setSession(next);
@@ -249,7 +251,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   // Stay on the splash until the account read finishes, so a brand-new login
   // does not flash an empty planner before claim returns. Signed out, only
   // the session check matters.
-  const loading = !sessionReady || (session != null && readyFor !== session.user.id);
+  const loading = authLoading(sessionReady, session?.user.id ?? null, readyFor);
   const pendingPasswordReset = passwordChangeAllowed(recoveryUserId, session?.user.id ?? null);
 
   return (
@@ -265,11 +267,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
         // Local scope ends this device only. The default (global) revokes every
         // session for the user, including XOS in the browser.
         signOut: () => {
+          const held = applyLocalSignOutHold();
           profileReq.current += 1;
           resetMembershipMemory();
           setProfile(null);
-          setReadyFor(null);
-          setRecoveryUserId(null);
+          setReadyFor(held.readyForUserId);
+          setRecoveryUserId(held.recoveryUserId);
           AsyncStorage.removeItem(RESET_KEY).catch(() => {});
           return supabase.auth.signOut({ scope: 'local' }).then(() => {});
         },

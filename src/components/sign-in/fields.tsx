@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } fro
 
 import { Icon, useC, type IconName } from '@/components/ui';
 import { useT } from '@/lib/i18n';
-import { normalizeRecoveryCode, RECOVERY_CODE_MAX } from '@/lib/recoveryCode';
+import { normalizeRecoveryCode } from '@/lib/recoveryCode';
 import { Fonts, Radius, Type } from '@/lib/theme';
 
 export function TextField({
