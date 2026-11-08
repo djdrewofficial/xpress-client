@@ -131,6 +131,10 @@ export function classifyAuthUrl(input: string): AuthLink {
   const parts = partsFor(url);
   if (!parts) return { kind: 'none' };
   const path = authPath(parts);
+  // The website owns https://xos.xpressdjs.com/auth/set-password and the site
+  // root. Adopting those would consume a staff or browser recovery token.
+  const https = url.protocol === 'https:';
+  if (https && path !== 'reset' && path !== 'confirm') return { kind: 'none' };
   const params = authQuery(text);
   const type = params.type || null;
   const errorBlob = `${params.error ?? ''} ${params.error_code ?? ''} ${params.error_description ?? ''}`.toLowerCase();
@@ -204,20 +208,40 @@ export async function applyAuthLink(link: AuthLink, client: AuthExchange): Promi
       return link.type === 'recovery' || link.path === 'reset' ? 'recovery' : 'session';
     }
     if (link.mode === 'implicit' && link.accessToken && link.refreshToken) {
-      const tokens = { access_token: link.accessToken, refresh_token: link.refreshToken };
-      if (recovery) {
-        const { error } = await client.setSession(tokens);
-        return error ? 'expired' : 'recovery';
-      }
       const existing = await client.getSession();
-      if (existing.data.session) return 'session';
-      const { error } = await client.setSession(tokens);
-      return error ? 'ignored' : 'session';
+      // A link can carry any tokens. Never replace the session already on this device,
+      // and never adopt tokens that are not on an auth route.
+      if (existing.data.session) return 'ignored';
+      if (link.path !== 'reset' && link.path !== 'confirm' && link.path !== 'set-password') return 'ignored';
+      const { error } = await client.setSession({
+        access_token: link.accessToken,
+        refresh_token: link.refreshToken,
+      });
+      if (error) return recovery ? 'expired' : 'ignored';
+      return recovery ? 'recovery' : 'session';
     }
   } catch {
     return recovery ? 'expired' : 'ignored';
   }
   return 'ignored';
+}
+
+/**
+ * The stored value has to be the recovery session's user id.
+ * A bare flag must not let whatever session is on the device change its password.
+ */
+export function passwordChangeAllowed(storedUserId: string | null, sessionUserId: string | null): boolean {
+  if (!storedUserId || !sessionUserId) return false;
+  if (storedUserId === '1') return false;
+  return storedUserId === sessionUserId;
+}
+
+export function sessionUserId(session: object | null): string | null {
+  if (!session || typeof session !== 'object' || !('user' in session)) return null;
+  const user = session.user;
+  if (!user || typeof user !== 'object' || !('id' in user)) return null;
+  const id = user.id;
+  return typeof id === 'string' && id && id !== '1' ? id : null;
 }
 
 export function isRecoverySessionFailure(code: string | undefined, message: string | undefined): boolean {

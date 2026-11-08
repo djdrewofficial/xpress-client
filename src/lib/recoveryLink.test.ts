@@ -8,6 +8,7 @@ import {
   classifyAuthUrl,
   finishAuthAdopt,
   isRecoverySessionFailure,
+  passwordChangeAllowed,
   recoveryRedirectUrl,
   recoveryTemplateHref,
   startAuthAdopt,
@@ -115,22 +116,30 @@ test('a reset path with no credentials is a failed link', () => {
   assert.equal(classifyAuthUrl('xpressclient://auth/reset').kind, 'failed');
 });
 
-test('the site-root fallback is not the reset route', () => {
+test('the site-root recovery query is left for the website', async () => {
   const link = classifyAuthUrl('https://xos.xpressdjs.com?token_hash=hash-fixture&type=recovery');
-  assert.equal(link.kind, 'credentials');
-  if (link.kind !== 'credentials') return;
-  assert.equal(link.path, null);
-  assert.equal(link.mode, 'otp');
-  assert.equal(link.type, 'recovery');
+  assert.equal(link.kind, 'none');
+  const fake = client();
+  assert.equal(await applyAuthLink(link, fake), 'ignored');
+  assert.deepEqual(fake.calls, []);
 });
 
-test('the allow-listed set-password page is a recovery token hash', async () => {
+test('the browser set-password link is not adopted', async () => {
   const link = classifyAuthUrl('https://xos.xpressdjs.com/auth/set-password?token_hash=hash-fixture&type=recovery');
+  assert.equal(link.kind, 'none');
+  const fake = client();
+  assert.equal(await applyAuthLink(link, fake), 'ignored');
+  assert.deepEqual(fake.calls, []);
+});
+
+test('a native set-password token hash can still open recovery', async () => {
+  const link = classifyAuthUrl('xpressclient://auth/set-password?token_hash=hash-fixture&type=recovery');
   assert.equal(link.kind, 'credentials');
   if (link.kind !== 'credentials') return;
   assert.equal(link.path, 'set-password');
-  assert.equal(link.type, 'recovery');
-  assert.equal(await applyAuthLink(link, client()), 'recovery');
+  const fake = client();
+  assert.equal(await applyAuthLink(link, fake), 'recovery');
+  assert.deepEqual(fake.calls, ['verify']);
 });
 
 test('a triple-slash token hash is still a reset link if it arrives', () => {
@@ -229,15 +238,61 @@ test('an expired query does not call the auth client', async () => {
   assert.deepEqual(fake.calls, []);
 });
 
-test('implicit recovery replaces the current session', async () => {
+test('implicit recovery leaves the live session in place', async () => {
   const link = classifyAuthUrl(
     'xpressclient:///auth/reset#access_token=access-fixture&refresh_token=refresh-fixture&type=recovery',
   );
+  const calls: string[] = [];
   const fake = client({
-    getSession: async () => ({ data: { session: session() } }),
+    getSession: async () => {
+      calls.push('getSession');
+      return { data: { session: { user: { id: 'staff-user' } } } };
+    },
+    setSession: async () => {
+      calls.push('setSession');
+      return { error: null };
+    },
   });
-  assert.equal(await applyAuthLink(link, fake), 'recovery');
-  assert.deepEqual(fake.calls, ['setSession']);
+  assert.equal(await applyAuthLink(link, fake), 'ignored');
+  assert.deepEqual(calls, ['getSession']);
+});
+
+test('an arbitrary implicit URL does not replace a live session', async () => {
+  const link = classifyAuthUrl(
+    'xpressclient://attacker#access_token=attacker-access&refresh_token=attacker-refresh&type=recovery',
+  );
+  const calls: string[] = [];
+  const fake = client({
+    getSession: async () => {
+      calls.push('getSession');
+      return { data: { session: { user: { id: 'staff-user' } } } };
+    },
+    setSession: async () => {
+      calls.push('setSession');
+      return { error: null };
+    },
+  });
+  assert.equal(await applyAuthLink(link, fake), 'ignored');
+  assert.deepEqual(calls, ['getSession']);
+});
+
+test('an arbitrary implicit URL is not adopted when signed out', async () => {
+  const link = classifyAuthUrl(
+    'xpressclient://attacker#access_token=attacker-access&refresh_token=attacker-refresh',
+  );
+  const calls: string[] = [];
+  const fake = client({
+    getSession: async () => {
+      calls.push('getSession');
+      return { data: { session: null } };
+    },
+    setSession: async () => {
+      calls.push('setSession');
+      return { error: null };
+    },
+  });
+  assert.equal(await applyAuthLink(link, fake), 'ignored');
+  assert.deepEqual(calls, ['getSession']);
 });
 
 test('a non-recovery implicit link does not replace a live session', async () => {
@@ -262,7 +317,7 @@ test('a non-recovery implicit link does not replace a live session', async () =>
       return { error: null };
     },
   });
-  assert.equal(await applyAuthLink(link, fake), 'session');
+  assert.equal(await applyAuthLink(link, fake), 'ignored');
   assert.deepEqual(calls, ['getSession']);
 });
 
@@ -273,6 +328,15 @@ test('new password rules reject a mismatch, a short value, and a missing number'
   assert.equal(newPasswordIssue('abcdefgh', 'abcdefgh', 'person@example.com'), 'number');
   assert.equal(newPasswordIssue('12345678', '12345678', 'person@example.com'), 'letter');
   assert.equal(newPasswordIssue('user1@example.com', 'user1@example.com', 'user1@example.com'), 'email');
+});
+
+test('a stored recovery flag authorizes only that same session', () => {
+  assert.equal(passwordChangeAllowed('recovery-user', 'recovery-user'), true);
+  assert.equal(passwordChangeAllowed('recovery-user', 'staff-user'), false);
+  assert.equal(passwordChangeAllowed('1', 'staff-user'), false);
+  assert.equal(passwordChangeAllowed('1', '1'), false);
+  assert.equal(passwordChangeAllowed(null, 'staff-user'), false);
+  assert.equal(passwordChangeAllowed('recovery-user', null), false);
 });
 
 test('recovery session failures are distinguished from a wrong password', () => {

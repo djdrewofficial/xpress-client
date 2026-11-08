@@ -99,8 +99,8 @@ function IncomingLinks() {
       startAuthAdopt();
       try {
         const result = await adoptIncomingUrl(url);
-        if (result === 'recovery') markReset.current();
-        if (result === 'expired') routerRef.current.replace('/auth/reset');
+        if (result.status === 'recovery' && result.userId) markReset.current(result.userId);
+        if (result.status === 'expired') routerRef.current.replace('/auth/reset');
       } finally {
         finishAuthAdopt();
       }

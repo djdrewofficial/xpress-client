@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 
 import { claimEventInvites } from '@/lib/claimInvites';
 import { hydrateMembership, noteAccountType, resetMembershipMemory } from '@/lib/membership';
+import { passwordChangeAllowed } from '@/lib/recoveryLink';
 import { supabase } from '@/lib/supabase';
 
 export type PermissionTier = 'master_admin' | 'salesperson' | 'employee';
@@ -36,9 +37,9 @@ type AuthState = {
   session: Session | null;
   loading: boolean;
   profile: Profile | null;
-  /** A recovery link was opened. The app stays on the new-password screen until it is saved. */
+  /** The open session is the recovery session. The app stays on the new-password screen until it is saved. */
   pendingPasswordReset: boolean;
-  markPasswordReset: () => void;
+  markPasswordReset: (userId: string) => void;
   clearPasswordReset: () => void;
   /** Re-read the account. Pass `{ claim: true }` to link invites again first. */
   reloadProfile: (opts?: { claim?: boolean }) => Promise<void>;
@@ -99,19 +100,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [sessionReady, setSessionReady] = useState(false);
   const [readyFor, setReadyFor] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [pendingPasswordReset, setPendingPasswordReset] = useState(false);
+  const [recoveryUserId, setRecoveryUserId] = useState<string | null>(null);
   const profileReq = useRef(0);
   const hadSession = useRef(false);
   const sessionRef = useRef<Session | null>(null);
   sessionRef.current = session;
 
-  const markPasswordReset = useCallback(() => {
-    setPendingPasswordReset(true);
-    AsyncStorage.setItem(RESET_KEY, '1').catch(() => {});
+  const markPasswordReset = useCallback((userId: string) => {
+    if (!passwordChangeAllowed(userId, userId)) return;
+    setRecoveryUserId(userId);
+    AsyncStorage.setItem(RESET_KEY, userId).catch(() => {});
   }, []);
 
   const clearPasswordReset = useCallback(() => {
-    setPendingPasswordReset(false);
+    setRecoveryUserId(null);
     AsyncStorage.removeItem(RESET_KEY).catch(() => {});
   }, []);
 
@@ -136,9 +138,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     // failure mode with AsyncStorage): force past the splash after 8s.
     const timer = setTimeout(finish, 8000);
     const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setPendingPasswordReset(true);
-        AsyncStorage.setItem(RESET_KEY, '1').catch(() => {});
+      if (event === 'PASSWORD_RECOVERY' && next?.user.id) {
+        setRecoveryUserId(next.user.id);
+        AsyncStorage.setItem(RESET_KEY, next.user.id).catch(() => {});
       }
       if (event === 'SIGNED_OUT') setSession(null);
       else if (next) setSession(next);
@@ -176,7 +178,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setReadyFor(null);
       if (hadSession.current) {
         hadSession.current = false;
-        setPendingPasswordReset(false);
+        setRecoveryUserId(null);
         AsyncStorage.removeItem(RESET_KEY).catch(() => {});
       }
       return;
@@ -200,7 +202,21 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }, 12000);
     AsyncStorage.getItem(RESET_KEY)
       .then((value) => {
-        if (!cancelled && value === '1') setPendingPasswordReset(true);
+        if (cancelled) return;
+        if (passwordChangeAllowed(value, uid)) {
+          setRecoveryUserId(value);
+          return;
+        }
+        // A bare flag or another account's id must not authorize this session.
+        if (value && value !== uid) {
+          setRecoveryUserId((current) => (current === value ? null : current));
+          // Drop that stale value only. A newer recovery id written after this read stays.
+          AsyncStorage.getItem(RESET_KEY)
+            .then((latest) => {
+              if (latest === value) AsyncStorage.removeItem(RESET_KEY).catch(() => {});
+            })
+            .catch(() => {});
+        }
       })
       .catch(() => {});
     loadProfile(uid, current, true).finally(() => {
@@ -234,6 +250,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   // does not flash an empty planner before claim returns. Signed out, only
   // the session check matters.
   const loading = !sessionReady || (session != null && readyFor !== session.user.id);
+  const pendingPasswordReset = passwordChangeAllowed(recoveryUserId, session?.user.id ?? null);
 
   return (
     <AuthContext.Provider
@@ -252,7 +269,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
           resetMembershipMemory();
           setProfile(null);
           setReadyFor(null);
-          setPendingPasswordReset(false);
+          setRecoveryUserId(null);
           AsyncStorage.removeItem(RESET_KEY).catch(() => {});
           return supabase.auth.signOut({ scope: 'local' }).then(() => {});
         },
