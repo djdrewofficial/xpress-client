@@ -3,6 +3,16 @@ import * as Linking from 'expo-linking';
 
 import { emailLooksValid } from '@/lib/phone';
 import { passwordIssue, type PasswordIssue } from '@/lib/passwords';
+import {
+  authFailureFrom,
+  isNetworkFailure,
+  isRequestRateLimit,
+  isSilentResetSendFailure,
+  mapRecoveryCodeError,
+  normalizeRecoveryCode,
+  recoveryCodeReady,
+  type AuthFailure,
+} from '@/lib/recoveryCode';
 import { isRecoverySessionFailure, recoveryRedirectUrl } from '@/lib/recoveryLink';
 import { supabase } from '@/lib/supabase';
 
@@ -23,17 +33,23 @@ export type EmailAuthError =
   | 'weak'
   | 'rate'
   | 'expired'
+  | 'wrongCode'
+  | 'codeRejected'
+  | 'network'
   | 'generic'
   | PasswordIssue;
 
-export function mapAuthError(error: AuthError): EmailAuthError {
-  const blob = `${error.code ?? ''} ${error.message ?? ''}`.toLowerCase();
+export function mapAuthError(error: AuthError | AuthFailure): EmailAuthError {
+  const failure = authFailureFrom(error);
+  if (isNetworkFailure(failure)) return 'network';
+  if (isRequestRateLimit(failure)) return 'rate';
+  const blob = `${failure.code ?? ''} ${failure.message ?? ''}`.toLowerCase();
   if (/rate|over_request|too many/.test(blob)) return 'rate';
   if (/not confirmed|email_not_confirmed/.test(blob)) return 'unconfirmed';
   if (/already registered|already been registered|user_already_exists|already exists/.test(blob)) return 'exists';
   if (/invalid login|invalid_credentials|invalid email or password/.test(blob)) return 'badCredentials';
   if (/password/.test(blob) && /weak|short|at least|should be/.test(blob)) return 'weak';
-  if (isRecoverySessionFailure(error.code, error.message)) return 'expired';
+  if (isRecoverySessionFailure(failure.code, failure.message)) return 'expired';
   return 'generic';
 }
 
@@ -74,9 +90,35 @@ export async function signInWithEmail(
 export async function sendPasswordReset(email: string): Promise<{ ok: true } | { ok: false; error: EmailAuthError }> {
   const clean = email.trim().toLowerCase();
   if (!emailLooksValid(clean)) return { ok: false, error: 'invalidEmail' };
-  const { error } = await supabase.auth.resetPasswordForEmail(clean, { redirectTo: resetRedirectUrl() });
-  if (error) return { ok: false, error: mapAuthError(error) };
-  return { ok: true };
+  try {
+    // Exact allow-listed value: xpressclient://auth/reset. The shared recovery
+    // template uses this redirect to show {{ .Token }} for the app.
+    const { error } = await supabase.auth.resetPasswordForEmail(clean, { redirectTo: resetRedirectUrl() });
+    if (!error || isSilentResetSendFailure(error)) return { ok: true };
+    return { ok: false, error: mapAuthError(error) };
+  } catch (error) {
+    return { ok: false, error: mapAuthError(authFailureFrom(error)) };
+  }
+}
+
+export async function verifyRecoveryCode(
+  email: string,
+  token: string,
+): Promise<{ ok: true; userId: string } | { ok: false; error: EmailAuthError }> {
+  const clean = email.trim().toLowerCase();
+  const code = normalizeRecoveryCode(token);
+  if (!emailLooksValid(clean)) return { ok: false, error: 'invalidEmail' };
+  if (!recoveryCodeReady(code)) return { ok: false, error: 'wrongCode' };
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({ email: clean, token: code, type: 'recovery' });
+    if (error) return { ok: false, error: mapRecoveryCodeError(error) };
+    const userId = data.session?.user?.id || data.user?.id;
+    if (!userId) return { ok: false, error: 'generic' };
+    return { ok: true, userId };
+  } catch (error) {
+    const failure = authFailureFrom(error);
+    return { ok: false, error: isNetworkFailure(failure) ? 'network' : mapAuthError(failure) };
+  }
 }
 
 export async function resendConfirmation(email: string): Promise<{ ok: true } | { ok: false; error: EmailAuthError }> {
@@ -97,7 +139,11 @@ export async function saveNewPassword(
 ): Promise<{ ok: true } | { ok: false; error: EmailAuthError }> {
   const issue = passwordIssue(password, email);
   if (issue) return { ok: false, error: issue };
-  const { error } = await supabase.auth.updateUser({ password });
-  if (error) return { ok: false, error: mapAuthError(error) };
-  return { ok: true };
+  try {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) return { ok: false, error: mapAuthError(error) };
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: mapAuthError(authFailureFrom(error)) };
+  }
 }

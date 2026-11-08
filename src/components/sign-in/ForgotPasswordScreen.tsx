@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 
 import { AuthFrame } from '@/components/sign-in/AuthFrame';
 import { TextField } from '@/components/sign-in/fields';
+import { ResetCodeScreen } from '@/components/sign-in/ResetCodeScreen';
 import { Button, useC } from '@/components/ui';
 import { sendPasswordReset, type EmailAuthError } from '@/lib/emailAuth';
 import { useT, type TranslationKey } from '@/lib/i18n';
@@ -24,6 +25,9 @@ const ERROR_KEY: Record<EmailAuthError, TranslationKey> = {
   number: 'signup.number',
   email: 'signup.sameEmail',
   long: 'signup.long',
+  wrongCode: 'login.genericError',
+  codeRejected: 'login.genericError',
+  network: 'login.network',
 };
 
 export function ForgotPasswordScreen() {
@@ -32,7 +36,7 @@ export function ForgotPasswordScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<TranslationKey | null>(null);
-  const [sent, setSent] = useState(false);
+  const [step, setStep] = useState<'email' | 'code'>('email');
   const [busy, setBusy] = useState(false);
 
   async function submit() {
@@ -40,19 +44,29 @@ export function ForgotPasswordScreen() {
     setBusy(true);
     setError(null);
     try {
-      const result = await sendPasswordReset(email);
+      const clean = email.trim().toLowerCase();
+      const result = await sendPasswordReset(clean);
       if (!result.ok) setError(ERROR_KEY[result.error]);
-      else setSent(true);
+      else {
+        setEmail(clean);
+        setStep('code');
+      }
+    } catch {
+      setError('login.network');
     } finally {
       setBusy(false);
     }
   }
 
-  if (sent) {
+  if (step === 'code') {
     return (
-      <AuthFrame title={t('forgot.sentTitle')} subtitle={t('forgot.sentBody', { email: email.trim() })}>
-        <Button label={t('forgot.back')} onPress={() => router.replace('/login')} />
-      </AuthFrame>
+      <ResetCodeScreen
+        email={email}
+        onChangeEmail={() => {
+          setStep('email');
+          setError(null);
+        }}
+      />
     );
   }
 
@@ -72,6 +86,7 @@ export function ForgotPasswordScreen() {
         textContentType="emailAddress"
         returnKeyType="send"
         onSubmitEditing={submit}
+        error={error === 'login.emailInvalid'}
       />
       {error ? <Text style={[Type.footnote, { color: c.redInk }]}>{t(error)}</Text> : null}
       <Button label={busy ? t('forgot.sending') : t('forgot.submit')} onPress={submit} disabled={busy} />

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } fro
 
 import { Icon, useC, type IconName } from '@/components/ui';
 import { useT } from '@/lib/i18n';
+import { normalizeRecoveryCode } from '@/lib/recoveryCode';
 import { Fonts, Radius, Type } from '@/lib/theme';
 
 export function TextField({
@@ -90,6 +91,56 @@ export function PasswordField({
   );
 }
 
+export function OneTimeCodeField({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  error,
+  editable = true,
+  autoFocus = false,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  error?: boolean;
+  editable?: boolean;
+  autoFocus?: boolean;
+}) {
+  const c = useC();
+  const [focused, setFocused] = useState(false);
+  const digits = normalizeRecoveryCode(value);
+  return (
+    <View style={{ gap: 6 }}>
+      <Text style={[Type.label, { color: c.accent }]}>{label}</Text>
+      <View style={[styles.field, { backgroundColor: c.surface, borderColor: error ? c.red : focused ? c.red : c.line }]}>
+        <Icon name="shield" size={22} color={c.ink3} />
+        <TextInput
+          value={digits}
+          onChangeText={(next) => onChangeText(normalizeRecoveryCode(next))}
+          placeholder={placeholder}
+          placeholderTextColor={c.ink3}
+          keyboardType="number-pad"
+          inputMode="numeric"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="one-time-code"
+          textContentType="oneTimeCode"
+          importantForAutofill="yes"
+          maxLength={32}
+          editable={editable}
+          autoFocus={autoFocus}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          accessibilityLabel={label}
+          style={[styles.input, digits ? styles.codeDigits : null, { color: c.ink }]}
+        />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   field: {
     height: 52,
@@ -101,4 +152,5 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   input: { flex: 1, fontFamily: Fonts.body, fontSize: 16, paddingVertical: 0 },
+  codeDigits: { fontFamily: Fonts.semibold, fontSize: 20, letterSpacing: 2 },
 });

@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth';
 import { saveNewPassword, type EmailAuthError } from '@/lib/emailAuth';
 import { useT, type TranslationKey } from '@/lib/i18n';
 import { newPasswordIssue } from '@/lib/passwords';
+import { resetExitAction } from '@/lib/recoveryGate';
 import { authAdoptInflight, subscribeAuthAdopt } from '@/lib/recoveryLink';
 import { Type } from '@/lib/theme';
 
@@ -22,6 +23,9 @@ const ERROR_KEY: Record<EmailAuthError, TranslationKey> = {
   rate: 'login.rateLimited',
   generic: 'login.genericError',
   expired: 'reset.invalid',
+  wrongCode: 'login.genericError',
+  codeRejected: 'login.genericError',
+  network: 'login.network',
   short: 'signup.short',
   letter: 'signup.letter',
   number: 'signup.number',
@@ -64,17 +68,23 @@ export function ResetPasswordScreen() {
     }
   }
 
-  if (!session || !pendingPasswordReset) {
-    if (loading || adopting) {
-      return (
-        <AuthFrame title={t('reset.title')} subtitle={t('reset.checking')}>
-          <ActivityIndicator color={c.accent} />
-        </AuthFrame>
-      );
-    }
+  const exit = resetExitAction({
+    hasSession: !!session,
+    pendingPasswordReset,
+    loading,
+    adopting,
+  });
+  if (exit === 'wait') {
+    return (
+      <AuthFrame title={t('reset.title')} subtitle={t('reset.checking')}>
+        <ActivityIndicator color={c.accent} />
+      </AuthFrame>
+    );
+  }
+  if (exit === 'invalid-home' || exit === 'invalid-request') {
     return (
       <AuthFrame title={t('reset.title')} subtitle={t('reset.invalid')}>
-        {session ? (
+        {exit === 'invalid-home' ? (
           <Button label={t('login.backChoices')} onPress={() => router.replace('/')} />
         ) : (
           <Button label={t('reset.request')} onPress={() => router.replace('/auth/forgot-password')} />

@@ -10,6 +10,9 @@
  * Request the allow-listed double-slash URL with no query. The template adds
  * the token hash. Incoming https reset links, the triple-slash form, and
  * PKCE codes are still accepted. Join links are not auth callbacks.
+ *
+ * The in-app reset asks for the emailed code and verifies it with the address.
+ * This module still accepts token-hash links from emails that were already sent.
  */
 
 export const RECOVERY_REDIRECT_URL = 'xpressclient://auth/reset';
