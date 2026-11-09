@@ -2,6 +2,7 @@ import { Text, View } from 'react-native';
 
 import { useT } from '@/lib/i18n';
 import { Type } from '@/lib/theme';
+import { scaledType } from '@/lib/welcomeCopy';
 import { useC } from './useC';
 
 /** Review prompt with tappable Privacy and Terms. Continuing does not authorize AI or marketing texts. */
@@ -25,6 +26,37 @@ export function LegalLine({
       {t('legal.reviewAnd')}
       <Text style={link} onPress={onTerms}>{t('legal.termsTitle')}</Text>
       {t('legal.reviewAfter')}
+    </Text>
+  );
+}
+
+/**
+ * One sentence above Continue. Terms and Privacy are links.
+ * Continuing still records the same acceptance. It does not opt in to texts or AI.
+ */
+export function ContinueAgreement({
+  onTerms,
+  onPrivacy,
+  fontScale = 1,
+}: {
+  onTerms: () => void;
+  onPrivacy: () => void;
+  /** Sample preview only. Production stays on the system text size. */
+  fontScale?: number;
+}) {
+  const c = useC();
+  const { t } = useT();
+  const foot = scaledType(Type.footnote, fontScale);
+  const link = [foot, { color: c.accent, textDecorationLine: 'underline' as const }];
+  const base = [foot, { color: c.ink2, textAlign: 'center' as const }];
+
+  return (
+    <Text style={base}>
+      {t('welcome.agreeBefore')}
+      <Text style={link} accessibilityRole="link" onPress={onTerms}>{t('legal.termsTitle')}</Text>
+      {t('welcome.agreeAnd')}
+      <Text style={link} accessibilityRole="link" onPress={onPrivacy}>{t('legal.privacyTitle')}</Text>
+      {t('welcome.agreeAfter')}
     </Text>
   );
 }

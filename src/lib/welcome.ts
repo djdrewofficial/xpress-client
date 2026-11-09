@@ -8,6 +8,8 @@ export type WelcomeSnapshot = {
   venue: string | null;
   /** 0–100, or null when planning data didn't load. */
   progress: number | null;
+  /** Existing public cover URL, when the event already has one. */
+  coverUrl?: string | null;
 };
 
 type LinkedClient = { first_name?: string | null } | { first_name?: string | null }[] | null;
@@ -20,10 +22,10 @@ function firstOf(client: LinkedClient): string | null {
 
 /** Couple label, event date, venue name, and endowed planning progress for Welcome. */
 export async function loadWelcomeSnapshot(eventId: string): Promise<WelcomeSnapshot> {
-  const empty: WelcomeSnapshot = { names: '', date: null, venue: null, progress: null };
+  const empty: WelcomeSnapshot = { names: '', date: null, venue: null, progress: null, coverUrl: null };
   const { data: ev } = await supabase
     .from('events')
-    .select('name, event_date, venue_id, package_id, client_id')
+    .select('name, event_date, venue_id, package_id, client_id, cover_photo_url')
     .eq('id', eventId)
     .maybeSingle();
   if (!ev) return empty;
@@ -61,10 +63,12 @@ export async function loadWelcomeSnapshot(eventId: string): Promise<WelcomeSnaps
     progress = null;
   }
 
+  const cover = (ev as { cover_photo_url?: unknown }).cover_photo_url;
   return {
     names: coupleDisplayName(firstNames, ev.name),
     date: ev.event_date ?? null,
     venue,
     progress,
+    coverUrl: typeof cover === 'string' && cover.trim() ? cover : null,
   };
 }

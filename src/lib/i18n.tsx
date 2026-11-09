@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { appEn, appEs } from '@/lib/appCopy';
 import { useAuth } from '@/lib/auth';
 import { readClientLanguage, readInitialLocale, readLanguagePref, saveLocale } from '@/lib/preferences';
+import { welcomeCopy } from '@/lib/welcomeCopy';
 
 /**
  * Tiny dictionaries for this phase (sign-in, welcome, music, first song).
@@ -117,12 +118,12 @@ const phaseEn = {
 
   'welcome.hello': 'Welcome',
   'welcome.helloNames': 'Welcome, {{names}}',
-  'welcome.sub': 'Plan your event with Xpress DJs. Save song requests, answer planning questions and coordinate with your event team. Information in shared event sections is available to authorized participants and staff. Cover photos use public links.',
   'welcome.langPrompt': 'English or Español?',
   'welcome.english': 'English',
   'welcome.spanish': 'Español',
   'welcome.selected': 'Selected',
   'welcome.continue': 'Continue',
+  ...welcomeCopy.en,
 
   'legal.privacyTitle': 'Privacy Policy',
   'legal.termsTitle': 'Terms of Use',
@@ -270,12 +271,12 @@ const phaseEs: Record<keyof typeof phaseEn, string> = {
 
   'welcome.hello': 'Bienvenidos',
   'welcome.helloNames': 'Bienvenidos, {{names}}',
-  'welcome.sub': 'Planifique su evento con Xpress DJs. Guarde solicitudes de canciones, responda preguntas y coordínese con su equipo. La información de las secciones compartidas está disponible para participantes autorizados y personal. Las portadas utilizan enlaces públicos.',
   'welcome.langPrompt': '¿Inglés o Español?',
   'welcome.english': 'Inglés',
   'welcome.spanish': 'Español',
   'welcome.selected': 'Elegido',
   'welcome.continue': 'Continuar',
+  ...welcomeCopy.es,
 
   'legal.privacyTitle': 'Política de privacidad',
   'legal.termsTitle': 'Condiciones de uso',

@@ -1,5 +1,6 @@
-import { useLayoutEffect } from 'react';
+import { useLayoutEffect, type ReactNode } from 'react';
 import { Redirect, useLocalSearchParams } from 'expo-router';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { JoinEventScreen } from '@/components/JoinEventScreen';
 import { FirstSongStep } from '@/components/onboarding/FirstSongStep';
@@ -14,15 +15,37 @@ import type { WelcomeSnapshot } from '@/lib/welcome';
 
 /**
  * Dev-only stills. Not linked from the app.
- * Open /dev/phase2?frame=login|signup|forgot|join|welcome|welcome-es|privacy|music|song
+ * Open /dev/phase2?frame=login|signup|forgot|join|welcome|welcome-es|welcome-offers|welcome-offers-es|privacy|music|song
+ * Welcome stills accept chrome=iphone|ipad for device insets. Sample data only.
  */
 
 const SAMPLE: WelcomeSnapshot = {
-  names: 'Sample & Couple',
+  names: 'Alex',
   date: '2027-06-12',
   venue: 'Sample Venue',
   progress: 43,
 };
+
+const IPHONE_METRICS = {
+  frame: { x: 0, y: 0, width: 402, height: 874 },
+  insets: { top: 59, left: 0, right: 0, bottom: 34 },
+};
+
+const IPAD_METRICS = {
+  frame: { x: 0, y: 0, width: 834, height: 1194 },
+  insets: { top: 24, left: 0, right: 0, bottom: 20 },
+};
+
+function PreviewFrame({ children }: { children: ReactNode }) {
+  const { chrome } = useLocalSearchParams<{ chrome?: string }>();
+  const value = Array.isArray(chrome) ? chrome[0] : chrome;
+  if (value !== 'iphone' && value !== 'ipad') return children;
+  return (
+    <SafeAreaProvider initialMetrics={value === 'ipad' ? IPAD_METRICS : IPHONE_METRICS}>
+      {children}
+    </SafeAreaProvider>
+  );
+}
 
 export default function Phase2Preview() {
   useDevLocale();
@@ -40,8 +63,24 @@ export default function Phase2Preview() {
   if (frame === 'signup' || frame === 'signup-es') return <SignUpScreen />;
   if (frame === 'forgot' || frame === 'forgot-es') return <ForgotPasswordScreen />;
   if (frame === 'join' || frame === 'join-es') return <JoinEventScreen onJoined={async () => {}} />;
-  if (frame === 'welcome' || frame === 'welcome-es') {
-    return <WelcomeScreen preview={SAMPLE} onContinue={() => {}} />;
+  if (
+    frame === 'welcome' ||
+    frame === 'welcome-es' ||
+    frame === 'welcome-large' ||
+    frame === 'welcome-large-es' ||
+    frame === 'welcome-offers' ||
+    frame === 'welcome-offers-es'
+  ) {
+    return (
+      <PreviewFrame>
+        <WelcomeScreen
+          preview={SAMPLE}
+          previewSms={frame.startsWith('welcome-offers')}
+          previewFontScale={frame.includes('large') ? 1.35 : 1}
+          onContinue={() => {}}
+        />
+      </PreviewFrame>
+    );
   }
   if (frame === 'privacy' || frame === 'privacy-es') {
     return <WelcomeScreen preview={SAMPLE} initialSheet="privacy" onContinue={() => {}} />;
