@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SmsConsentSetting } from '@/components/SmsConsentSetting';
 import { Button, ContentColumn, ContinueAgreement, useC } from '@/components/ui';
@@ -15,13 +16,15 @@ import { useT } from '@/lib/i18n';
 import { markWelcomeDone, recordLegalAcceptance, saveLocale } from '@/lib/preferences';
 import { Fonts, Radius, Type } from '@/lib/theme';
 import { loadWelcomeSnapshot, type WelcomeSnapshot } from '@/lib/welcome';
-import { scaledType } from '@/lib/welcomeCopy';
+import { continueAgreement, scaledType } from '@/lib/welcomeCopy';
+import { welcomePosterLayout } from '@/lib/welcomeLayout';
 import type { LegalDoc } from '@/lib/legal';
 
 export function WelcomeScreen({
   onContinue,
   preview,
   previewSms = false,
+  previewLocked = false,
   previewFontScale = 1,
   initialSheet = null,
 }: {
@@ -30,12 +33,15 @@ export function WelcomeScreen({
   preview?: WelcomeSnapshot | null;
   /** Sample preview only. Starts promotional texts on without a server call. */
   previewSms?: boolean;
+  /** Sample preview only. Shows the ineligible promotional-text explanation. */
+  previewLocked?: boolean;
   /** Sample preview only. Does not change production type size. */
   previewFontScale?: number;
   initialSheet?: LegalDoc | null;
 }) {
   const c = useC();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const frame = frameFor(width);
   const { t, locale, setLocale } = useT();
   const { session, profile } = useAuth();
@@ -44,6 +50,21 @@ export function WelcomeScreen({
   const [sheet, setSheet] = useState<LegalDoc | null>(initialSheet);
   const lock = useRef(false);
   const scale = previewFontScale;
+  const poster = welcomePosterLayout({
+    form: frame.form,
+    windowHeight: height,
+    contentWidth: Math.max(0, width - frame.horizontalPadding * 2),
+    topInset: insets.top,
+    bottomInset: insets.bottom,
+    fontScale: scale,
+    copy: {
+      invite: t('welcome.invite'),
+      daysToGo: t('welcome.daysToGo'),
+      smsLine: t('welcome.smsLine'),
+      phoneNote: t('sms.needPhone'),
+      agreement: continueAgreement(locale, t('legal.termsTitle'), t('legal.privacyTitle')),
+    },
+  });
 
   useEffect(() => {
     if (preview || !event) return;
@@ -100,10 +121,11 @@ export function WelcomeScreen({
           coverUrl={coverUrl}
           locale={locale}
           fontScale={scale}
+          posterMinHeight={poster.posterMinHeight}
         />
         <View style={[sheetStyle, { backgroundColor: c.bg }]}>
           <ContentColumn>
-            <View style={{ paddingHorizontal: frame.horizontalPadding, paddingTop: 28, paddingBottom: 20, gap: 22 }}>
+            <View style={{ paddingHorizontal: frame.horizontalPadding, paddingTop: 28, paddingBottom: Math.max(insets.bottom, 20), gap: 22 }}>
               <View accessibilityLabel={t('welcome.langPrompt')} style={langRow}>
                 <Text style={[langLabel, { color: c.ink3, fontFamily: Fonts.medium }]}>{t('welcome.language')}</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -128,6 +150,7 @@ export function WelcomeScreen({
                 onTerms={() => setSheet('terms')}
                 preview={!!preview}
                 previewGranted={preview ? previewSms : false}
+                previewLocked={preview ? previewLocked : false}
                 fontScale={scale}
                 layout="welcome"
               />
@@ -137,7 +160,7 @@ export function WelcomeScreen({
                   onPrivacy={() => setSheet('privacy')}
                   fontScale={scale}
                 />
-                <Button label={t('welcome.continue')} onPress={finish} />
+                <Button label={t('welcome.continue')} onPress={finish} style={{ flexShrink: 0 }} />
               </View>
             </View>
           </ContentColumn>

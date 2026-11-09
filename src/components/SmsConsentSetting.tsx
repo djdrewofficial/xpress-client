@@ -6,7 +6,10 @@ import { useC } from '@/components/ui';
 import {
   consentFromRead,
   loadingConsent,
+  previewSmsChoice,
   settleConsentWrite,
+  smsLockedNotice,
+  smsSwitchEnabled,
   type ConsentRead,
   type ConsentUi,
 } from '@/lib/consentState';
@@ -23,6 +26,7 @@ export function SmsConsentSetting({
   onTerms,
   preview = false,
   previewGranted = false,
+  previewLocked = false,
   fontScale = 1,
   layout = 'card',
 }: {
@@ -33,6 +37,8 @@ export function SmsConsentSetting({
   preview?: boolean;
   /** Sample preview only. Starts the switch on without a server call. */
   previewGranted?: boolean;
+  /** Sample preview only. Shows the no-US-mobile explanation and no switch. */
+  previewLocked?: boolean;
   /** Sample preview only. */
   fontScale?: number;
   /** `welcome` is the quiet row. `card` is the My Event setting. */
@@ -47,13 +53,17 @@ export function SmsConsentSetting({
 
   useEffect(() => {
     if (preview) {
-      setUi({
-        phase: 'known',
-        granted: previewGranted,
-        canGrant: !previewGranted,
-        canWithdraw: previewGranted,
-        notice: null,
-      });
+      setUi(
+        previewLocked
+          ? { phase: 'known', granted: false, canGrant: false, canWithdraw: false, notice: 'needPhone' }
+          : {
+              phase: 'known',
+              granted: previewGranted,
+              canGrant: !previewGranted,
+              canWithdraw: previewGranted,
+              notice: null,
+            },
+      );
       return;
     }
     const ticket = ++gen.current;
@@ -63,12 +73,11 @@ export function SmsConsentSetting({
       setUi(consentFromRead(asRead(result), 'sms'));
     });
     return () => { gen.current += 1; };
-  }, [preview, previewGranted, reloadSignal]);
+  }, [preview, previewGranted, previewLocked, reloadSignal]);
 
   async function write(intent: 'grant' | 'withdraw') {
     if (preview) {
-      const granted = intent === 'grant';
-      setUi({ phase: 'known', granted, canGrant: !granted, canWithdraw: granted, notice: null });
+      setUi(previewSmsChoice(intent));
       return;
     }
     if (busy || ui.phase !== 'known') return;
@@ -90,7 +99,8 @@ export function SmsConsentSetting({
   }
 
   const known = ui.phase === 'known';
-  const disabled = !known || busy || (ui.granted ? !ui.canWithdraw : !ui.canGrant);
+  const enabled = smsSwitchEnabled(ui) && !busy;
+  const lockedNotice = smsLockedNotice(ui);
 
   const welcomeTitle = scaledType(Type.subhead, fontScale);
   const welcomeBody = scaledType(Type.footnote, fontScale);
@@ -109,12 +119,11 @@ export function SmsConsentSetting({
               {t('welcome.details')}
             </Text>
           </View>
-          {known ? (
+          {enabled ? (
             <Switch
               value={ui.granted === true}
-              disabled={disabled}
+              disabled={false}
               onValueChange={(next) => {
-                if (disabled) return;
                 void write(next ? 'grant' : 'withdraw');
               }}
               trackColor={{ false: c.sunken, true: c.accent }}
@@ -131,10 +140,10 @@ export function SmsConsentSetting({
             {ui.phase === 'loading' ? t('sms.checking') : ui.notice === 'unconfirmed' ? t('sms.unconfirmed') : t('sms.unread')}
           </Text>
         )}
-        {ui.notice === 'needPhone' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.needPhone')}</Text> : null}
-        {ui.notice === 'unavailable' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.unavailable')}</Text> : null}
-        {ui.notice === 'ineligible' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.ineligible')}</Text> : null}
-        {ui.notice === 'failed' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.failed')}</Text> : null}
+        {lockedNotice === 'needPhone' ? <Text style={[welcomeBody, { color: c.ink2 }]}>{t('sms.needPhone')}</Text> : null}
+        {lockedNotice === 'unavailable' ? <Text style={[welcomeBody, { color: c.ink2 }]}>{t('sms.unavailable')}</Text> : null}
+        {lockedNotice === 'ineligible' ? <Text style={[welcomeBody, { color: c.ink2 }]}>{t('sms.ineligible')}</Text> : null}
+        {lockedNotice === 'failed' ? <Text style={[welcomeBody, { color: c.ink2 }]}>{t('sms.failed')}</Text> : null}
         {ui.phase === 'unknown' ? (
           <Pressable onPress={() => void reload()} accessibilityRole="button">
             <Text style={[Type.footnote, { color: c.accent }]}>{t('common.tryAgain')}</Text>
@@ -158,6 +167,7 @@ export function SmsConsentSetting({
     );
   }
 
+  const cardDisabled = !known || busy || (ui.granted ? !ui.canWithdraw : !ui.canGrant);
   return (
     <View style={[card, Shadow.card, { backgroundColor: c.surface, paddingHorizontal: 14, paddingVertical: 12, gap: 8 }]}>
       <Text style={[title, { color: c.ink }]}>{t('sms.title')}</Text>
@@ -167,9 +177,9 @@ export function SmsConsentSetting({
           <Text style={[Type.subhead, { color: c.ink, flex: 1 }]}>{t('sms.toggle')}</Text>
           <Switch
             value={ui.granted === true}
-            disabled={disabled}
+            disabled={cardDisabled}
             onValueChange={(next) => {
-              if (disabled) return;
+              if (cardDisabled) return;
               void write(next ? 'grant' : 'withdraw');
             }}
             trackColor={{ false: c.sunken, true: c.accent }}
