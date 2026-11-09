@@ -13,7 +13,7 @@ import {
 import { useT } from '@/lib/i18n';
 import { grantSmsConsent, loadSmsConsent, withdrawSmsConsent, type SmsConsentResult } from '@/lib/smsConsent';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
-import { marketingRatesVisible, smsDisclosureKeys } from '@/lib/welcomeCopy';
+import { scaledType, smsDisclosureKeys } from '@/lib/welcomeCopy';
 
 /** Promotional texts only. The switch is shown only after a server read confirms it. */
 export function SmsConsentSetting({
@@ -23,6 +23,7 @@ export function SmsConsentSetting({
   onTerms,
   preview = false,
   previewGranted = false,
+  fontScale = 1,
   layout = 'card',
 }: {
   eventId?: string | null;
@@ -32,7 +33,9 @@ export function SmsConsentSetting({
   preview?: boolean;
   /** Sample preview only. Starts the switch on without a server call. */
   previewGranted?: boolean;
-  /** `welcome` is the short row. `card` is the My Event setting. */
+  /** Sample preview only. */
+  fontScale?: number;
+  /** `welcome` is the quiet row. `card` is the My Event setting. */
   layout?: 'card' | 'welcome';
 }) {
   const c = useC();
@@ -89,13 +92,22 @@ export function SmsConsentSetting({
   const known = ui.phase === 'known';
   const disabled = !known || busy || (ui.granted ? !ui.canWithdraw : !ui.canGrant);
 
+  const welcomeTitle = scaledType(Type.subhead, fontScale);
+  const welcomeBody = scaledType(Type.footnote, fontScale);
+
   if (layout === 'welcome') {
     return (
-      <View style={[welcomeCard, { backgroundColor: c.surface, borderColor: c.line }]}>
-        <View style={row}>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={[Type.subhead, { color: c.ink }]}>{t('welcome.smsTitle')}</Text>
-            <Text style={[Type.footnote, { color: c.ink2 }]}>{t('welcome.smsLine')}</Text>
+      <View style={welcomeCard}>
+        <View style={[row, { alignItems: 'flex-start' }]}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={[welcomeTitle, { color: c.ink, fontFamily: Fonts.semibold }]}>{t('welcome.smsTitle')}</Text>
+            <Text style={[welcomeBody, { color: c.ink2 }]}>{t('welcome.smsLine')}</Text>
+            <Text
+              onPress={() => setDetails(true)}
+              accessibilityRole="link"
+              style={[welcomeBody, { color: c.accent, textDecorationLine: 'underline', alignSelf: 'flex-start' }]}>
+              {t('welcome.details')}
+            </Text>
           </View>
           {known ? (
             <Switch
@@ -115,19 +127,10 @@ export function SmsConsentSetting({
           ) : null}
         </View>
         {known ? null : (
-          <Text style={[Type.footnote, { color: c.ink2 }]}>
+          <Text style={[welcomeBody, { color: c.ink2 }]}>
             {ui.phase === 'loading' ? t('sms.checking') : ui.notice === 'unconfirmed' ? t('sms.unconfirmed') : t('sms.unread')}
           </Text>
         )}
-        {marketingRatesVisible(ui.granted) ? (
-          <Text style={[Type.footnote, { color: c.ink2 }]}>{t('welcome.smsRates')}</Text>
-        ) : null}
-        <Text
-          onPress={() => setDetails(true)}
-          accessibilityRole="link"
-          style={[Type.footnote, { color: c.accent, textDecorationLine: 'underline', alignSelf: 'flex-start' }]}>
-          {t('welcome.details')}
-        </Text>
         {ui.notice === 'needPhone' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.needPhone')}</Text> : null}
         {ui.notice === 'unavailable' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.unavailable')}</Text> : null}
         {ui.notice === 'ineligible' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.ineligible')}</Text> : null}
@@ -222,6 +225,6 @@ function asRead(result: SmsConsentResult): ConsentRead {
 }
 
 const card = { borderRadius: Radius.lg };
-const welcomeCard = { borderRadius: Radius.lg, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, gap: 6 };
+const welcomeCard = { gap: 6 };
 const row = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12 };
 const title = { fontFamily: Fonts.semibold, fontSize: 16, lineHeight: 21 };

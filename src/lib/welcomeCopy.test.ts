@@ -3,13 +3,7 @@ import test from 'node:test';
 
 import { appEn, appEs } from './appCopy.ts';
 import { legalDocument } from './legalCopy.ts';
-import {
-  aiDisclosureKeys,
-  continueAgreement,
-  marketingRatesVisible,
-  smsDisclosureKeys,
-  welcomeCopy,
-} from './welcomeCopy.ts';
+import { continueAgreement, scaledType, smsDisclosureKeys, welcomeCopy } from './welcomeCopy.ts';
 
 test('welcome copy has the same keys in English and Spanish, with no dashes', () => {
   assert.deepEqual(Object.keys(welcomeCopy.en).sort(), Object.keys(welcomeCopy.es).sort());
@@ -37,19 +31,23 @@ test('continuing agrees to Terms, Privacy, and 18+ in one sentence', () => {
   assert.equal(english.includes('third-party'), false);
 });
 
-test('the marketing summary is visible only while the switch is on', () => {
-  assert.equal(marketingRatesVisible(true), true);
-  assert.equal(marketingRatesVisible(false), false);
-  assert.equal(marketingRatesVisible(null), false);
-  assert.match(welcomeCopy.en['welcome.smsRates'], /Recurring automated texts/);
-  assert.match(welcomeCopy.en['welcome.smsRates'], /Msg & data rates may apply/);
-  assert.match(welcomeCopy.en['welcome.smsRates'], /Reply STOP to opt out/);
-  assert.match(welcomeCopy.es['welcome.smsRates'], /STOP/);
-  assert.match(welcomeCopy.es['welcome.smsRates'], /tarifas de mensajes y datos/);
+test('welcome does not ask for AI permission', () => {
+  for (const locale of ['en', 'es'] as const) {
+    for (const value of Object.values(welcomeCopy[locale])) {
+      assert.equal(/openai|ai planning|herramientas de ia/i.test(value), false, value);
+    }
+  }
+  assert.match(appEn['ai.body'], /OpenAI/);
+  assert.match(appEs['ai.body'], /OpenAI/);
 });
 
-test('details sheets keep the existing AI and marketing disclosure', () => {
-  assert.deepEqual([...aiDisclosureKeys], ['ai.body']);
+test('type scale leaves production sizes alone and grows a preview', () => {
+  const base = { fontSize: 16, lineHeight: 24, fontFamily: 'Montserrat' };
+  assert.deepEqual(scaledType(base, 1), base);
+  assert.deepEqual(scaledType(base, 1.35), { fontSize: 22, lineHeight: 32, fontFamily: 'Montserrat' });
+});
+
+test('details keep the existing marketing disclosure for review before opt-in', () => {
   assert.deepEqual([...smsDisclosureKeys], ['sms.body', 'sms.disclosure', 'sms.reassurance']);
 
   const ai = appEn['ai.body'];

@@ -2,6 +2,7 @@ import { Text, View } from 'react-native';
 
 import { useT } from '@/lib/i18n';
 import { Type } from '@/lib/theme';
+import { scaledType } from '@/lib/welcomeCopy';
 import { useC } from './useC';
 
 /** Review prompt with tappable Privacy and Terms. Continuing does not authorize AI or marketing texts. */
@@ -36,14 +37,18 @@ export function LegalLine({
 export function ContinueAgreement({
   onTerms,
   onPrivacy,
+  fontScale = 1,
 }: {
   onTerms: () => void;
   onPrivacy: () => void;
+  /** Sample preview only. Production stays on the system text size. */
+  fontScale?: number;
 }) {
   const c = useC();
   const { t } = useT();
-  const link = [Type.footnote, { color: c.accent, textDecorationLine: 'underline' as const }];
-  const base = [Type.footnote, { color: c.ink2, textAlign: 'center' as const }];
+  const foot = scaledType(Type.footnote, fontScale);
+  const link = [foot, { color: c.accent, textDecorationLine: 'underline' as const }];
+  const base = [foot, { color: c.ink2, textAlign: 'center' as const }];
 
   return (
     <Text style={base}>

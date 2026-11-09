@@ -63,10 +63,22 @@ export default function Phase2Preview() {
   if (frame === 'signup' || frame === 'signup-es') return <SignUpScreen />;
   if (frame === 'forgot' || frame === 'forgot-es') return <ForgotPasswordScreen />;
   if (frame === 'join' || frame === 'join-es') return <JoinEventScreen onJoined={async () => {}} />;
-  if (frame === 'welcome' || frame === 'welcome-es' || frame === 'welcome-offers' || frame === 'welcome-offers-es') {
+  if (
+    frame === 'welcome' ||
+    frame === 'welcome-es' ||
+    frame === 'welcome-large' ||
+    frame === 'welcome-large-es' ||
+    frame === 'welcome-offers' ||
+    frame === 'welcome-offers-es'
+  ) {
     return (
       <PreviewFrame>
-        <WelcomeScreen preview={SAMPLE} previewSms={frame.startsWith('welcome-offers')} onContinue={() => {}} />
+        <WelcomeScreen
+          preview={SAMPLE}
+          previewSms={frame.startsWith('welcome-offers')}
+          previewFontScale={frame.includes('large') ? 1.35 : 1}
+          onContinue={() => {}}
+        />
       </PreviewFrame>
     );
   }

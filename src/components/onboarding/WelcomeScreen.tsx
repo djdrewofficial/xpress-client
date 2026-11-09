@@ -1,30 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, Text, View, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
-import { AiConsentSetting } from '@/components/AiConsentSetting';
 import { SmsConsentSetting } from '@/components/SmsConsentSetting';
-import { Button, ContentColumn, ContinueAgreement, CountdownHero, LanguageCard, useC, useScheme } from '@/components/ui';
+import { Button, ContentColumn, ContinueAgreement, useC } from '@/components/ui';
 import { LegalSheet } from '@/components/onboarding/LegalSheet';
+import { WelcomeHero } from '@/components/onboarding/WelcomeHero';
 import { coupleDisplayName } from '@/lib/coupleName';
 import { formatEventEyebrow } from '@/lib/eventDate';
 import { frameFor } from '@/lib/frame';
 import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
-import { viewerRole } from '@/lib/membership';
 import { useT } from '@/lib/i18n';
 import { markWelcomeDone, recordLegalAcceptance, saveLocale } from '@/lib/preferences';
-import { Type } from '@/lib/theme';
+import { Fonts, Radius, Type } from '@/lib/theme';
 import { loadWelcomeSnapshot, type WelcomeSnapshot } from '@/lib/welcome';
+import { scaledType } from '@/lib/welcomeCopy';
 import type { LegalDoc } from '@/lib/legal';
-
-const SECTION = 16;
 
 export function WelcomeScreen({
   onContinue,
   preview,
   previewSms = false,
+  previewFontScale = 1,
   initialSheet = null,
 }: {
   onContinue: () => void;
@@ -32,10 +30,11 @@ export function WelcomeScreen({
   preview?: WelcomeSnapshot | null;
   /** Sample preview only. Starts promotional texts on without a server call. */
   previewSms?: boolean;
+  /** Sample preview only. Does not change production type size. */
+  previewFontScale?: number;
   initialSheet?: LegalDoc | null;
 }) {
   const c = useC();
-  const scheme = useScheme();
   const { width } = useWindowDimensions();
   const frame = frameFor(width);
   const { t, locale, setLocale } = useT();
@@ -44,6 +43,7 @@ export function WelcomeScreen({
   const [snap, setSnap] = useState<WelcomeSnapshot | null>(preview ?? null);
   const [sheet, setSheet] = useState<LegalDoc | null>(initialSheet);
   const lock = useRef(false);
+  const scale = previewFontScale;
 
   useEffect(() => {
     if (preview || !event) return;
@@ -63,12 +63,9 @@ export function WelcomeScreen({
   const date = snap?.date ?? event?.event_date ?? null;
   const venue = snap?.venue ?? event?.venueName ?? null;
   const progress = snap?.progress ?? null;
-  const host = !!event && viewerRole(event, profile?.accountType) === 'host';
-  const showAiToggle = !!preview || (host && !!event?.contractClient);
-  const showAiBlocked = !preview && host && !!event && !event.contractClient;
-
-  const headline = names ? t('welcome.helloNames', { names }) : t('welcome.hello');
-  const nameAt = names ? headline.lastIndexOf(names) : -1;
+  const coverUrl = snap?.coverUrl ?? (preview ? null : event?.cover_photo_url ?? null);
+  const langLabel = scaledType(Type.footnote, scale);
+  const langChoice = scaledType({ fontSize: 15, lineHeight: 20 }, scale);
 
   async function finish() {
     if (lock.current) return;
@@ -89,89 +86,112 @@ export function WelcomeScreen({
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'bottom']}>
-      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <ScrollView
-        style={{ flex: 1 }}
-        alwaysBounceVertical={false}
-        contentContainerStyle={{ flexGrow: 1 }}>
-        <ContentColumn fill>
-          <View
-            style={{
-              flexGrow: 1,
-              paddingHorizontal: frame.horizontalPadding,
-              paddingTop: frame.form === 'tablet' ? 28 : 8,
-              paddingBottom: 12,
-              justifyContent: frame.form === 'tablet' ? 'center' : 'space-between',
-              gap: SECTION,
-            }}>
-            <View style={{ gap: SECTION }}>
-              <Text style={[Type.largeTitle, { color: c.ink }]}>
-                {nameAt >= 0 ? headline.slice(0, nameAt) : headline}
-                {nameAt >= 0 ? <Text style={[Type.accent, { color: c.accent }]}>{names}</Text> : null}
-              </Text>
-
-              {date ? (
-                <CountdownHero
-                  date={date}
-                  venue={venue}
-                  dateLabel={formatEventEyebrow(date, locale)}
-                  progress={progress == null ? undefined : progress}
-                  size="large"
-                  locale={locale}
-                  showMoment={false}
-                />
-              ) : null}
-            </View>
-
-            <View style={{ gap: SECTION }}>
-              <View accessibilityLabel={t('welcome.langPrompt')} style={{ flexDirection: 'row', gap: 10 }}>
-                <LanguageCard
-                  compact
-                  label={t('welcome.english')}
-                  selected={locale === 'en'}
-                  selectedLabel={t('welcome.selected')}
-                  onPress={() => setLocale('en')}
-                />
-                <LanguageCard
-                  compact
-                  label={t('welcome.spanish')}
-                  selected={locale === 'es'}
-                  selectedLabel={t('welcome.selected')}
-                  onPress={() => setLocale('es')}
-                />
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <StatusBar style="light" />
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
+        <WelcomeHero
+          hello={t('welcome.hello')}
+          name={names}
+          invite={t('welcome.invite')}
+          date={date}
+          dateLabel={date ? formatEventEyebrow(date, locale) : undefined}
+          venue={venue}
+          progress={progress}
+          coverUrl={coverUrl}
+          locale={locale}
+          fontScale={scale}
+        />
+        <View style={[sheetStyle, { backgroundColor: c.bg }]}>
+          <ContentColumn>
+            <View style={{ paddingHorizontal: frame.horizontalPadding, paddingTop: 28, paddingBottom: 20, gap: 22 }}>
+              <View accessibilityLabel={t('welcome.langPrompt')} style={langRow}>
+                <Text style={[langLabel, { color: c.ink3, fontFamily: Fonts.medium }]}>{t('welcome.language')}</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <LangChoice
+                    label={t('welcome.english')}
+                    selected={locale === 'en'}
+                    scaleStyle={langChoice}
+                    onPress={() => setLocale('en')}
+                  />
+                  <LangChoice
+                    label={t('welcome.spanish')}
+                    selected={locale === 'es'}
+                    scaleStyle={langChoice}
+                    onPress={() => setLocale('es')}
+                  />
+                </View>
               </View>
-              {showAiToggle ? (
-                <AiConsentSetting
-                  eventId={event?.id ?? 'preview'}
-                  onPrivacy={() => setSheet('privacy')}
-                  onTerms={() => setSheet('terms')}
-                  preview={!!preview}
-                  layout="welcome"
-                />
-              ) : null}
-              {showAiBlocked ? (
-                <Text style={[Type.footnote, { color: c.ink3 }]}>{t('ai.notContractClient')}</Text>
-              ) : null}
+              <View style={{ height: 1, backgroundColor: c.line }} />
               <SmsConsentSetting
                 eventId={event?.id ?? null}
                 onPrivacy={() => setSheet('privacy')}
                 onTerms={() => setSheet('terms')}
                 preview={!!preview}
                 previewGranted={preview ? previewSms : false}
+                fontScale={scale}
                 layout="welcome"
               />
+              <View style={{ gap: 12, marginTop: 4 }}>
+                <ContinueAgreement
+                  onTerms={() => setSheet('terms')}
+                  onPrivacy={() => setSheet('privacy')}
+                  fontScale={scale}
+                />
+                <Button label={t('welcome.continue')} onPress={finish} />
+              </View>
             </View>
-
-            <View style={{ gap: 12 }}>
-              <ContinueAgreement onTerms={() => setSheet('terms')} onPrivacy={() => setSheet('privacy')} />
-              <Button label={t('welcome.continue')} onPress={finish} />
-            </View>
-          </View>
-        </ContentColumn>
+          </ContentColumn>
+        </View>
       </ScrollView>
-
       <LegalSheet visible={sheet != null} doc={sheet} onClose={() => setSheet(null)} />
-    </SafeAreaView>
+    </View>
   );
 }
+
+function LangChoice({
+  label,
+  selected,
+  onPress,
+  scaleStyle,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+  scaleStyle: { fontSize: number; lineHeight: number };
+}) {
+  const c = useC();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      style={{
+        borderRadius: Radius.pill,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: selected ? c.accentTint : 'transparent',
+      }}>
+      <Text
+        style={{
+          fontFamily: selected ? Fonts.semibold : Fonts.medium,
+          fontSize: scaleStyle.fontSize,
+          lineHeight: scaleStyle.lineHeight,
+          color: selected ? c.accent : c.ink2,
+        }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+const sheetStyle = {
+  marginTop: -28,
+  borderTopLeftRadius: 28,
+  borderTopRightRadius: 28,
+};
+const langRow = {
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  justifyContent: 'space-between' as const,
+  gap: 12,
+};
