@@ -29,6 +29,33 @@ export function LegalLine({
   );
 }
 
+/**
+ * One sentence above Continue. Terms and Privacy are links.
+ * Continuing still records the same acceptance. It does not opt in to texts or AI.
+ */
+export function ContinueAgreement({
+  onTerms,
+  onPrivacy,
+}: {
+  onTerms: () => void;
+  onPrivacy: () => void;
+}) {
+  const c = useC();
+  const { t } = useT();
+  const link = [Type.footnote, { color: c.accent, textDecorationLine: 'underline' as const }];
+  const base = [Type.footnote, { color: c.ink2, textAlign: 'center' as const }];
+
+  return (
+    <Text style={base}>
+      {t('welcome.agreeBefore')}
+      <Text style={link} accessibilityRole="link" onPress={onTerms}>{t('legal.termsTitle')}</Text>
+      {t('welcome.agreeAnd')}
+      <Text style={link} accessibilityRole="link" onPress={onPrivacy}>{t('legal.privacyTitle')}</Text>
+      {t('welcome.agreeAfter')}
+    </Text>
+  );
+}
+
 /** Privacy and Terms links for sign-in and sign-up. Does not open unpublished website pages. */
 export function PolicyLinks({
   onPrivacy,

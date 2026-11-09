@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, Switch, Text, View } from 'react-native';
+import { Platform, Pressable, Switch, Text, View } from 'react-native';
 
+import { DisclosureSheet } from '@/components/onboarding/DisclosureSheet';
 import { useC } from '@/components/ui';
 import {
   consentFromRead,
@@ -12,6 +13,7 @@ import {
 import { useT } from '@/lib/i18n';
 import { grantSmsConsent, loadSmsConsent, withdrawSmsConsent, type SmsConsentResult } from '@/lib/smsConsent';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
+import { marketingRatesVisible, smsDisclosureKeys } from '@/lib/welcomeCopy';
 
 /** Promotional texts only. The switch is shown only after a server read confirms it. */
 export function SmsConsentSetting({
@@ -20,22 +22,35 @@ export function SmsConsentSetting({
   onPrivacy,
   onTerms,
   preview = false,
+  previewGranted = false,
+  layout = 'card',
 }: {
   eventId?: string | null;
   reloadSignal?: number;
   onPrivacy: () => void;
   onTerms: () => void;
   preview?: boolean;
+  /** Sample preview only. Starts the switch on without a server call. */
+  previewGranted?: boolean;
+  /** `welcome` is the short row. `card` is the My Event setting. */
+  layout?: 'card' | 'welcome';
 }) {
   const c = useC();
   const { t } = useT();
   const [ui, setUi] = useState<ConsentUi>(loadingConsent());
+  const [details, setDetails] = useState(false);
   const [busy, setBusy] = useState(false);
   const gen = useRef(0);
 
   useEffect(() => {
     if (preview) {
-      setUi({ phase: 'known', granted: false, canGrant: true, canWithdraw: false, notice: null });
+      setUi({
+        phase: 'known',
+        granted: previewGranted,
+        canGrant: !previewGranted,
+        canWithdraw: previewGranted,
+        notice: null,
+      });
       return;
     }
     const ticket = ++gen.current;
@@ -45,10 +60,15 @@ export function SmsConsentSetting({
       setUi(consentFromRead(asRead(result), 'sms'));
     });
     return () => { gen.current += 1; };
-  }, [preview, reloadSignal]);
+  }, [preview, previewGranted, reloadSignal]);
 
   async function write(intent: 'grant' | 'withdraw') {
-    if (busy || preview || ui.phase !== 'known') return;
+    if (preview) {
+      const granted = intent === 'grant';
+      setUi({ phase: 'known', granted, canGrant: !granted, canWithdraw: granted, notice: null });
+      return;
+    }
+    if (busy || ui.phase !== 'known') return;
     if (intent === 'grant' && !ui.canGrant) return;
     if (intent === 'withdraw' && (!ui.granted || !ui.canWithdraw)) return;
     const ticket = ++gen.current;
@@ -68,6 +88,72 @@ export function SmsConsentSetting({
 
   const known = ui.phase === 'known';
   const disabled = !known || busy || (ui.granted ? !ui.canWithdraw : !ui.canGrant);
+
+  if (layout === 'welcome') {
+    return (
+      <View style={[welcomeCard, { backgroundColor: c.surface, borderColor: c.line }]}>
+        <View style={row}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={[Type.subhead, { color: c.ink }]}>{t('welcome.smsTitle')}</Text>
+            <Text style={[Type.footnote, { color: c.ink2 }]}>{t('welcome.smsLine')}</Text>
+          </View>
+          {known ? (
+            <Switch
+              value={ui.granted === true}
+              disabled={disabled}
+              onValueChange={(next) => {
+                if (disabled) return;
+                void write(next ? 'grant' : 'withdraw');
+              }}
+              trackColor={{ false: c.sunken, true: c.accent }}
+              thumbColor="#ffffff"
+              ios_backgroundColor={c.sunken}
+              accessibilityLabel={t('welcome.smsTitle')}
+              // Web paints a teal thumb unless this is set. iOS keeps its white thumb.
+              {...(Platform.OS === 'web' ? { activeThumbColor: '#ffffff' } : {})}
+            />
+          ) : null}
+        </View>
+        {known ? null : (
+          <Text style={[Type.footnote, { color: c.ink2 }]}>
+            {ui.phase === 'loading' ? t('sms.checking') : ui.notice === 'unconfirmed' ? t('sms.unconfirmed') : t('sms.unread')}
+          </Text>
+        )}
+        {marketingRatesVisible(ui.granted) ? (
+          <Text style={[Type.footnote, { color: c.ink2 }]}>{t('welcome.smsRates')}</Text>
+        ) : null}
+        <Text
+          onPress={() => setDetails(true)}
+          accessibilityRole="link"
+          style={[Type.footnote, { color: c.accent, textDecorationLine: 'underline', alignSelf: 'flex-start' }]}>
+          {t('welcome.details')}
+        </Text>
+        {ui.notice === 'needPhone' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.needPhone')}</Text> : null}
+        {ui.notice === 'unavailable' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.unavailable')}</Text> : null}
+        {ui.notice === 'ineligible' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.ineligible')}</Text> : null}
+        {ui.notice === 'failed' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.failed')}</Text> : null}
+        {ui.phase === 'unknown' ? (
+          <Pressable onPress={() => void reload()} accessibilityRole="button">
+            <Text style={[Type.footnote, { color: c.accent }]}>{t('common.tryAgain')}</Text>
+          </Pressable>
+        ) : null}
+        <DisclosureSheet
+          visible={details}
+          title={t('welcome.smsTitle')}
+          paragraphs={smsDisclosureKeys.map((key) => t(key))}
+          onClose={() => setDetails(false)}
+          onTerms={() => {
+            setDetails(false);
+            onTerms();
+          }}
+          onPrivacy={() => {
+            setDetails(false);
+            onPrivacy();
+          }}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={[card, Shadow.card, { backgroundColor: c.surface, paddingHorizontal: 14, paddingVertical: 12, gap: 8 }]}>
@@ -136,5 +222,6 @@ function asRead(result: SmsConsentResult): ConsentRead {
 }
 
 const card = { borderRadius: Radius.lg };
+const welcomeCard = { borderRadius: Radius.lg, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, gap: 6 };
 const row = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12 };
 const title = { fontFamily: Fonts.semibold, fontSize: 16, lineHeight: 21 };
