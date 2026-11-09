@@ -54,7 +54,7 @@ export function WelcomeHero({
   const venueType = scaledType({ fontFamily: Fonts.displayItalic, fontSize: 20, lineHeight: 26, color: '#ffffff' }, fontScale);
 
   return (
-    <View style={[styles.hero, { minHeight: tablet ? Math.round(height * 0.68) : Math.round(height * 0.58) }]}>
+    <View style={[styles.hero, tablet ? null : { minHeight: Math.round(height * 0.58) }]}>
       {coverUrl ? (
         <Image source={{ uri: coverUrl }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
       ) : (
@@ -72,12 +72,17 @@ export function WelcomeHero({
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
-      <ContentColumn fill>
-        <View style={[styles.inner, { paddingTop: insets.top + (tablet ? 36 : 12), paddingBottom: tablet ? 56 : 48 }]}>
+      <ContentColumn fill={!tablet}>
+        <View
+          style={[
+            styles.inner,
+            { paddingTop: insets.top + (tablet ? 32 : 12), paddingBottom: tablet ? 40 : 48 },
+            tablet ? styles.innerTablet : null,
+          ]}>
           <Text style={[kicker, styles.kicker]}>{hello}</Text>
           {name ? <Text style={[styles.name, nameType]}>{name}</Text> : null}
           <Text style={[styles.invite, inviteType]}>{invite}</Text>
-          <View style={styles.spacer} />
+          <View style={tablet ? styles.tabletGap : styles.spacer} />
           {model ? (
             <View style={styles.countBlock}>
               {showCount ? <Text style={[styles.numeral, numeral]}>{model.days}</Text> : null}
@@ -120,6 +125,8 @@ const styles = StyleSheet.create({
     right: -70,
   },
   inner: { flexGrow: 1, paddingHorizontal: 24, gap: 10 },
+  innerTablet: { flexGrow: 0, gap: 12 },
+  tabletGap: { height: 20 },
   kicker: { color: Gradients.countdownHero.glow },
   name: { fontFamily: Fonts.displayItalic, color: '#ffffff', marginTop: 2 },
   invite: { fontFamily: Fonts.body, color: 'rgba(255,255,255,0.88)', maxWidth: 460 },
