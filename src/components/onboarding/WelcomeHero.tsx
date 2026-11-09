@@ -51,13 +51,13 @@ export function WelcomeHero({
   const unit = model ? unitLabel(model.days, model.tier, locale) : '';
   const pct = progress == null ? null : Math.max(0, Math.min(100, Math.round(progress)));
   const kicker = scaledType(Type.overline, fontScale);
-  const inviteType = scaledType({ fontSize: compact ? 16 : 17, lineHeight: compact ? 22 : 24 }, fontScale);
+  const inviteType = scaledType({ fontSize: compact ? 16 : 17, lineHeight: compact ? 20 : 24 }, fontScale);
   const nameType = scaledType(
-    { fontSize: tablet ? 56 : compact ? 34 : 42, lineHeight: tablet ? 60 : compact ? 38 : 46 },
+    { fontSize: tablet ? 56 : compact ? 32 : 42, lineHeight: tablet ? 60 : compact ? 36 : 46 },
     fontScale,
   );
   const numeral = scaledType(
-    { fontSize: tablet ? 104 : compact ? 52 : 72, lineHeight: tablet ? 104 : compact ? 52 : 72 },
+    { fontSize: tablet ? 104 : compact ? 48 : 72, lineHeight: tablet ? 104 : compact ? 48 : 72 },
     fontScale,
   );
   const unitType = scaledType({ fontSize: compact ? 18 : 22, lineHeight: compact ? 22 : 28 }, fontScale);
@@ -66,6 +66,8 @@ export function WelcomeHero({
     { fontFamily: Fonts.displayItalic, fontSize: compact ? 18 : 20, lineHeight: compact ? 22 : 26, color: '#ffffff' },
     fontScale,
   );
+  const logoHeight = tablet ? 80 : compact ? 48 : 72;
+  const logoGap = tablet ? 18 : compact ? 8 : 16;
 
   return (
     <View style={[styles.hero, posterMinHeight != null ? { height: posterMinHeight, minHeight: posterMinHeight } : null]}>
@@ -91,17 +93,20 @@ export function WelcomeHero({
           style={[
             styles.inner,
             {
-              paddingTop: insets.top + (tablet ? 32 : compact ? 8 : 10),
-              paddingBottom: tablet ? 40 : compact ? 28 : 36,
-              gap: tablet ? 12 : compact ? 6 : 10,
+              paddingTop: insets.top + (tablet ? 32 : compact ? 6 : 10),
+              paddingBottom: tablet ? 40 : compact ? 20 : 36,
             },
             tablet ? styles.innerTablet : null,
           ]}>
-          <Text style={[kicker, styles.kicker]}>{hello}</Text>
-          {name ? <Text style={[styles.name, nameType]}>{name}</Text> : null}
-          <Text style={[styles.invite, inviteType]}>{invite}</Text>
-          <View style={tablet ? styles.logoTablet : [styles.spacer, compact ? styles.spacerCompact : null]}>
-            <Logo variant="full" height={tablet ? 44 : compact ? 28 : 36} tone="#ffffff" />
+          {/* Leftover poster height stays above the composed greeting → logo → countdown unit. */}
+          {tablet ? null : <View style={styles.topFlex} />}
+          <View style={[styles.greeting, { gap: compact ? 4 : 6 }]}>
+            <Text style={[kicker, styles.kicker]}>{hello}</Text>
+            {name ? <Text style={[styles.name, nameType]}>{name}</Text> : null}
+            <Text style={[styles.invite, inviteType]}>{invite}</Text>
+          </View>
+          <View style={[styles.logoSlot, { marginTop: logoGap, marginBottom: logoGap }]}>
+            <Logo variant="full" height={logoHeight} tone="#ffffff" />
           </View>
           {model ? (
             <View style={styles.countBlock}>
@@ -144,14 +149,14 @@ const styles = StyleSheet.create({
     top: -80,
     right: -70,
   },
-  inner: { flexGrow: 1, paddingHorizontal: 24, gap: 10 },
-  innerTablet: { flexGrow: 0, gap: 12 },
-  logoTablet: { marginTop: 10, marginBottom: 6, alignItems: 'flex-start' },
+  inner: { flexGrow: 1, paddingHorizontal: 24, gap: 0 },
+  innerTablet: { flexGrow: 0, gap: 0 },
+  topFlex: { flexGrow: 1, minHeight: 0 },
+  greeting: { alignItems: 'flex-start' },
+  logoSlot: { alignItems: 'flex-start' },
   kicker: { color: Gradients.countdownHero.glow },
   name: { fontFamily: Fonts.displayItalic, color: '#ffffff', marginTop: 2 },
   invite: { fontFamily: Fonts.body, color: 'rgba(255,255,255,0.88)', maxWidth: 460 },
-  spacer: { flexGrow: 1, minHeight: 32, justifyContent: 'center', alignItems: 'flex-start' },
-  spacerCompact: { minHeight: 28 },
   countBlock: { gap: 4, alignItems: 'flex-start' },
   numeral: { fontFamily: Fonts.display, color: '#ffffff', letterSpacing: -1.5 },
   unit: { fontFamily: Fonts.displayItalic, color: Gradients.countdownHero.glow, marginTop: -2 },

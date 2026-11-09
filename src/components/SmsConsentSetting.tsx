@@ -141,7 +141,11 @@ export function SmsConsentSetting({
           </Text>
         )}
         {lockedNotice === 'needPhone' ? (
-          <Text style={[welcomeBody, { color: c.ink2 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.9}>
+          <Text
+            style={[welcomeBody, { color: c.ink2 }]}
+            {...(Platform.OS === 'web'
+              ? null
+              : { numberOfLines: 1 as const, adjustsFontSizeToFit: true, minimumFontScale: 0.9 })}>
             {t('sms.needPhone')}
           </Text>
         ) : null}

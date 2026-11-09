@@ -79,27 +79,30 @@ function posterContentHeight(
 ): number {
   const inviteLines = wrappedLines(copy.invite, Math.min(width, 460), Math.round((compact ? 16 : 17) * scale));
   const unitLines = wrappedLines(copy.daysToGo, width, Math.round((compact ? 20 : 22) * scale));
-  // Logo sits in the flex gap; this floor is the non-flex stack on a phone.
-  const logoGap = compact ? 28 : 32;
-  const name = Math.round((compact ? 36 : 46) * scale);
-  const numeral = Math.round((compact ? 52 : 72) * scale);
-  const unit = Math.round((compact ? 22 : 28) * scale);
-  const inviteLine = Math.round((compact ? 22 : 24) * scale);
-  const padBottom = compact ? 26 : 36;
-  const progress = compact ? 22 : 30;
-  const gap = compact ? 6 : 10;
+  // Greeting → logo → countdown pack with even gaps; leftover height stays above.
+  const logo = compact ? 48 : 72;
+  const logoGap = compact ? 8 : 16;
+  const name = Math.round((compact ? 32 : 46) * scale);
+  const numeral = Math.round((compact ? 48 : 72) * scale);
+  const unit = Math.round((compact ? 20 : 28) * scale);
+  const inviteLine = Math.round((compact ? 20 : 24) * scale);
+  const padBottom = compact ? 20 : 36;
+  const progress = compact ? 18 : 30;
+  const greetingGap = compact ? 4 : 6;
   return (
     topInset +
-    (compact ? 8 : 10) +
+    (compact ? 6 : 10) +
     Math.round(14 * scale) +
-    gap +
+    greetingGap +
     name +
-    gap +
+    greetingGap +
     inviteLines * inviteLine +
+    logoGap +
+    logo +
     logoGap +
     numeral +
     unitLines * unit +
-    (compact ? 12 : 19) +
+    (compact ? 10 : 19) +
     Math.round(18 * scale) +
     progress +
     padBottom
