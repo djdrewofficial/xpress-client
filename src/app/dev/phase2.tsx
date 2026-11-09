@@ -15,7 +15,7 @@ import type { WelcomeSnapshot } from '@/lib/welcome';
 
 /**
  * Dev-only stills. Not linked from the app.
- * Open /dev/phase2?frame=login|signup|forgot|join|welcome|welcome-es|welcome-offers|welcome-offers-es|privacy|music|song
+ * Open /dev/phase2?frame=login|signup|forgot|join|welcome|welcome-es|welcome-large|welcome-large-es|welcome-locked|welcome-offers|welcome-offers-es|privacy|music|song
  * Welcome stills accept chrome=iphone|ipad for device insets. Sample data only.
  */
 
@@ -69,13 +69,16 @@ export default function Phase2Preview() {
     frame === 'welcome-large' ||
     frame === 'welcome-large-es' ||
     frame === 'welcome-offers' ||
-    frame === 'welcome-offers-es'
+    frame === 'welcome-offers-es' ||
+    frame === 'welcome-locked' ||
+    frame === 'welcome-locked-es'
   ) {
     return (
       <PreviewFrame>
         <WelcomeScreen
           preview={SAMPLE}
           previewSms={frame.startsWith('welcome-offers')}
+          previewLocked={frame.startsWith('welcome-locked')}
           previewFontScale={frame.includes('large') ? 1.35 : 1}
           onContinue={() => {}}
         />

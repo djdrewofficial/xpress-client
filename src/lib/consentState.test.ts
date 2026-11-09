@@ -6,7 +6,10 @@ import {
   consentAfterWrite,
   consentFromRead,
   loadingConsent,
+  previewSmsChoice,
   settleConsentWrite,
+  smsLockedNotice,
+  smsSwitchEnabled,
   type ConsentRead,
   type ConsentUi,
 } from './consentState.ts';
@@ -48,6 +51,40 @@ test('a failed read is unknown, not an explicit decline', () => {
   assert.equal(ui.phase, 'unknown');
   assert.equal(ui.granted, null);
   assert.equal(ui.notice, 'unread');
+});
+
+test('a booking without a US mobile does not offer a switch', () => {
+  const ui = consentFromRead(
+    { ok: true, record: { granted: false, canGrant: false, canWithdraw: false, reason: 'no_mobile_number' } },
+    'sms',
+  );
+  assert.equal(ui.notice, 'needPhone');
+  assert.equal(smsSwitchEnabled(ui), false);
+  assert.equal(smsLockedNotice(ui), 'needPhone');
+});
+
+test('an eligible promotional-text switch follows the choice', () => {
+  const off = consentFromRead(
+    { ok: true, record: { granted: false, canGrant: true, canWithdraw: false, reason: null } },
+    'sms',
+  );
+  assert.equal(smsSwitchEnabled(off), true);
+  assert.equal(smsLockedNotice(off), null);
+  const on = previewSmsChoice('grant');
+  assert.equal(on.granted, true);
+  assert.equal(smsSwitchEnabled(on), true);
+  const back = previewSmsChoice('withdraw');
+  assert.equal(back.granted, false);
+  assert.equal(smsSwitchEnabled(back), true);
+});
+
+test('a locked switch without a reason still explains itself', () => {
+  const ui = consentFromRead(
+    { ok: true, record: { granted: false, canGrant: false, canWithdraw: false, reason: null } },
+    'sms',
+  );
+  assert.equal(smsSwitchEnabled(ui), false);
+  assert.equal(smsLockedNotice(ui), 'ineligible');
 });
 
 test('a server record of not granted is a known no', () => {

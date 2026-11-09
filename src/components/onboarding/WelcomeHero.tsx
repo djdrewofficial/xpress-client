@@ -26,6 +26,7 @@ export function WelcomeHero({
   coverUrl,
   locale,
   fontScale = 1,
+  posterMinHeight = null,
 }: {
   hello: string;
   name: string;
@@ -37,9 +38,11 @@ export function WelcomeHero({
   coverUrl?: string | null;
   locale: Locale;
   fontScale?: number;
+  /** Phone only. Null keeps the tablet poster. */
+  posterMinHeight?: number | null;
 }) {
   const insets = useSafeAreaInsets();
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const tablet = frameFor(width).form === 'tablet';
   const model = date ? countdownModel(date, locale) : null;
   const showCount = model != null && model.tier !== 'dayOf' && model.tier !== 'married';
@@ -54,7 +57,7 @@ export function WelcomeHero({
   const venueType = scaledType({ fontFamily: Fonts.displayItalic, fontSize: 20, lineHeight: 26, color: '#ffffff' }, fontScale);
 
   return (
-    <View style={[styles.hero, tablet ? null : { minHeight: Math.round(height * 0.58) }]}>
+    <View style={[styles.hero, posterMinHeight != null ? { minHeight: posterMinHeight } : null]}>
       {coverUrl ? (
         <Image source={{ uri: coverUrl }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
       ) : (

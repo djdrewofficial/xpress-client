@@ -36,6 +36,29 @@ export function loadingConsent(): ConsentUi {
   return { phase: 'loading', granted: null, canGrant: false, canWithdraw: false, notice: null };
 }
 
+/**
+ * A known SMS choice that the server will not accept is not a working switch.
+ * Welcome explains that state instead of showing a control that does not move.
+ */
+export function smsSwitchEnabled(ui: ConsentUi): boolean {
+  if (ui.phase !== 'known') return false;
+  return ui.granted === true ? ui.canWithdraw === true : ui.canGrant === true;
+}
+
+/** The sentence to show when the switch must not be offered. */
+export function smsLockedNotice(ui: ConsentUi): ConsentNotice {
+  if (smsSwitchEnabled(ui)) return null;
+  if (ui.notice) return ui.notice;
+  if (ui.phase === 'known') return 'ineligible';
+  return null;
+}
+
+/** Sample preview only. A real grant still goes through the server. */
+export function previewSmsChoice(intent: 'grant' | 'withdraw'): ConsentUi {
+  const granted = intent === 'grant';
+  return { phase: 'known', granted, canGrant: !granted, canWithdraw: granted, notice: null };
+}
+
 function knownFrom(record: ConsentSnapshot, kind: ConsentKind): ConsentUi {
   let notice: ConsentNotice = null;
   if (kind === 'sms' && record.reason === 'no_mobile_number') notice = 'needPhone';
