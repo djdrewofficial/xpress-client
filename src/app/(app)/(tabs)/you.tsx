@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { AiConsentSetting } from '@/components/AiConsentSetting';
 import { EventSafetyPanel } from '@/components/moderation/EventSafetyPanel';
 import { DeleteAccountSheet, InviteSentSheet } from '@/components/AccountSheets';
 import { SmsConsentSetting } from '@/components/SmsConsentSetting';
@@ -209,15 +208,6 @@ export default function AccountScreen() {
         deleting={deletePhase === 'working'}
         language={locale}
         onLanguage={setLocale}
-        aiConsent={
-          event && viewerRole(event, profile?.accountType) === 'host' ? (
-            event.contractClient && eventId ? (
-              <AiConsentSetting eventId={eventId} reloadSignal={consentReload} onPrivacy={() => setLegal('privacy')} />
-            ) : (
-              <Text style={[Type.footnote, { color: c.ink3 }]}>{t('ai.notContractClient')}</Text>
-            )
-          ) : null
-        }
         smsConsent={
           profile?.accountType === 'staff' ? null : (
             <SmsConsentSetting

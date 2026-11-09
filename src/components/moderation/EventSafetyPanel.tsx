@@ -89,19 +89,23 @@ export function EventSafetyPanel({
   const songTitle = (songId: string) => songs.find((song) => song.id === songId)?.title ?? t('safety.likes');
 
   return (
-    <View style={{ gap: 10 }}>
-      <Text style={[Type.label, { color: c.ink3 }]}>{t('safety.heading')}</Text>
+    <View style={{ gap: 12 }}>
+      <View style={{ gap: 6 }}>
+        <Text style={[Type.label, { color: c.ink3 }]}>{t('safety.heading')}</Text>
+        {!loading && !notice ? (
+          <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.intro')}</Text>
+        ) : null}
+      </View>
       {loading ? <ActivityIndicator color={c.accent} /> : null}
       {!loading && notice ? (
         <Text style={[Type.footnote, { color: c.ink2 }]}>{t(noticeCopy(notice))}</Text>
       ) : null}
       {!loading && !notice ? (
         <>
-          <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.intro')}</Text>
           {ambiguousLikes || unlabeledBlocked.length > 1 ? (
             <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.namesUnavailable')}</Text>
           ) : null}
-          <Text style={[Type.subhead, { color: c.ink }]}>{t('safety.blockedPeople')}</Text>
+          <Text style={[Type.subhead, { color: c.ink, marginTop: 2 }]}>{t('safety.blockedPeople')}</Text>
           {namedBlocked.length === 0 && unlabeledBlocked.length === 0 ? (
             <Text style={[Type.footnote, { color: c.ink3 }]}>{t('safety.noBlocked')}</Text>
           ) : null}

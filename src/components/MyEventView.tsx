@@ -60,7 +60,6 @@ export function MyEventView({
   deleting,
   language,
   onLanguage,
-  aiConsent,
   smsConsent,
   safety,
 }: {
@@ -95,8 +94,6 @@ export function MyEventView({
   deleting: boolean;
   language: AppLanguage;
   onLanguage: (language: AppLanguage) => void;
-  /** Contract-client AI consent, or a short note when this host cannot grant it. */
-  aiConsent?: ReactNode;
   /** Promotional texts. Omitted for staff. */
   smsConsent?: ReactNode;
   /** Reports, blocks, and the unblock list. */
@@ -341,16 +338,17 @@ export function MyEventView({
           </View>
         </View>
 
-        <View style={{ gap: 10 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>{t('event.settings')}</Text>
-          <Text style={[Type.footnote, { color: c.ink2, marginTop: -4 }]}>{t('event.language')}</Text>
-          <View style={styles.langRow}>
-            <LanguageCard label={t('event.english')} selected={language === 'en'} selectedLabel={t('event.selected')} onPress={() => onLanguage('en')} />
-            <LanguageCard label={t('event.spanish')} selected={language === 'es'} selectedLabel={t('event.selectedEs')} onPress={() => onLanguage('es')} />
+        <View style={{ gap: 16 }}>
+          <View style={{ gap: 8 }}>
+            <Text style={[Type.label, { color: c.ink3 }]}>{t('event.settings')}</Text>
+            <Text style={[Type.footnote, { color: c.ink2 }]}>{t('event.language')}</Text>
+            <View style={styles.langRow}>
+              <LanguageCard label={t('event.english')} selected={language === 'en'} selectedLabel={t('event.selected')} onPress={() => onLanguage('en')} />
+              <LanguageCard label={t('event.spanish')} selected={language === 'es'} selectedLabel={t('event.selectedEs')} onPress={() => onLanguage('es')} />
+            </View>
           </View>
-          {aiConsent}
-          {smsConsent}
-          {safety}
+          {smsConsent ? <View style={{ gap: 8 }}>{smsConsent}</View> : null}
+          {safety ? <View style={{ gap: 8 }}>{safety}</View> : null}
         </View>
 
         <View style={styles.logo}>

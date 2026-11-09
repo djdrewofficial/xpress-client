@@ -37,8 +37,17 @@ test('welcome does not ask for AI permission', () => {
       assert.equal(/openai|ai planning|herramientas de ia/i.test(value), false, value);
     }
   }
-  assert.match(appEn['ai.body'], /OpenAI/);
-  assert.match(appEs['ai.body'], /OpenAI/);
+  assert.equal(Object.keys(appEn).some((key) => key.startsWith('ai.')), false);
+  assert.equal(Object.keys(appEs).some((key) => key.startsWith('ai.')), false);
+});
+
+test('My Event Safety keeps report, block, and the only removal path for song ideas and avoid notes', () => {
+  assert.equal(appEn['safety.intro'], 'Report or block people and content. Remove items you are allowed to hide.');
+  assert.equal(appEs['safety.intro'], 'Reporte o bloquee personas y contenido. Quite lo que le está permitido ocultar.');
+  assert.equal(appEn['safety.songIdeas'], 'Song ideas');
+  assert.equal(appEn['safety.avoid'], 'Music to avoid');
+  assert.equal(appEs['safety.songIdeas'], 'Ideas de canciones');
+  assert.equal(appEs['safety.avoid'], 'Música a evitar');
 });
 
 test('type scale leaves production sizes alone and grows a preview', () => {
@@ -58,16 +67,6 @@ test('the locked promotional-text note is one short line', () => {
 
 test('details keep the existing marketing disclosure for review before opt-in', () => {
   assert.deepEqual([...smsDisclosureKeys], ['sms.body', 'sms.disclosure', 'sms.reassurance']);
-
-  const ai = appEn['ai.body'];
-  assert.match(ai, /OpenAI/);
-  assert.match(ai, /names, venue, timeline, music choices and planning answers/);
-  assert.match(ai, /It's optional/);
-  assert.match(ai, /turn it off anytime in My Event/);
-  const aiEs = appEs['ai.body'];
-  assert.match(aiEs, /OpenAI/);
-  assert.match(aiEs, /Es opcional/);
-  assert.match(aiEs, /Mi evento/);
 
   const sms = appEn['sms.disclosure'];
   assert.match(sms, /recurring automated marketing texts/);
