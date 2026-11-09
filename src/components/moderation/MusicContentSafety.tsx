@@ -10,7 +10,7 @@ import {
   type EventText,
   type ModerationKind,
 } from '@/lib/moderation';
-import { Radius, Shadow, Type } from '@/lib/theme';
+import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
 import { SafetyLinks } from './SafetyLinks';
 import { useModeration } from './useModeration';
 
@@ -94,10 +94,10 @@ export function MusicContentSafety({
   if (ideas.length === 0 && !avoid) return moderation.sheet;
 
   return (
-    <View style={{ gap: 14 }}>
+    <View style={{ gap: 32 }}>
       {ideas.length > 0 ? (
-        <View style={{ gap: 8 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>{t('safety.songIdeas')}</Text>
+        <View style={{ gap: 12 }}>
+          <Text style={[styles.sectionLabel, { color: c.ink2 }]}>{t('safety.songIdeas')}</Text>
           <View style={{ gap: 10 }}>
             {ideas.map((idea) => {
               const mine = idea.addedBy === userId;
@@ -153,8 +153,8 @@ export function MusicContentSafety({
       ) : null}
 
       {avoid ? (
-        <View style={{ gap: 8 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>{t('safety.avoid')}</Text>
+        <View style={{ gap: 12 }}>
+          <Text style={[styles.sectionLabel, { color: c.ink2 }]}>{t('safety.avoid')}</Text>
           <Card>
             <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={6}>
               {avoid.text}
@@ -226,5 +226,12 @@ function Card({ children }: { children: ReactNode }) {
 }
 
 const styles = {
+  sectionLabel: {
+    fontFamily: Fonts.semibold,
+    fontSize: 13,
+    lineHeight: 18,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase' as const,
+  },
   block: { borderRadius: Radius.lg, padding: 14 },
 };

@@ -99,8 +99,8 @@ export function EventSafetyPanel({
   const reportItems = labeledLikes.length + singleUnlabeled.length;
 
   return (
-    <View style={{ gap: 8 }}>
-      <Text style={[Type.label, { color: c.ink3 }]}>{t('safety.heading')}</Text>
+    <View style={{ gap: 12 }}>
+      <Text style={[styles.sectionLabel, { color: c.ink2 }]}>{t('safety.heading')}</Text>
       <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
         {loading ? (
           <View style={styles.pad}>
@@ -285,6 +285,13 @@ function noticeCopy(
 }
 
 const styles = {
+  sectionLabel: {
+    fontFamily: Fonts.semibold,
+    fontSize: 13,
+    lineHeight: 18,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase' as const,
+  },
   card: { borderRadius: Radius.lg, overflow: 'hidden' as const },
   pad: { padding: 14 },
   div: { height: StyleSheet.hairlineWidth },

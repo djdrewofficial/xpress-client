@@ -130,12 +130,11 @@ export function MyEventView({
         scrollEventThrottle={16}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
         contentContainerStyle={{
-          paddingTop: insets.top + 16,
+          paddingTop: insets.top + 16 + (compact ? 52 : 0),
           paddingBottom: insets.bottom + 120,
           paddingHorizontal: 20,
-          gap: 24,
         }}>
-        <ContentColumn>
+        <ContentColumn style={{ gap: 32 }}>
         <View style={{ gap: 12 }}>
           {eyebrow ? (
             <Pressable onPress={onSwitch} disabled={!onSwitch} style={styles.eyebrowRow}>
@@ -367,8 +366,8 @@ export function MyEventView({
 function Section({ label, children }: { label: string; children: ReactNode }) {
   const c = useC();
   return (
-    <View style={{ gap: 8 }}>
-      <Text style={[Type.label, { color: c.ink3 }]}>{label}</Text>
+    <View style={{ gap: 12 }}>
+      <Text style={[styles.sectionLabel, { color: c.ink2 }]}>{label}</Text>
       {children}
     </View>
   );
@@ -513,6 +512,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   contactTxt: { fontFamily: Fonts.semibold, fontSize: 14 },
+  sectionLabel: {
+    fontFamily: Fonts.semibold,
+    fontSize: 13,
+    lineHeight: 18,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
   settingsLang: {
     flexDirection: 'row',
     alignItems: 'center',

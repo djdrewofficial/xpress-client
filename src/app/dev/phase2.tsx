@@ -65,12 +65,20 @@ function MyEventSmsStill() {
   );
 }
 
+const sectionLabel = {
+  fontFamily: 'Montserrat-SemiBold' as const,
+  fontSize: 13,
+  lineHeight: 18,
+  letterSpacing: 1.4,
+  textTransform: 'uppercase' as const,
+};
+
 function MyEventSafetyStill() {
   const c = useC();
   const { t } = useT();
   return (
-    <View style={{ gap: 8 }}>
-      <Text style={[Type.label, { color: c.ink3 }]}>{t('safety.heading')}</Text>
+    <View style={{ gap: 12 }}>
+      <Text style={[sectionLabel, { color: c.ink2 }]}>{t('safety.heading')}</Text>
       <View style={{ backgroundColor: c.surface, borderRadius: Radius.lg, overflow: 'hidden' }}>
         <Text style={[Type.footnote, { color: c.ink2, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 }]}>
           {t('safety.intro')}
@@ -97,19 +105,21 @@ function MusicIdeasStill() {
   const c = useC();
   const { t } = useT();
   return (
-    <View style={{ gap: 14, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40, backgroundColor: c.bg, flex: 1 }}>
-      <Text style={[Type.overline, { color: c.red }]}>{t('record.eyebrow')}</Text>
-      <Text style={[Type.largeTitle, { color: c.ink }]}>{t('record.title')}</Text>
-      <View style={{ gap: 8 }}>
-        <Text style={[Type.label, { color: c.ink3 }]}>{t('safety.songIdeas')}</Text>
+    <View style={{ gap: 32, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40, backgroundColor: c.bg, flex: 1 }}>
+      <View>
+        <Text style={[Type.overline, { color: c.red }]}>{t('record.eyebrow')}</Text>
+        <Text style={[Type.largeTitle, { color: c.ink }]}>{t('record.title')}</Text>
+      </View>
+      <View style={{ gap: 12 }}>
+        <Text style={[sectionLabel, { color: c.ink2 }]}>{t('safety.songIdeas')}</Text>
         <View style={{ backgroundColor: c.surface, borderRadius: Radius.lg, padding: 14, gap: 8 }}>
           <Text style={[Type.callout, { color: c.ink }]}>Sample First Dance · Sample Artist</Text>
           <Text style={[Type.footnote, { color: c.accent }]}>{t('safety.reportIdea')}</Text>
           <Text style={[Type.footnote, { color: c.red }]}>{t('safety.remove')}</Text>
         </View>
       </View>
-      <View style={{ gap: 8 }}>
-        <Text style={[Type.label, { color: c.ink3 }]}>{t('safety.avoid')}</Text>
+      <View style={{ gap: 12 }}>
+        <Text style={[sectionLabel, { color: c.ink2 }]}>{t('safety.avoid')}</Text>
         <View style={{ backgroundColor: c.surface, borderRadius: Radius.lg, padding: 14, gap: 8 }}>
           <Text style={[Type.footnote, { color: c.ink2 }]}>No reggaeton, no line dances.</Text>
           <Text style={[Type.footnote, { color: c.accent }]}>{t('safety.reportAvoid')}</Text>
