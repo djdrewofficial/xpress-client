@@ -177,12 +177,21 @@ export function SmsConsentSetting({
 
   const cardDisabled = !known || busy || (ui.granted ? !ui.canWithdraw : !ui.canGrant);
   return (
-    <View style={[card, Shadow.card, { backgroundColor: c.surface, paddingHorizontal: 14, paddingVertical: 12, gap: 8 }]}>
-      <Text style={[title, { color: c.ink }]}>{t('sms.title')}</Text>
-      <Text style={[Type.footnote, { color: c.ink2 }]}>{t('sms.body')}</Text>
-      {known ? (
-        <View style={row}>
-          <Text style={[Type.subhead, { color: c.ink, flex: 1 }]}>{t('sms.toggle')}</Text>
+    <View style={[card, Shadow.card, { backgroundColor: c.surface, paddingHorizontal: 14, paddingVertical: 12, gap: 6 }]}>
+      <View style={[row, { alignItems: 'flex-start' }]}>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text style={[title, { color: c.ink }]}>{t('sms.title')}</Text>
+          <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={2}>
+            {t('welcome.smsLine')}
+          </Text>
+          <Text
+            onPress={() => setDetails(true)}
+            accessibilityRole="link"
+            style={[Type.footnote, { color: c.accent, textDecorationLine: 'underline', alignSelf: 'flex-start' }]}>
+            {t('welcome.details')}
+          </Text>
+        </View>
+        {enabled ? (
           <Switch
             value={ui.granted === true}
             disabled={cardDisabled}
@@ -194,29 +203,38 @@ export function SmsConsentSetting({
             thumbColor="#ffffff"
             ios_backgroundColor={c.sunken}
             accessibilityLabel={t('sms.toggle')}
+            {...(Platform.OS === 'web' ? { activeThumbColor: '#ffffff' } : {})}
           />
-        </View>
-      ) : (
+        ) : null}
+      </View>
+      {known ? null : (
         <Text style={[Type.footnote, { color: c.ink2 }]}>
           {ui.phase === 'loading' ? t('sms.checking') : ui.notice === 'unconfirmed' ? t('sms.unconfirmed') : t('sms.unread')}
         </Text>
       )}
-      <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.disclosure')}</Text>
-      <Text style={[Type.footnote, { color: c.ink2 }]}>{t('sms.reassurance')}</Text>
-      <Text style={[Type.footnote, { color: c.ink2 }]}>
-        <Text onPress={onTerms} style={{ color: c.accent }}>{t('legal.termsTitle')}</Text>
-        {' · '}
-        <Text onPress={onPrivacy} style={{ color: c.accent }}>{t('legal.privacyTitle')}</Text>
-      </Text>
-      {ui.notice === 'needPhone' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.needPhone')}</Text> : null}
-      {ui.notice === 'unavailable' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.unavailable')}</Text> : null}
-      {ui.notice === 'ineligible' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.ineligible')}</Text> : null}
-      {ui.notice === 'failed' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.failed')}</Text> : null}
+      {lockedNotice === 'needPhone' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.needPhone')}</Text> : null}
+      {lockedNotice === 'unavailable' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.unavailable')}</Text> : null}
+      {lockedNotice === 'ineligible' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.ineligible')}</Text> : null}
+      {lockedNotice === 'failed' ? <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.failed')}</Text> : null}
       {ui.phase === 'unknown' ? (
         <Pressable onPress={() => void reload()} accessibilityRole="button">
           <Text style={[Type.footnote, { color: c.accent }]}>{t('common.tryAgain')}</Text>
         </Pressable>
       ) : null}
+      <DisclosureSheet
+        visible={details}
+        title={t('sms.title')}
+        paragraphs={smsDisclosureKeys.map((key) => t(key))}
+        onClose={() => setDetails(false)}
+        onTerms={() => {
+          setDetails(false);
+          onTerms();
+        }}
+        onPrivacy={() => {
+          setDetails(false);
+          onPrivacy();
+        }}
+      />
     </View>
   );
 

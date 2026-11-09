@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,6 +49,7 @@ export function MusicRecord({
   onImport,
   onSearch,
   onSwitchEvent,
+  afterHero,
 }: {
   moments: MusicMoment[];
   loading?: boolean;
@@ -58,6 +60,8 @@ export function MusicRecord({
   onImport: () => void;
   onSearch: () => void;
   onSwitchEvent?: () => void;
+  /** Song ideas / Music to avoid moderation cards. */
+  afterHero?: ReactNode;
 }) {
   const c = useC();
   const { t } = useT();
@@ -118,6 +122,8 @@ export function MusicRecord({
             <Stat value={loading ? '—' : String(stats.doNotPlay)} label={t('record.doNotPlay')} tone="red" />
           </View>
         </LinearGradient>
+
+        {afterHero}
 
         {moments.length === 0 && !loading ? (
           <View style={[styles.empty, { backgroundColor: c.surface }]}>

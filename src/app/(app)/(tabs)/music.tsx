@@ -7,7 +7,9 @@ import { ContentColumn } from '@/components/ui';
 import { useAddMusic } from '@/components/music/AddMusicSheet';
 import { buildMusicRecord, defaultMoment, type MusicMoment } from '@/components/music/model';
 import { EventSwitcher } from '@/components/EventSwitcher';
+import { MusicContentSafety } from '@/components/moderation/MusicContentSafety';
 import { useAuth } from '@/lib/auth';
+import { managesEvent } from '@/lib/membership';
 import { useT } from '@/lib/i18n';
 import { useEvent } from '@/lib/events';
 import { loadEventSongs, loadOverview } from '@/lib/planning';
@@ -15,10 +17,11 @@ import { loadEventSongs, loadOverview } from '@/lib/planning';
 export default function MusicScreen() {
   const router = useRouter();
   const { t } = useT();
-  const { profile } = useAuth();
-  const { eventId, events, loading: eventLoading } = useEvent();
+  const { profile, session } = useAuth();
+  const { event, eventId, events, loading: eventLoading } = useEvent();
   const [moments, setMoments] = useState<MusicMoment[] | null>(null);
   const [switcher, setSwitcher] = useState(false);
+  const [safetyReload, setSafetyReload] = useState(0);
 
   const load = useCallback(async () => {
     if (!eventId) {
@@ -33,7 +36,10 @@ export default function MusicScreen() {
     }
   }, [eventId]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    load();
+    setSafetyReload((n) => n + 1);
+  }, [load]));
 
   const sections = useMemo(
     () => (moments ?? []).filter((m) => m.id !== 'do-not-play').map((m) => ({
@@ -81,6 +87,16 @@ export default function MusicScreen() {
         onImport={() => requireMoment((moment) => music.open({ sectionId: moment.id, segment: 'import' }))}
         onSearch={() => requireMoment((moment) => music.open({ sectionId: moment.id, segment: 'search' }))}
         onSwitchEvent={canSwitch ? () => (isStaff ? router.push('/events') : setSwitcher(true)) : undefined}
+        afterHero={
+          eventId && session?.user.id ? (
+            <MusicContentSafety
+              eventId={eventId}
+              userId={session.user.id}
+              canManage={managesEvent(event, profile?.accountType)}
+              reloadSignal={safetyReload}
+            />
+          ) : null
+        }
       />
       </ContentColumn>
       {music.sheet}
