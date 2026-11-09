@@ -41,9 +41,11 @@ test('welcome does not ask for AI permission', () => {
   assert.equal(Object.keys(appEs).some((key) => key.startsWith('ai.')), false);
 });
 
-test('My Event Safety keeps report, block, and the only removal path for song ideas and avoid notes', () => {
-  assert.equal(appEn['safety.intro'], 'Report or block people and content. Remove items you are allowed to hide.');
-  assert.equal(appEs['safety.intro'], 'Reporte o bloquee personas y contenido. Quite lo que le está permitido ocultar.');
+test('My Event Safety is report/block only; Music owns song ideas and avoid notes', () => {
+  assert.equal(appEn['safety.intro'], 'Report or block people and content on this event.');
+  assert.equal(appEs['safety.intro'], 'Reporte o bloquee personas y contenido de este evento.');
+  assert.equal(appEn['safety.reportRow'], 'Report a person or content');
+  assert.equal(appEs['safety.reportRow'], 'Reportar a una persona o contenido');
   assert.equal(appEn['safety.songIdeas'], 'Song ideas');
   assert.equal(appEn['safety.avoid'], 'Music to avoid');
   assert.equal(appEs['safety.songIdeas'], 'Ideas de canciones');

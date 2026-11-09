@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Logo } from '@/components/Logo';
-import { ContentColumn, FocusedStatusBar, Icon, LanguageCard, NavBar, useC, type IconName } from '@/components/ui';
+import { ContentColumn, FocusedStatusBar, Icon, NavBar, useC, type IconName } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { Brand, Fonts, Radius, Shadow, Space, Type } from '@/lib/theme';
 import type { AppLanguage } from '@/lib/language';
@@ -133,7 +133,7 @@ export function MyEventView({
           paddingTop: insets.top + 16,
           paddingBottom: insets.bottom + 120,
           paddingHorizontal: 20,
-          gap: 22,
+          gap: 24,
         }}>
         <ContentColumn>
         <View style={{ gap: 12 }}>
@@ -204,8 +204,7 @@ export function MyEventView({
                 </LinearGradient>
 
                 {financials.schedule.length > 0 ? (
-                  <View style={{ gap: 8 }}>
-                    <Text style={[Type.label, { color: c.ink3 }]}>{t('event.schedule')}</Text>
+                  <Section label={t('event.schedule')}>
                     <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
                       {financials.schedule.map((row, index) => (
                         <View key={row.id}>
@@ -228,7 +227,7 @@ export function MyEventView({
                         </View>
                       ))}
                     </View>
-                  </View>
+                  </Section>
                 ) : null}
 
                 {financials.pendingNote || financials.footnote ? (
@@ -245,8 +244,7 @@ export function MyEventView({
             ) : null}
 
             {eventFacts ? (
-              <View style={{ gap: 8 }}>
-                <Text style={[Type.label, { color: c.ink3 }]}>{t('event.event')}</Text>
+              <Section label={t('event.event')}>
                 <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
                   <Cell icon="calendar" title={t('event.date')} trailing={<Text style={[Type.footnote, { color: c.ink2 }]}>{eventFacts.dateLabel}</Text>} />
                   {eventFacts.venue ? (
@@ -262,21 +260,19 @@ export function MyEventView({
                     </>
                   ) : null}
                 </View>
-              </View>
+              </Section>
             ) : null}
 
             {packageInfo && !packageInsideEvent ? (
-              <View style={{ gap: 8 }}>
-                <Text style={[Type.label, { color: c.ink3 }]}>{t('event.package')}</Text>
+              <Section label={t('event.package')}>
                 <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
                   <Cell icon="gem" title={packageInfo.name} subtitle={packageInfo.detail} onPress={onPackage} chevron />
                 </View>
-              </View>
+              </Section>
             ) : null}
 
             {team ? (
-              <View style={{ gap: 8 }}>
-                <Text style={[Type.label, { color: c.ink3 }]}>{t('event.team')}</Text>
+              <Section label={t('event.team')}>
                 <View style={[styles.card, Shadow.card, { backgroundColor: c.surface, padding: 14, gap: 14 }]}>
                   <View style={styles.teamTop}>
                     <View style={[styles.avatar, { backgroundColor: Brand.purple }]}>
@@ -299,23 +295,21 @@ export function MyEventView({
                     </View>
                   ) : null}
                 </View>
-              </View>
+              </Section>
             ) : null}
 
             {hostTools}
             {showInvite && !hostTools ? (
-              <View style={{ gap: 8 }}>
-                <Text style={[Type.label, { color: c.ink3 }]}>{t('event.people')}</Text>
+              <Section label={t('event.people')}>
                 <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
                   <Cell icon="users" title={t('event.invite')} subtitle={t('event.inviteSub')} onPress={onInvite} chevron />
                 </View>
-              </View>
+              </Section>
             ) : null}
           </>
         )}
 
-        <View style={{ gap: 8 }}>
-          <Text style={[Type.label, { color: c.ink3 }]}>{t('event.account')}</Text>
+        <Section label={t('event.account')}>
           <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
             <Cell icon="user" title={accountName} subtitle={accountEmail} />
             <View style={[styles.div, { backgroundColor: c.line, marginLeft: 62 }]} />
@@ -336,20 +330,30 @@ export function MyEventView({
               onPress={deleting ? undefined : onDelete}
             />
           </View>
-        </View>
+        </Section>
 
-        <View style={{ gap: 16 }}>
-          <View style={{ gap: 8 }}>
-            <Text style={[Type.label, { color: c.ink3 }]}>{t('event.settings')}</Text>
-            <Text style={[Type.footnote, { color: c.ink2 }]}>{t('event.language')}</Text>
-            <View style={styles.langRow}>
-              <LanguageCard label={t('event.english')} selected={language === 'en'} selectedLabel={t('event.selected')} onPress={() => onLanguage('en')} />
-              <LanguageCard label={t('event.spanish')} selected={language === 'es'} selectedLabel={t('event.selectedEs')} onPress={() => onLanguage('es')} />
+        <Section label={t('event.settings')}>
+          <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
+            <View style={styles.settingsLang}>
+              <Text style={[Type.footnote, { color: c.ink3, fontFamily: Fonts.medium }]}>{t('event.language')}</Text>
+              <View style={styles.langPills}>
+                <LangPill
+                  label={t('event.english')}
+                  selected={language === 'en'}
+                  onPress={() => onLanguage('en')}
+                />
+                <LangPill
+                  label={t('event.spanish')}
+                  selected={language === 'es'}
+                  onPress={() => onLanguage('es')}
+                />
+              </View>
             </View>
           </View>
-          {smsConsent ? <View style={{ gap: 8 }}>{smsConsent}</View> : null}
-          {safety ? <View style={{ gap: 8 }}>{safety}</View> : null}
-        </View>
+        </Section>
+
+        {smsConsent ? <Section label={t('event.marketing')}>{smsConsent}</Section> : null}
+        {safety}
 
         <View style={styles.logo}>
           <Logo variant="full" height={28} />
@@ -357,6 +361,42 @@ export function MyEventView({
         </ContentColumn>
       </ScrollView>
     </View>
+  );
+}
+
+function Section({ label, children }: { label: string; children: ReactNode }) {
+  const c = useC();
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={[Type.label, { color: c.ink3 }]}>{label}</Text>
+      {children}
+    </View>
+  );
+}
+
+function LangPill({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  const c = useC();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      style={{
+        borderRadius: Radius.pill,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: selected ? c.accentTint : 'transparent',
+      }}>
+      <Text
+        style={{
+          fontFamily: selected ? Fonts.semibold : Fonts.medium,
+          fontSize: 15,
+          lineHeight: 20,
+          color: selected ? c.accent : c.ink2,
+        }}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -473,7 +513,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   contactTxt: { fontFamily: Fonts.semibold, fontSize: 14 },
-  langRow: { flexDirection: 'row', gap: 8 },
+  settingsLang: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 52,
+  },
+  langPills: { flexDirection: 'row', gap: 8 },
   marketRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  logo: { alignItems: 'center', paddingTop: 8 },
+  logo: { alignItems: 'center', paddingTop: 16, paddingBottom: 8 },
 });

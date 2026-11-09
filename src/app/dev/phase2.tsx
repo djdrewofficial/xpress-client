@@ -57,9 +57,9 @@ function MyEventSmsStill() {
   const c = useC();
   const { t } = useT();
   return (
-    <View style={{ borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, gap: 8 }}>
+    <View style={{ backgroundColor: c.surface, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, gap: 6 }}>
       <Text style={[Type.subhead, { color: c.ink }]}>{t('sms.title')}</Text>
-      <Text style={[Type.footnote, { color: c.ink2 }]}>{t('sms.body')}</Text>
+      <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={2}>{t('welcome.smsLine')}</Text>
       <Text style={[Type.footnote, { color: c.ink3 }]}>{t('sms.needPhone')}</Text>
     </View>
   );
@@ -69,24 +69,52 @@ function MyEventSafetyStill() {
   const c = useC();
   const { t } = useT();
   return (
-    <View style={{ gap: 12 }}>
-      <View style={{ gap: 6 }}>
-        <Text style={[Type.label, { color: c.ink3 }]}>{t('safety.heading')}</Text>
-        <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.intro')}</Text>
+    <View style={{ gap: 8 }}>
+      <Text style={[Type.label, { color: c.ink3 }]}>{t('safety.heading')}</Text>
+      <View style={{ backgroundColor: c.surface, borderRadius: Radius.lg, overflow: 'hidden' }}>
+        <Text style={[Type.footnote, { color: c.ink2, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 }]}>
+          {t('safety.intro')}
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, minHeight: 58 }}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={[Type.subhead, { color: c.ink }]}>{t('safety.reportRow')}</Text>
+            <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.reportRowHint')}</Text>
+          </View>
+        </View>
+        <View style={{ height: 1, backgroundColor: c.line, marginLeft: 14 }} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, minHeight: 58 }}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={[Type.subhead, { color: c.ink }]}>{t('safety.blockedPeople')}</Text>
+            <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.noBlocked')}</Text>
+          </View>
+        </View>
       </View>
-      <Text style={[Type.subhead, { color: c.ink, marginTop: 2 }]}>{t('safety.blockedPeople')}</Text>
-      <Text style={[Type.footnote, { color: c.ink3 }]}>{t('safety.noBlocked')}</Text>
-      <Text style={[Type.subhead, { color: c.ink }]}>{t('safety.songIdeas')}</Text>
-      <View style={{ borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, borderRadius: Radius.md, padding: 12, gap: 6 }}>
-        <Text style={[Type.callout, { color: c.ink }]}>Sample First Dance · Sample Artist</Text>
-        <Text style={[Type.footnote, { color: c.accent }]}>{t('safety.reportIdea')}</Text>
-        <Text style={[Type.footnote, { color: c.red }]}>{t('safety.remove')}</Text>
+    </View>
+  );
+}
+
+function MusicIdeasStill() {
+  const c = useC();
+  const { t } = useT();
+  return (
+    <View style={{ gap: 14, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40, backgroundColor: c.bg, flex: 1 }}>
+      <Text style={[Type.overline, { color: c.red }]}>{t('record.eyebrow')}</Text>
+      <Text style={[Type.largeTitle, { color: c.ink }]}>{t('record.title')}</Text>
+      <View style={{ gap: 8 }}>
+        <Text style={[Type.label, { color: c.ink3 }]}>{t('safety.songIdeas')}</Text>
+        <View style={{ backgroundColor: c.surface, borderRadius: Radius.lg, padding: 14, gap: 8 }}>
+          <Text style={[Type.callout, { color: c.ink }]}>Sample First Dance · Sample Artist</Text>
+          <Text style={[Type.footnote, { color: c.accent }]}>{t('safety.reportIdea')}</Text>
+          <Text style={[Type.footnote, { color: c.red }]}>{t('safety.remove')}</Text>
+        </View>
       </View>
-      <View style={{ borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, borderRadius: Radius.md, padding: 12, gap: 6 }}>
-        <Text style={[Type.subhead, { color: c.ink }]}>{t('safety.avoid')}</Text>
-        <Text style={[Type.footnote, { color: c.ink2 }]}>No reggaeton, no line dances.</Text>
-        <Text style={[Type.footnote, { color: c.accent }]}>{t('safety.reportAvoid')}</Text>
-        <Text style={[Type.footnote, { color: c.red }]}>{t('safety.remove')}</Text>
+      <View style={{ gap: 8 }}>
+        <Text style={[Type.label, { color: c.ink3 }]}>{t('safety.avoid')}</Text>
+        <View style={{ backgroundColor: c.surface, borderRadius: Radius.lg, padding: 14, gap: 8 }}>
+          <Text style={[Type.footnote, { color: c.ink2 }]}>No reggaeton, no line dances.</Text>
+          <Text style={[Type.footnote, { color: c.accent }]}>{t('safety.reportAvoid')}</Text>
+          <Text style={[Type.footnote, { color: c.red }]}>{t('safety.remove')}</Text>
+        </View>
       </View>
     </View>
   );
@@ -192,6 +220,13 @@ export default function Phase2Preview() {
     return (
       <PreviewFrame>
         <MyEventStill />
+      </PreviewFrame>
+    );
+  }
+  if (frame === 'music-ideas' || frame === 'music-ideas-es') {
+    return (
+      <PreviewFrame>
+        <MusicIdeasStill />
       </PreviewFrame>
     );
   }
