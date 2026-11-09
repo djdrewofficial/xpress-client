@@ -109,7 +109,7 @@ export function WelcomeScreen({
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <StatusBar style="light" />
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} scrollEnabled={poster.scrolls}>
         <WelcomeHero
           hello={t('welcome.hello')}
           name={names}

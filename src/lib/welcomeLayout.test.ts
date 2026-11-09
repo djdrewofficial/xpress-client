@@ -58,3 +58,18 @@ test('an iPad keeps its own poster', () => {
   assert.equal(layout.posterMinHeight, null);
   assert.equal(layout.scrolls, false);
 });
+
+test('a small iPhone still keeps Continue on one screen at normal text', () => {
+  for (const locale of ['en', 'es'] as const) {
+    const layout = welcomePosterLayout({
+      form: 'phone',
+      windowHeight: 667,
+      contentWidth: 335,
+      topInset: 20,
+      bottomInset: 0,
+      fontScale: 1,
+      copy: measure(locale),
+    });
+    assert.equal(layout.scrolls, false, locale);
+  }
+});

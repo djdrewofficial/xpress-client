@@ -16,19 +16,24 @@ import type { WelcomeSnapshot } from '@/lib/welcome';
 /**
  * Dev-only stills. Not linked from the app.
  * Open /dev/phase2?frame=login|signup|forgot|join|welcome|welcome-es|welcome-large|welcome-large-es|welcome-locked|welcome-offers|welcome-offers-es|privacy|music|song
- * Welcome stills accept chrome=iphone|ipad for device insets. Sample data only.
+ * Welcome stills accept chrome=iphone|iphonese|ipad for device insets. Sample data only.
  */
 
 const SAMPLE: WelcomeSnapshot = {
   names: 'Alex',
-  date: '2027-06-12',
-  venue: 'Sample Venue',
-  progress: 43,
+  date: '2027-10-16',
+  venue: null,
+  progress: 95,
 };
 
 const IPHONE_METRICS = {
   frame: { x: 0, y: 0, width: 402, height: 874 },
   insets: { top: 59, left: 0, right: 0, bottom: 34 },
+};
+
+const IPHONE_SE_METRICS = {
+  frame: { x: 0, y: 0, width: 375, height: 667 },
+  insets: { top: 20, left: 0, right: 0, bottom: 0 },
 };
 
 const IPAD_METRICS = {
@@ -39,12 +44,9 @@ const IPAD_METRICS = {
 function PreviewFrame({ children }: { children: ReactNode }) {
   const { chrome } = useLocalSearchParams<{ chrome?: string }>();
   const value = Array.isArray(chrome) ? chrome[0] : chrome;
-  if (value !== 'iphone' && value !== 'ipad') return children;
-  return (
-    <SafeAreaProvider initialMetrics={value === 'ipad' ? IPAD_METRICS : IPHONE_METRICS}>
-      {children}
-    </SafeAreaProvider>
-  );
+  const metrics = value === 'ipad' ? IPAD_METRICS : value === 'iphonese' ? IPHONE_SE_METRICS : value === 'iphone' ? IPHONE_METRICS : null;
+  if (!metrics) return children;
+  return <SafeAreaProvider initialMetrics={metrics}>{children}</SafeAreaProvider>;
 }
 
 export default function Phase2Preview() {

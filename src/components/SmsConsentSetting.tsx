@@ -140,7 +140,15 @@ export function SmsConsentSetting({
             {ui.phase === 'loading' ? t('sms.checking') : ui.notice === 'unconfirmed' ? t('sms.unconfirmed') : t('sms.unread')}
           </Text>
         )}
-        {lockedNotice === 'needPhone' ? <Text style={[welcomeBody, { color: c.ink2 }]}>{t('sms.needPhone')}</Text> : null}
+        {lockedNotice === 'needPhone' ? (
+          <Text
+            style={[welcomeBody, { color: c.ink2 }]}
+            {...(Platform.OS === 'web'
+              ? null
+              : { numberOfLines: 1 as const, adjustsFontSizeToFit: true, minimumFontScale: 0.9 })}>
+            {t('sms.needPhone')}
+          </Text>
+        ) : null}
         {lockedNotice === 'unavailable' ? <Text style={[welcomeBody, { color: c.ink2 }]}>{t('sms.unavailable')}</Text> : null}
         {lockedNotice === 'ineligible' ? <Text style={[welcomeBody, { color: c.ink2 }]}>{t('sms.ineligible')}</Text> : null}
         {lockedNotice === 'failed' ? <Text style={[welcomeBody, { color: c.ink2 }]}>{t('sms.failed')}</Text> : null}

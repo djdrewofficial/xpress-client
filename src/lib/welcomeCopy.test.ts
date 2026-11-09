@@ -47,6 +47,15 @@ test('type scale leaves production sizes alone and grows a preview', () => {
   assert.deepEqual(scaledType(base, 1.35), { fontSize: 22, lineHeight: 32, fontFamily: 'Montserrat' });
 });
 
+test('the locked promotional-text note is one short line', () => {
+  assert.equal(appEn['sms.needPhone'], 'Add a mobile number to your booking to get texts.');
+  assert.equal(appEs['sms.needPhone'], 'Agrega un número móvil a tu reserva para recibir textos.');
+  assert.equal(appEn['sms.needPhone'].includes('\n'), false);
+  assert.equal(appEs['sms.needPhone'].includes('\n'), false);
+  assert.ok(appEn['sms.needPhone'].length < 70);
+  assert.ok(appEs['sms.needPhone'].length < 70);
+});
+
 test('details keep the existing marketing disclosure for review before opt-in', () => {
   assert.deepEqual([...smsDisclosureKeys], ['sms.body', 'sms.disclosure', 'sms.reassurance']);
 

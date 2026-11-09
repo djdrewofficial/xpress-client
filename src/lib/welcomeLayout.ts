@@ -23,9 +23,10 @@ export function welcomePosterLayout(input: {
     sheetHeight(input.copy, input.contentWidth, scale, false, input.bottomInset),
     sheetHeight(input.copy, input.contentWidth, scale, true, input.bottomInset),
   );
-  const posterContent = posterContentHeight(input.copy, input.contentWidth, scale, input.topInset);
+  const compact = input.windowHeight < 740;
+  const posterContent = posterContentHeight(input.copy, input.contentWidth, scale, input.topInset, compact);
   const room = input.windowHeight - sheet + SHEET_OVERLAP;
-  const floor = Math.round(300 * Math.min(scale, 1.15));
+  const floor = Math.round((compact ? 260 : 300) * Math.min(scale, 1.15));
   if (room >= Math.max(floor, posterContent)) {
     return { posterMinHeight: room, scrolls: false };
   }
@@ -45,7 +46,8 @@ function sheetHeight(copy: WelcomeMeasureCopy, width: number, scale: number, loc
   const sub = Math.round(19 * scale);
   const textWidth = Math.max(120, width - (locked ? 0 : 64));
   const bodyLines = wrappedLines(copy.smsLine, textWidth, Math.round(13 * scale));
-  const noteLines = locked ? wrappedLines(copy.phoneNote, width, Math.round(13 * scale)) : 0;
+  // Welcome keeps the locked phone note on one line (see SmsConsentSetting).
+  const noteLines = locked ? 1 : 0;
   const agreeLines = wrappedLines(copy.agreement, width, Math.round(13 * scale));
   const padBottom = Math.max(20, bottomInset);
   return (
@@ -68,24 +70,42 @@ function sheetHeight(copy: WelcomeMeasureCopy, width: number, scale: number, loc
   );
 }
 
-function posterContentHeight(copy: WelcomeMeasureCopy, width: number, scale: number, topInset: number): number {
-  const inviteLines = wrappedLines(copy.invite, Math.min(width, 460), Math.round(17 * scale));
-  const unitLines = wrappedLines(copy.daysToGo, width, Math.round(22 * scale));
+function posterContentHeight(
+  copy: WelcomeMeasureCopy,
+  width: number,
+  scale: number,
+  topInset: number,
+  compact: boolean,
+): number {
+  const inviteLines = wrappedLines(copy.invite, Math.min(width, 460), Math.round((compact ? 16 : 17) * scale));
+  const unitLines = wrappedLines(copy.daysToGo, width, Math.round((compact ? 20 : 22) * scale));
+  // Greeting → logo → countdown pack with even gaps; leftover height stays above.
+  const logo = compact ? 48 : 72;
+  const logoGap = compact ? 8 : 16;
+  const name = Math.round((compact ? 32 : 46) * scale);
+  const numeral = Math.round((compact ? 48 : 72) * scale);
+  const unit = Math.round((compact ? 20 : 28) * scale);
+  const inviteLine = Math.round((compact ? 20 : 24) * scale);
+  const padBottom = compact ? 20 : 36;
+  const progress = compact ? 18 : 30;
+  const greetingGap = compact ? 4 : 6;
   return (
     topInset +
-    12 +
+    (compact ? 6 : 10) +
     Math.round(14 * scale) +
-    10 +
-    Math.round(48 * scale) +
-    10 +
-    inviteLines * Math.round(24 * scale) +
-    16 +
-    Math.round(84 * scale) +
-    unitLines * Math.round(28 * scale) +
-    19 +
+    greetingGap +
+    name +
+    greetingGap +
+    inviteLines * inviteLine +
+    logoGap +
+    logo +
+    logoGap +
+    numeral +
+    unitLines * unit +
+    (compact ? 10 : 19) +
     Math.round(18 * scale) +
-    30 +
-    48
+    progress +
+    padBottom
   );
 }
 
