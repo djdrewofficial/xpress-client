@@ -50,6 +50,13 @@ test('My Event Safety is report/block only; Music owns song ideas and avoid note
   assert.equal(appEn['safety.avoid'], 'Music to avoid');
   assert.equal(appEs['safety.songIdeas'], 'Ideas de canciones');
   assert.equal(appEs['safety.avoid'], 'Música a evitar');
+  assert.equal(appEn['safety.swipeHint'], 'Swipe left to remove, right to add to Must Play.');
+  assert.equal(
+    appEs['safety.swipeHint'],
+    'Desliza a la izquierda para quitar y a la derecha para agregar a Imprescindibles.',
+  );
+  assert.match(appEn['safety.addedMustPlay'], /Must Play/);
+  assert.match(appEs['safety.addedMustPlay'], /Imprescindibles/);
 });
 
 test('type scale leaves production sizes alone and grows a preview', () => {

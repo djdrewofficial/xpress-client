@@ -93,6 +93,8 @@ export default function MusicScreen() {
               eventId={eventId}
               userId={session.user.id}
               canManage={managesEvent(event, profile?.accountType)}
+              mustPlaySectionId={target?.id ?? null}
+              onCatalogChanged={() => { void load(); }}
               reloadSignal={safetyReload}
             />
           ) : null

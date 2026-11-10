@@ -1,32 +1,47 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { ActivityIndicator, Text, View } from 'react-native';
+import {
+  AccessibilityActionEvent,
+  ActivityIndicator,
+  Alert,
+  Text,
+  View,
+} from 'react-native';
 
 import { useC } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import {
+  hideContent,
   loadEventContent,
   type EventSongIdea,
   type EventText,
   type ModerationKind,
 } from '@/lib/moderation';
-import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
+import { moveSongIdeaToMustPlay } from '@/lib/moveSongIdeaToMustPlay';
+import { Fonts, Radius, Shadow, Status, Type } from '@/lib/theme';
 import { SafetyLinks } from './SafetyLinks';
+import { SafetyCard, SwipeSafetyRow } from './SwipeSafetyRow';
 import { useModeration } from './useModeration';
 
 /**
  * Song ideas and the Music-to-avoid note for the Music tab.
- * Uses the same report / remove / block / guest rules as My Event used to.
+ * Swipe left to remove/report; swipe right on ideas to add Must Play.
  */
 export function MusicContentSafety({
   eventId,
   userId,
   canManage,
+  mustPlaySectionId = null,
+  onCatalogChanged,
   reloadSignal = 0,
 }: {
   eventId: string;
   userId: string;
   canManage: boolean;
+  /** Dance-floor / Open Dancing section id for Must Play swipes. */
+  mustPlaySectionId?: string | null;
+  /** Refresh the Music record after an idea is promoted. */
+  onCatalogChanged?: () => void;
   reloadSignal?: number;
 }) {
   const c = useC();
@@ -36,6 +51,7 @@ export function MusicContentSafety({
   const [ideas, setIdeas] = useState<EventSongIdea[]>([]);
   const [avoid, setAvoid] = useState<EventText | null>(null);
   const [tick, setTick] = useState(0);
+  const busy = useRef(false);
   const seenEvent = useRef(eventId);
   const moderation = useModeration(eventId, () => setTick((n) => n + 1));
 
@@ -75,6 +91,39 @@ export function MusicContentSafety({
     };
   }, [load, reloadSignal, tick, eventId]);
 
+  async function removeTarget(
+    target: { targetType: 'song_idea' | 'do_not_play_note'; targetId: string },
+    optimistic: () => void,
+  ) {
+    if (busy.current) return;
+    busy.current = true;
+    optimistic();
+    const result = await hideContent(eventId, target);
+    busy.current = false;
+    if (!result.ok) {
+      setTick((n) => n + 1);
+      moderation.explain(result);
+      return;
+    }
+    Alert.alert(t('safety.removed'));
+  }
+
+  async function addIdeaToMustPlay(idea: EventSongIdea) {
+    if (!mustPlaySectionId || busy.current) return;
+    busy.current = true;
+    setIdeas((prev) => prev.filter((row) => row.id !== idea.id));
+    const result = await moveSongIdeaToMustPlay(eventId, mustPlaySectionId, idea);
+    busy.current = false;
+    if (!result.ok) {
+      setTick((n) => n + 1);
+      Alert.alert(t('common.couldntSave'), t('common.checkConnection'));
+      return;
+    }
+    onCatalogChanged?.();
+    if (!result.ideaHidden) setTick((n) => n + 1);
+    Alert.alert(t('safety.addedMustPlay'));
+  }
+
   if (loading) {
     return (
       <View style={[styles.block, { backgroundColor: c.surface }, Shadow.card]}>
@@ -98,54 +147,112 @@ export function MusicContentSafety({
       {ideas.length > 0 ? (
         <View style={{ gap: 12 }}>
           <Text style={[styles.sectionLabel, { color: c.ink2 }]}>{t('safety.songIdeas')}</Text>
+          <Text style={[Type.footnote, { color: c.ink3 }]}>{t('safety.swipeHint')}</Text>
           <View style={{ gap: 10 }}>
             {ideas.map((idea) => {
               const mine = idea.addedBy === userId;
+              const canRemove = canManage || mine;
+              const canReport = !mine;
+              const canMust = canManage && !!mustPlaySectionId;
+              const title = [idea.title, idea.artist].filter(Boolean).join(' · ') || t('safety.songIdeas');
+
+              const rightActions = [
+                canReport
+                  ? {
+                      key: 'report',
+                      label: t('safety.report'),
+                      color: c.accent,
+                      icon: 'shield' as const,
+                      onPress: () => moderation.openReport({ targetType: 'song_idea', targetId: idea.id }),
+                    }
+                  : null,
+                canRemove
+                  ? {
+                      key: 'remove',
+                      label: t('safety.remove'),
+                      color: Status.archive,
+                      icon: 'trash' as const,
+                      onPress: () =>
+                        void removeTarget({ targetType: 'song_idea', targetId: idea.id }, () =>
+                          setIdeas((prev) => prev.filter((row) => row.id !== idea.id)),
+                        ),
+                    }
+                  : null,
+              ].filter((item): item is NonNullable<typeof item> => item != null);
+
+              const leftActions = canMust
+                ? [
+                    {
+                      key: 'must',
+                      label: t('record.mustPlay'),
+                      color: c.success,
+                      icon: 'star' as const,
+                      onPress: () => void addIdeaToMustPlay(idea),
+                    },
+                  ]
+                : [];
+
+              const a11yActions = [
+                canRemove ? { name: 'remove', label: t('safety.remove') } : null,
+                canMust ? { name: 'mustPlay', label: t('moment.markMust') } : null,
+                canReport ? { name: 'report', label: t('safety.reportIdea') } : null,
+              ].filter((item): item is { name: string; label: string } => item != null);
+
+              const onA11y = ({ nativeEvent }: AccessibilityActionEvent) => {
+                if (nativeEvent.actionName === 'remove' && canRemove) {
+                  void removeTarget({ targetType: 'song_idea', targetId: idea.id }, () =>
+                    setIdeas((prev) => prev.filter((row) => row.id !== idea.id)),
+                  );
+                } else if (nativeEvent.actionName === 'mustPlay' && canMust) {
+                  void addIdeaToMustPlay(idea);
+                } else if (nativeEvent.actionName === 'report' && canReport) {
+                  moderation.openReport({ targetType: 'song_idea', targetId: idea.id });
+                }
+              };
+
               return (
-                <Card key={idea.id}>
-                  <Text style={[Type.callout, { color: c.ink }]}>
-                    {[idea.title, idea.artist].filter(Boolean).join(' · ') || t('safety.songIdeas')}
-                  </Text>
-                  {idea.note ? (
-                    <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={3}>
-                      {idea.note}
-                    </Text>
-                  ) : null}
-                  <SafetyLinks
-                    reportLabel={mine ? undefined : t('safety.reportIdea')}
-                    onReport={mine ? undefined : () => moderation.openReport({ targetType: 'song_idea', targetId: idea.id })}
-                    blockLabel={
-                      idea.addedBy && !mine
-                        ? idea.addedByLabel
-                          ? t('safety.blockNamed', { name: idea.addedByLabel })
-                          : t('safety.blockAdded')
-                        : undefined
-                    }
-                    onBlock={
-                      idea.addedBy && !mine
-                        ? () => moderation.askBlock(idea.addedBy as string, idea.addedByLabel)
-                        : undefined
-                    }
-                    guestLabel={
-                      canManage && idea.addedBy && !mine
-                        ? idea.addedByLabel
-                          ? t('safety.removeGuestNamed', { name: idea.addedByLabel })
-                          : t('safety.removeGuest')
-                        : undefined
-                    }
-                    onRemoveGuest={
-                      canManage && idea.addedBy && !mine
-                        ? () => moderation.askRemoveGuest(idea.addedBy as string, idea.addedByLabel)
-                        : undefined
-                    }
-                    hideLabel={canManage || mine ? t('safety.remove') : undefined}
-                    onHide={
-                      canManage || mine
-                        ? () => moderation.askHide({ targetType: 'song_idea', targetId: idea.id })
-                        : undefined
-                    }
-                  />
-                </Card>
+                <SwipeSafetyRow
+                  key={idea.id}
+                  accessibilityLabel={title}
+                  accessibilityActions={a11yActions}
+                  onAccessibilityAction={onA11y}
+                  leftActions={leftActions}
+                  rightActions={rightActions}>
+                  <SafetyCard>
+                    <Text style={[Type.callout, { color: c.ink }]}>{title}</Text>
+                    {idea.note ? (
+                      <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={3}>
+                        {idea.note}
+                      </Text>
+                    ) : null}
+                    <SafetyLinks
+                      blockLabel={
+                        idea.addedBy && !mine
+                          ? idea.addedByLabel
+                            ? t('safety.blockNamed', { name: idea.addedByLabel })
+                            : t('safety.blockAdded')
+                          : undefined
+                      }
+                      onBlock={
+                        idea.addedBy && !mine
+                          ? () => moderation.askBlock(idea.addedBy as string, idea.addedByLabel)
+                          : undefined
+                      }
+                      guestLabel={
+                        canManage && idea.addedBy && !mine
+                          ? idea.addedByLabel
+                            ? t('safety.removeGuestNamed', { name: idea.addedByLabel })
+                            : t('safety.removeGuest')
+                          : undefined
+                      }
+                      onRemoveGuest={
+                        canManage && idea.addedBy && !mine
+                          ? () => moderation.askRemoveGuest(idea.addedBy as string, idea.addedByLabel)
+                          : undefined
+                      }
+                    />
+                  </SafetyCard>
+                </SwipeSafetyRow>
               );
             })}
           </View>
@@ -155,49 +262,88 @@ export function MusicContentSafety({
       {avoid ? (
         <View style={{ gap: 12 }}>
           <Text style={[styles.sectionLabel, { color: c.ink2 }]}>{t('safety.avoid')}</Text>
-          <Card>
-            <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={6}>
-              {avoid.text}
-            </Text>
-            <SafetyLinks
-              reportLabel={avoid.updatedBy === userId ? undefined : t('safety.reportAvoid')}
-              onReport={
-                avoid.updatedBy === userId
-                  ? undefined
-                  : () => moderation.openReport({ targetType: 'do_not_play_note', targetId: eventId })
-              }
-              hideLabel={canManage || avoid.updatedBy === userId ? t('safety.remove') : undefined}
-              onHide={
-                canManage || avoid.updatedBy === userId
-                  ? () => moderation.askHide({ targetType: 'do_not_play_note', targetId: eventId })
-                  : undefined
-              }
-              blockLabel={
-                avoid.updatedBy && avoid.updatedBy !== userId
-                  ? avoid.updatedByLabel
-                    ? t('safety.blockNamed', { name: avoid.updatedByLabel })
-                    : t('safety.block')
-                  : undefined
-              }
-              onBlock={
-                avoid.updatedBy && avoid.updatedBy !== userId
-                  ? () => moderation.askBlock(avoid.updatedBy as string, avoid.updatedByLabel)
-                  : undefined
-              }
-              guestLabel={
-                canManage && avoid.updatedBy && avoid.updatedBy !== userId
-                  ? avoid.updatedByLabel
-                    ? t('safety.removeGuestNamed', { name: avoid.updatedByLabel })
-                    : t('safety.removeGuest')
-                  : undefined
-              }
-              onRemoveGuest={
-                canManage && avoid.updatedBy && avoid.updatedBy !== userId
-                  ? () => moderation.askRemoveGuest(avoid.updatedBy as string, avoid.updatedByLabel)
-                  : undefined
-              }
-            />
-          </Card>
+          {(() => {
+            const mine = avoid.updatedBy === userId;
+            const canRemove = canManage || mine;
+            const canReport = !mine;
+            const rightActions = [
+              canReport
+                ? {
+                    key: 'report',
+                    label: t('safety.report'),
+                    color: c.accent,
+                    icon: 'shield' as const,
+                    onPress: () =>
+                      moderation.openReport({ targetType: 'do_not_play_note', targetId: eventId }),
+                  }
+                : null,
+              canRemove
+                ? {
+                    key: 'remove',
+                    label: t('safety.remove'),
+                    color: Status.archive,
+                    icon: 'trash' as const,
+                    onPress: () =>
+                      void removeTarget({ targetType: 'do_not_play_note', targetId: eventId }, () =>
+                        setAvoid(null),
+                      ),
+                  }
+                : null,
+            ].filter((item): item is NonNullable<typeof item> => item != null);
+
+            const a11yActions = [
+              canRemove ? { name: 'remove', label: t('safety.remove') } : null,
+              canReport ? { name: 'report', label: t('safety.reportAvoid') } : null,
+            ].filter((item): item is { name: string; label: string } => item != null);
+
+            return (
+              <SwipeSafetyRow
+                accessibilityLabel={t('safety.avoid')}
+                accessibilityActions={a11yActions}
+                onAccessibilityAction={({ nativeEvent }) => {
+                  if (nativeEvent.actionName === 'remove' && canRemove) {
+                    void removeTarget({ targetType: 'do_not_play_note', targetId: eventId }, () =>
+                      setAvoid(null),
+                    );
+                  } else if (nativeEvent.actionName === 'report' && canReport) {
+                    moderation.openReport({ targetType: 'do_not_play_note', targetId: eventId });
+                  }
+                }}
+                rightActions={rightActions}>
+                <SafetyCard>
+                  <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={6}>
+                    {avoid.text}
+                  </Text>
+                  <SafetyLinks
+                    blockLabel={
+                      avoid.updatedBy && avoid.updatedBy !== userId
+                        ? avoid.updatedByLabel
+                          ? t('safety.blockNamed', { name: avoid.updatedByLabel })
+                          : t('safety.block')
+                        : undefined
+                    }
+                    onBlock={
+                      avoid.updatedBy && avoid.updatedBy !== userId
+                        ? () => moderation.askBlock(avoid.updatedBy as string, avoid.updatedByLabel)
+                        : undefined
+                    }
+                    guestLabel={
+                      canManage && avoid.updatedBy && avoid.updatedBy !== userId
+                        ? avoid.updatedByLabel
+                          ? t('safety.removeGuestNamed', { name: avoid.updatedByLabel })
+                          : t('safety.removeGuest')
+                        : undefined
+                    }
+                    onRemoveGuest={
+                      canManage && avoid.updatedBy && avoid.updatedBy !== userId
+                        ? () => moderation.askRemoveGuest(avoid.updatedBy as string, avoid.updatedByLabel)
+                        : undefined
+                    }
+                  />
+                </SafetyCard>
+              </SwipeSafetyRow>
+            );
+          })()}
         </View>
       ) : null}
 
@@ -214,15 +360,6 @@ function noticeCopy(
   if (kind === 'forbidden') return 'safety.forbidden';
   if (kind === 'notFound') return 'safety.notFound';
   return 'safety.failed';
-}
-
-function Card({ children }: { children: ReactNode }) {
-  const c = useC();
-  return (
-    <View style={[Shadow.card, { borderRadius: Radius.lg, backgroundColor: c.surface, padding: 14, gap: 8 }]}>
-      {children}
-    </View>
-  );
 }
 
 const styles = {
