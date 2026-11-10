@@ -225,7 +225,9 @@ function MusicIdeasStill({ swipe = 'rest' }: { swipe?: 'rest' | 'left' | 'right'
       {swipe === 'rest' ? (
         <View style={{ gap: 12 }}>
           <Text style={[sectionLabel, { color: c.ink2 }]}>{t('safety.avoid')}</Text>
-          <MusicIdeaCard title="No heavy metal. No explicit lyrics during dinner." />
+          <View style={{ backgroundColor: c.surface, borderRadius: Radius.lg, padding: 14 }}>
+            <Text style={[Type.footnote, { color: c.ink2 }]}>No heavy metal. No explicit lyrics during dinner.</Text>
+          </View>
         </View>
       ) : null}
     </View>
