@@ -11,10 +11,10 @@ import { WelcomeScreen } from '@/components/onboarding/WelcomeScreen';
 import { ForgotPasswordScreen } from '@/components/sign-in/ForgotPasswordScreen';
 import { SignInScreen } from '@/components/sign-in/SignInScreen';
 import { SignUpScreen } from '@/components/sign-in/SignUpScreen';
-import { useC } from '@/components/ui';
+import { Icon, useC } from '@/components/ui';
 import { useDevLocale } from '@/lib/devLocale';
 import { useT } from '@/lib/i18n';
-import { Radius, Type } from '@/lib/theme';
+import { Fonts, Radius, Type } from '@/lib/theme';
 import type { WelcomeSnapshot } from '@/lib/welcome';
 
 /**
@@ -104,25 +104,55 @@ function MyEventSafetyStill() {
 function MusicIdeaCard({ title }: { title: string }) {
   const c = useC();
   return (
-    <View style={{ backgroundColor: c.surface, borderRadius: Radius.lg, padding: 14, gap: 8 }}>
+    <View style={{ backgroundColor: c.surface, borderRadius: Radius.lg, padding: 14, gap: 8, minHeight: 52, justifyContent: 'center' }}>
       <Text style={[Type.callout, { color: c.ink }]}>{title}</Text>
     </View>
   );
 }
 
-function SwipeChip({ label, color }: { label: string; color: string }) {
+function ConfirmStill({
+  tone,
+  label,
+  report,
+}: {
+  tone: 'remove' | 'must';
+  label: string;
+  report?: string;
+}) {
+  const { t } = useT();
+  const bg = tone === 'remove' ? '#e0584f' : '#2e8b62';
   return (
     <View
       style={{
-        width: 88,
         borderRadius: Radius.lg,
-        backgroundColor: color,
+        backgroundColor: bg,
+        minHeight: 52,
+        paddingHorizontal: 14,
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 8,
-        gap: 4,
+        gap: 10,
       }}>
-      <Text style={{ color: '#fff', fontFamily: 'Montserrat-Bold', fontSize: 12, textAlign: 'center' }}>{label}</Text>
+      <Icon name={tone === 'remove' ? 'trash' : 'star'} size={18} color="#fff" />
+      <Text style={{ flex: 1, color: '#fff', fontFamily: Fonts.semibold, fontSize: 15, lineHeight: 20 }}>
+        {label}
+      </Text>
+      {report ? (
+        <Text style={{ color: '#fff', fontFamily: Fonts.semibold, fontSize: 13, textDecorationLine: 'underline' }}>
+          {report}
+        </Text>
+      ) : null}
+      <View
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          backgroundColor: 'rgba(0,0,0,0.18)',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        accessibilityLabel={t('common.cancel')}>
+        <Icon name="close" size={16} color="#fff" />
+      </View>
     </View>
   );
 }
@@ -141,19 +171,14 @@ function MusicIdeasStill({ swipe = 'rest' }: { swipe?: 'rest' | 'left' | 'right'
         <Text style={[sectionLabel, { color: c.ink2 }]}>{t('safety.songIdeas')}</Text>
         <Text style={[Type.footnote, { color: c.ink3 }]}>{t('safety.swipeHint')}</Text>
         {swipe === 'left' ? (
-          <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: 0 }}>
-            <View style={{ flex: 1, transform: [{ translateX: -24 }] }}>
-              <MusicIdeaCard title={title} />
-            </View>
-            <SwipeChip label={t('safety.report')} color={c.accent} />
-            <SwipeChip label={t('safety.remove')} color="#e0584f" />
+          <View style={{ gap: 10 }}>
+            <ConfirmStill tone="remove" label={t('safety.tapToRemove')} report={t('safety.report')} />
+            <MusicIdeaCard title="Shut Up and Dance · Walk the Moon" />
           </View>
         ) : swipe === 'right' ? (
-          <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
-            <SwipeChip label={t('record.mustPlay')} color={c.success} />
-            <View style={{ flex: 1, transform: [{ translateX: 24 }] }}>
-              <MusicIdeaCard title={title} />
-            </View>
+          <View style={{ gap: 10 }}>
+            <ConfirmStill tone="must" label={t('safety.tapToMustPlay')} />
+            <MusicIdeaCard title="Shut Up and Dance · Walk the Moon" />
           </View>
         ) : (
           <View style={{ gap: 10 }}>

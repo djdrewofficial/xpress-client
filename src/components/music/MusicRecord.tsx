@@ -50,6 +50,7 @@ export function MusicRecord({
   onSearch,
   onSwitchEvent,
   afterHero,
+  onScrollBeginDrag,
 }: {
   moments: MusicMoment[];
   loading?: boolean;
@@ -62,6 +63,7 @@ export function MusicRecord({
   onSwitchEvent?: () => void;
   /** Song ideas / Music to avoid moderation cards. */
   afterHero?: ReactNode;
+  onScrollBeginDrag?: () => void;
 }) {
   const c = useC();
   const { t } = useT();
@@ -95,7 +97,10 @@ export function MusicRecord({
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: bottomPad, gap: 14 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: bottomPad, gap: 14 }}
+        showsVerticalScrollIndicator={false}
+        onScrollBeginDrag={onScrollBeginDrag}>
         <LinearGradient colors={['#241447', '#3d2278', '#5a2d88']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
           <View style={styles.vinyl} pointerEvents="none">
             <RecordVinyl />

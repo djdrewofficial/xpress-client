@@ -4,6 +4,7 @@ import {
   AccessibilityActionEvent,
   ActivityIndicator,
   Alert,
+  Pressable,
   Text,
   View,
 } from 'react-native';
@@ -18,14 +19,14 @@ import {
   type ModerationKind,
 } from '@/lib/moderation';
 import { moveSongIdeaToMustPlay } from '@/lib/moveSongIdeaToMustPlay';
-import { Fonts, Radius, Shadow, Status, Type } from '@/lib/theme';
+import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
 import { SafetyLinks } from './SafetyLinks';
 import { SafetyCard, SwipeSafetyRow } from './SwipeSafetyRow';
 import { useModeration } from './useModeration';
 
 /**
  * Song ideas and the Music-to-avoid note for the Music tab.
- * Swipe left to remove/report; swipe right on ideas to add Must Play.
+ * Swipe opens an in-place confirm overlay; tap runs remove / Must Play.
  */
 export function MusicContentSafety({
   eventId,
@@ -34,6 +35,7 @@ export function MusicContentSafety({
   mustPlaySectionId = null,
   onCatalogChanged,
   reloadSignal = 0,
+  dismissSignal = 0,
 }: {
   eventId: string;
   userId: string;
@@ -43,6 +45,8 @@ export function MusicContentSafety({
   /** Refresh the Music record after an idea is promoted. */
   onCatalogChanged?: () => void;
   reloadSignal?: number;
+  /** Bump when the Music list scrolls so open confirms dismiss. */
+  dismissSignal?: number;
 }) {
   const c = useC();
   const { t } = useT();
@@ -51,9 +55,11 @@ export function MusicContentSafety({
   const [ideas, setIdeas] = useState<EventSongIdea[]>([]);
   const [avoid, setAvoid] = useState<EventText | null>(null);
   const [tick, setTick] = useState(0);
+  const [localDismiss, setLocalDismiss] = useState(0);
   const busy = useRef(false);
   const seenEvent = useRef(eventId);
   const moderation = useModeration(eventId, () => setTick((n) => n + 1));
+  const dismiss = dismissSignal + localDismiss;
 
   const load = useCallback(async () => loadEventContent(eventId), [eventId]);
 
@@ -91,37 +97,41 @@ export function MusicContentSafety({
     };
   }, [load, reloadSignal, tick, eventId]);
 
-  async function removeTarget(
-    target: { targetType: 'song_idea' | 'do_not_play_note'; targetId: string },
-    optimistic: () => void,
-  ) {
-    if (busy.current) return;
+  async function removeIdea(idea: EventSongIdea) {
+    if (busy.current) throw new Error('busy');
     busy.current = true;
-    optimistic();
-    const result = await hideContent(eventId, target);
+    const result = await hideContent(eventId, { targetType: 'song_idea', targetId: idea.id });
     busy.current = false;
     if (!result.ok) {
       setTick((n) => n + 1);
       moderation.explain(result);
-      return;
+      throw new Error(result.kind);
     }
-    Alert.alert(t('safety.removed'));
+  }
+
+  async function removeAvoid() {
+    if (busy.current) throw new Error('busy');
+    busy.current = true;
+    const result = await hideContent(eventId, { targetType: 'do_not_play_note', targetId: eventId });
+    busy.current = false;
+    if (!result.ok) {
+      setTick((n) => n + 1);
+      moderation.explain(result);
+      throw new Error(result.kind);
+    }
   }
 
   async function addIdeaToMustPlay(idea: EventSongIdea) {
-    if (!mustPlaySectionId || busy.current) return;
+    if (!mustPlaySectionId || busy.current) throw new Error('busy');
     busy.current = true;
-    setIdeas((prev) => prev.filter((row) => row.id !== idea.id));
     const result = await moveSongIdeaToMustPlay(eventId, mustPlaySectionId, idea);
     busy.current = false;
     if (!result.ok) {
       setTick((n) => n + 1);
       Alert.alert(t('common.couldntSave'), t('common.checkConnection'));
-      return;
+      throw new Error(result.step);
     }
     onCatalogChanged?.();
-    if (!result.ideaHidden) setTick((n) => n + 1);
-    Alert.alert(t('safety.addedMustPlay'));
   }
 
   if (loading) {
@@ -143,7 +153,7 @@ export function MusicContentSafety({
   if (ideas.length === 0 && !avoid) return moderation.sheet;
 
   return (
-    <View style={{ gap: 32 }}>
+    <Pressable accessible={false} style={{ gap: 32 }} onPress={() => setLocalDismiss((n) => n + 1)}>
       {ideas.length > 0 ? (
         <View style={{ gap: 12 }}>
           <Text style={[styles.sectionLabel, { color: c.ink2 }]}>{t('safety.songIdeas')}</Text>
@@ -156,55 +166,19 @@ export function MusicContentSafety({
               const canMust = canManage && !!mustPlaySectionId;
               const title = [idea.title, idea.artist].filter(Boolean).join(' · ') || t('safety.songIdeas');
 
-              const rightActions = [
-                canReport
-                  ? {
-                      key: 'report',
-                      label: t('safety.report'),
-                      color: c.accent,
-                      icon: 'shield' as const,
-                      onPress: () => moderation.openReport({ targetType: 'song_idea', targetId: idea.id }),
-                    }
-                  : null,
-                canRemove
-                  ? {
-                      key: 'remove',
-                      label: t('safety.remove'),
-                      color: Status.archive,
-                      icon: 'trash' as const,
-                      onPress: () =>
-                        void removeTarget({ targetType: 'song_idea', targetId: idea.id }, () =>
-                          setIdeas((prev) => prev.filter((row) => row.id !== idea.id)),
-                        ),
-                    }
-                  : null,
-              ].filter((item): item is NonNullable<typeof item> => item != null);
-
-              const leftActions = canMust
-                ? [
-                    {
-                      key: 'must',
-                      label: t('record.mustPlay'),
-                      color: c.success,
-                      icon: 'star' as const,
-                      onPress: () => void addIdeaToMustPlay(idea),
-                    },
-                  ]
-                : [];
-
               const a11yActions = [
                 canRemove ? { name: 'remove', label: t('safety.remove') } : null,
                 canMust ? { name: 'mustPlay', label: t('moment.markMust') } : null,
                 canReport ? { name: 'report', label: t('safety.reportIdea') } : null,
               ].filter((item): item is { name: string; label: string } => item != null);
 
+              const dropIdea = () => setIdeas((prev) => prev.filter((row) => row.id !== idea.id));
+
               const onA11y = ({ nativeEvent }: AccessibilityActionEvent) => {
                 if (nativeEvent.actionName === 'remove' && canRemove) {
-                  void removeTarget({ targetType: 'song_idea', targetId: idea.id }, () =>
-                    setIdeas((prev) => prev.filter((row) => row.id !== idea.id)),
-                  );
+                  void removeIdea(idea).then(dropIdea).catch(() => {});
                 } else if (nativeEvent.actionName === 'mustPlay' && canMust) {
-                  void addIdeaToMustPlay(idea);
+                  void addIdeaToMustPlay(idea).then(dropIdea).catch(() => {});
                 } else if (nativeEvent.actionName === 'report' && canReport) {
                   moderation.openReport({ targetType: 'song_idea', targetId: idea.id });
                 }
@@ -216,8 +190,14 @@ export function MusicContentSafety({
                   accessibilityLabel={title}
                   accessibilityActions={a11yActions}
                   onAccessibilityAction={onA11y}
-                  leftActions={leftActions}
-                  rightActions={rightActions}>
+                  canRemove={canRemove}
+                  canMustPlay={canMust}
+                  canReport={canReport}
+                  dismissSignal={dismiss}
+                  onRemove={() => removeIdea(idea)}
+                  onMustPlay={() => addIdeaToMustPlay(idea)}
+                  onFinished={dropIdea}
+                  onReport={() => moderation.openReport({ targetType: 'song_idea', targetId: idea.id })}>
                   <SafetyCard>
                     <Text style={[Type.callout, { color: c.ink }]}>{title}</Text>
                     {idea.note ? (
@@ -266,31 +246,6 @@ export function MusicContentSafety({
             const mine = avoid.updatedBy === userId;
             const canRemove = canManage || mine;
             const canReport = !mine;
-            const rightActions = [
-              canReport
-                ? {
-                    key: 'report',
-                    label: t('safety.report'),
-                    color: c.accent,
-                    icon: 'shield' as const,
-                    onPress: () =>
-                      moderation.openReport({ targetType: 'do_not_play_note', targetId: eventId }),
-                  }
-                : null,
-              canRemove
-                ? {
-                    key: 'remove',
-                    label: t('safety.remove'),
-                    color: Status.archive,
-                    icon: 'trash' as const,
-                    onPress: () =>
-                      void removeTarget({ targetType: 'do_not_play_note', targetId: eventId }, () =>
-                        setAvoid(null),
-                      ),
-                  }
-                : null,
-            ].filter((item): item is NonNullable<typeof item> => item != null);
-
             const a11yActions = [
               canRemove ? { name: 'remove', label: t('safety.remove') } : null,
               canReport ? { name: 'report', label: t('safety.reportAvoid') } : null,
@@ -302,14 +257,21 @@ export function MusicContentSafety({
                 accessibilityActions={a11yActions}
                 onAccessibilityAction={({ nativeEvent }) => {
                   if (nativeEvent.actionName === 'remove' && canRemove) {
-                    void removeTarget({ targetType: 'do_not_play_note', targetId: eventId }, () =>
-                      setAvoid(null),
-                    );
+                    void removeAvoid()
+                      .then(() => setAvoid(null))
+                      .catch(() => {});
                   } else if (nativeEvent.actionName === 'report' && canReport) {
                     moderation.openReport({ targetType: 'do_not_play_note', targetId: eventId });
                   }
                 }}
-                rightActions={rightActions}>
+                canRemove={canRemove}
+                canReport={canReport}
+                dismissSignal={dismiss}
+                onRemove={() => removeAvoid()}
+                onFinished={() => setAvoid(null)}
+                onReport={() =>
+                  moderation.openReport({ targetType: 'do_not_play_note', targetId: eventId })
+                }>
                 <SafetyCard>
                   <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={6}>
                     {avoid.text}
@@ -348,7 +310,7 @@ export function MusicContentSafety({
       ) : null}
 
       {moderation.sheet}
-    </View>
+    </Pressable>
   );
 }
 
