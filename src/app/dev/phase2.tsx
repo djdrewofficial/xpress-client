@@ -104,8 +104,42 @@ function MyEventSafetyStill() {
 function MusicIdeaCard({ title }: { title: string }) {
   const c = useC();
   return (
-    <View style={{ backgroundColor: c.surface, borderRadius: Radius.lg, padding: 14, gap: 8, minHeight: 52, justifyContent: 'center' }}>
-      <Text style={[Type.callout, { color: c.ink }]}>{title}</Text>
+    <View
+      style={{
+        backgroundColor: c.surface,
+        borderRadius: Radius.lg,
+        padding: 14,
+        gap: 8,
+        minHeight: 52,
+        flexDirection: 'row',
+        alignItems: 'center',
+      }}>
+      <View
+        style={{
+          width: 46,
+          height: 46,
+          borderRadius: 8,
+          backgroundColor: c.accent,
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+        }}>
+        <Icon name="music" size={18} color="#fff" />
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.35)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Icon name="play" size={14} color="#fff" />
+        </View>
+      </View>
+      <Text style={[Type.callout, { color: c.ink, flex: 1 }]}>{title}</Text>
     </View>
   );
 }

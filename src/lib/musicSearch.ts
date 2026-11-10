@@ -1,4 +1,7 @@
 import { apiBase, authorizedFetch } from '@/lib/api';
+import { pickSearchHit } from '@/lib/musicSearchMatch';
+
+export { pickSearchHit } from '@/lib/musicSearchMatch';
 
 /* Talks to the XOS music endpoints (search across Spotify/Apple/YouTube +
    iTunes preview resolution) using the signed-in user's Supabase token. */
@@ -44,4 +47,19 @@ export async function resolvePreview(title: string, artist: string): Promise<str
   } catch {
     return null;
   }
+}
+
+/**
+ * Resolve artwork + preview for a free-text song (e.g. a song idea with no
+ * provider id) using the same catalog search + iTunes preview endpoints as Add music.
+ */
+export async function resolveTrackMedia(
+  title: string,
+  artist?: string | null,
+): Promise<{ artworkUrl: string | null; previewUrl: string | null }> {
+  const q = [title, artist].filter((part) => part && String(part).trim()).join(' ');
+  const hit = pickSearchHit(await searchTracks(q), title, artist);
+  let previewUrl = hit?.previewUrl ?? null;
+  if (!previewUrl) previewUrl = await resolvePreview(title, artist ?? '');
+  return { artworkUrl: hit?.artworkUrl ?? null, previewUrl };
 }

@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 
+import { SongArtPlay, useSongPreviewPlayer } from '@/components/music/SongArtPlay';
 import { useC } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import {
@@ -19,10 +20,13 @@ import {
   type ModerationKind,
 } from '@/lib/moderation';
 import { moveSongIdeaToMustPlay } from '@/lib/moveSongIdeaToMustPlay';
+import { resolveTrackMedia } from '@/lib/musicSearch';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
 import { SafetyLinks } from './SafetyLinks';
 import { SafetyCard, SwipeSafetyRow } from './SwipeSafetyRow';
 import { useModeration } from './useModeration';
+
+type IdeaMedia = { artworkUrl: string | null; previewUrl: string | null };
 
 /**
  * Song ideas and the Music-to-avoid note for the Music tab.
@@ -56,9 +60,11 @@ export function MusicContentSafety({
   const [avoid, setAvoid] = useState<EventText | null>(null);
   const [tick, setTick] = useState(0);
   const [localDismiss, setLocalDismiss] = useState(0);
+  const [mediaById, setMediaById] = useState<Record<string, IdeaMedia>>({});
   const busy = useRef(false);
   const seenEvent = useRef(eventId);
   const moderation = useModeration(eventId, () => setTick((n) => n + 1));
+  const preview = useSongPreviewPlayer();
   const dismiss = dismissSignal + localDismiss;
 
   const load = useCallback(async () => loadEventContent(eventId), [eventId]);
@@ -75,6 +81,7 @@ export function MusicContentSafety({
       seenEvent.current = eventId;
       setIdeas([]);
       setAvoid(null);
+      setMediaById({});
     }
     setLoading(true);
     void load().then((feed) => {
@@ -96,6 +103,27 @@ export function MusicContentSafety({
       cancel = true;
     };
   }, [load, reloadSignal, tick, eventId]);
+
+  useEffect(() => {
+    let cancel = false;
+    void (async () => {
+      const missing = ideas.filter((idea) => mediaById[idea.id] == null);
+      if (missing.length === 0) return;
+      const next: Record<string, IdeaMedia> = {};
+      await Promise.all(
+        missing.map(async (idea) => {
+          const media = await resolveTrackMedia(idea.title, idea.artist);
+          next[idea.id] = media;
+        }),
+      );
+      if (!cancel) setMediaById((prev) => ({ ...prev, ...next }));
+    })();
+    return () => {
+      cancel = true;
+    };
+    // Resolve once per idea id; mediaById is read for the missing filter only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ideas]);
 
   async function removeIdea(idea: EventSongIdea) {
     if (busy.current) throw new Error('busy');
@@ -124,7 +152,8 @@ export function MusicContentSafety({
   async function addIdeaToMustPlay(idea: EventSongIdea) {
     if (!mustPlaySectionId || busy.current) throw new Error('busy');
     busy.current = true;
-    const result = await moveSongIdeaToMustPlay(eventId, mustPlaySectionId, idea);
+    const media = mediaById[idea.id];
+    const result = await moveSongIdeaToMustPlay(eventId, mustPlaySectionId, idea, media);
     busy.current = false;
     if (!result.ok) {
       setTick((n) => n + 1);
@@ -199,12 +228,31 @@ export function MusicContentSafety({
                   onFinished={dropIdea}
                   onReport={() => moderation.openReport({ targetType: 'song_idea', targetId: idea.id })}>
                   <SafetyCard>
-                    <Text style={[Type.callout, { color: c.ink }]}>{title}</Text>
-                    {idea.note ? (
-                      <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={3}>
-                        {idea.note}
-                      </Text>
-                    ) : null}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <SongArtPlay
+                        title={idea.title || title}
+                        artworkUrl={mediaById[idea.id]?.artworkUrl}
+                        playing={preview.playingId === idea.id}
+                        onPress={() =>
+                          void preview.togglePlay({
+                            id: idea.id,
+                            title: idea.title,
+                            artist: idea.artist,
+                            previewUrl: mediaById[idea.id]?.previewUrl,
+                          })
+                        }
+                      />
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={[Type.callout, { color: c.ink }]} numberOfLines={2}>
+                          {title}
+                        </Text>
+                        {idea.note ? (
+                          <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={3}>
+                            {idea.note}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
                     <SafetyLinks
                       blockLabel={
                         idea.addedBy && !mine

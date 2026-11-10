@@ -4,12 +4,17 @@ import type { EventSongIdea } from '@/lib/moderation';
 export type SongIdeaSeed = Pick<EventSongIdea, 'id' | 'title' | 'artist'>;
 
 /** Manual addSong payload for an idea (ideas have no catalog provider id). */
-export function songIdeaToAddPayload(idea: SongIdeaSeed) {
+export function songIdeaToAddPayload(
+  idea: SongIdeaSeed,
+  media?: { artworkUrl?: string | null; previewUrl?: string | null },
+) {
   return {
     title: idea.title.trim() || 'Untitled',
     artist: idea.artist?.trim() || null,
     provider: 'manual' as const,
     provider_id: null,
+    artwork_url: media?.artworkUrl ?? null,
+    preview_url: media?.previewUrl ?? null,
   };
 }
 

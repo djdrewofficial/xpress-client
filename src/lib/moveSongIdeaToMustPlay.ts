@@ -15,10 +15,11 @@ export async function moveSongIdeaToMustPlay(
   eventId: string,
   sectionId: string,
   idea: SongIdeaSeed,
+  media?: { artworkUrl?: string | null; previewUrl?: string | null },
 ): Promise<MoveSongIdeaResult> {
   let songId: string;
   try {
-    const row = await addSong(eventId, sectionId, songIdeaToAddPayload(idea));
+    const row = await addSong(eventId, sectionId, songIdeaToAddPayload(idea, media));
     if (!row?.id) return { ok: false, step: 'add' };
     songId = row.id;
   } catch {
