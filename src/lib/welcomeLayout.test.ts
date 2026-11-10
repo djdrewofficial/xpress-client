@@ -23,6 +23,7 @@ function measure(locale: 'en' | 'es'): WelcomeMeasureCopy {
     smsLine: copy['welcome.smsLine'],
     phoneNote: locale === 'es' ? appEs['sms.needPhone'] : appEn['sms.needPhone'],
     agreement: continueAgreement(locale, terms, privacy),
+    aiNotice: copy['welcome.aiNotice'],
   };
 }
 

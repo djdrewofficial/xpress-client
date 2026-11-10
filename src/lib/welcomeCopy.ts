@@ -2,8 +2,8 @@
  * Welcome copy. Event-neutral: weddings and other celebrations share it.
  *
  * The full promotional-text disclosure is `smsDisclosureKeys`, shown from
- * Details before the switch is used. Welcome does not ask for AI permission
- * and does not treat Continue as AI consent.
+ * Details before the switch is used. Welcome shows a plain AI notice only;
+ * Continue is not an AI consent control. Promotional texts stay opt-in.
  */
 
 const welcomeEn = {
@@ -19,6 +19,7 @@ const welcomeEn = {
   'welcome.agreeBefore': 'By continuing you agree to our ',
   'welcome.agreeAnd': ' and ',
   'welcome.agreeAfter': " and confirm you're 18+.",
+  'welcome.aiNotice': 'Xpress uses AI tools to help plan and run your event.',
 } as const;
 
 const welcomeEs: Record<keyof typeof welcomeEn, string> = {
@@ -34,6 +35,7 @@ const welcomeEs: Record<keyof typeof welcomeEn, string> = {
   'welcome.agreeBefore': 'Al continuar aceptas las ',
   'welcome.agreeAnd': ' y la ',
   'welcome.agreeAfter': ', y confirmas que tienes 18 años o más.',
+  'welcome.aiNotice': 'Xpress usa herramientas de IA para ayudar a planificar y realizar su evento.',
 };
 
 export const welcomeCopy = { en: welcomeEn, es: welcomeEs };

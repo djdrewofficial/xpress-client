@@ -5,7 +5,7 @@ import { Type } from '@/lib/theme';
 import { scaledType } from '@/lib/welcomeCopy';
 import { useC } from './useC';
 
-/** Review prompt with tappable Privacy and Terms. Continuing does not authorize AI or marketing texts. */
+/** Review prompt with tappable Privacy and Terms. Continuing does not authorize marketing texts. */
 export function LegalLine({
   onTerms,
   onPrivacy,
@@ -32,7 +32,7 @@ export function LegalLine({
 
 /**
  * One sentence above Continue. Terms and Privacy are links.
- * Continuing still records the same acceptance. It does not opt in to texts or AI.
+ * Continuing still records the same acceptance. It does not opt in to promotional texts.
  */
 export function ContinueAgreement({
   onTerms,
@@ -57,6 +57,29 @@ export function ContinueAgreement({
       {t('welcome.agreeAnd')}
       <Text style={link} accessibilityRole="link" onPress={onPrivacy}>{t('legal.privacyTitle')}</Text>
       {t('welcome.agreeAfter')}
+    </Text>
+  );
+}
+
+/** Plain AI notice. No toggle and no consent question. Opens Privacy when tapped. */
+export function AiNotice({
+  onPrivacy,
+  fontScale = 1,
+}: {
+  onPrivacy: () => void;
+  /** Sample preview only. Production stays on the system text size. */
+  fontScale?: number;
+}) {
+  const c = useC();
+  const { t } = useT();
+  const foot = scaledType(Type.footnote, fontScale);
+  return (
+    <Text
+      style={[foot, { color: c.ink3, textAlign: 'center', textDecorationLine: 'underline' }]}
+      accessibilityRole="link"
+      onPress={onPrivacy}
+    >
+      {t('welcome.aiNotice')}
     </Text>
   );
 }

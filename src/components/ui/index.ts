@@ -32,4 +32,4 @@ export { FocusedStatusBar } from './FocusedStatusBar';
 export { CoachMark } from './CoachMark';
 export { CodeInput } from './CodeInput';
 export { LanguageCard } from './LanguageCard';
-export { ContinueAgreement, LegalLine, PolicyLinks } from './LegalLine';
+export { AiNotice, ContinueAgreement, LegalLine, PolicyLinks } from './LegalLine';
