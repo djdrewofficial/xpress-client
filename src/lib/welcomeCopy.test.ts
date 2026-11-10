@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { appEn, appEs } from './appCopy.ts';
-import { legalDocument } from './legalCopy.ts';
+import { legalDocument, legalPlainText } from './legalCopy.ts';
 import { continueAgreement, scaledType, smsDisclosureKeys, welcomeCopy } from './welcomeCopy.ts';
 
 test('welcome copy has the same keys in English and Spanish, with no dashes', () => {
@@ -31,11 +31,15 @@ test('continuing agrees to Terms, Privacy, and 18+ in one sentence', () => {
   assert.equal(english.includes('third-party'), false);
 });
 
-test('welcome does not ask for AI permission', () => {
+test('welcome shows a plain AI notice without a consent question', () => {
+  assert.equal(welcomeCopy.en['welcome.aiNotice'], 'Xpress uses AI tools to help plan and run your event.');
+  assert.equal(
+    welcomeCopy.es['welcome.aiNotice'],
+    'Xpress usa herramientas de IA para ayudar a planificar y realizar su evento.',
+  );
   for (const locale of ['en', 'es'] as const) {
-    for (const value of Object.values(welcomeCopy[locale])) {
-      assert.equal(/openai|ai planning|herramientas de ia/i.test(value), false, value);
-    }
+    const notice = welcomeCopy[locale]['welcome.aiNotice'];
+    assert.equal(/\?|consent|opt[- ]?in|autoriz|permiso|toggle|switch/i.test(notice), false, notice);
   }
   assert.equal(Object.keys(appEn).some((key) => key.startsWith('ai.')), false);
   assert.equal(Object.keys(appEs).some((key) => key.startsWith('ai.')), false);
@@ -102,18 +106,40 @@ test('details keep the existing marketing disclosure for review before opt-in', 
   assert.match(appEs['sms.reassurance'], /no afecta su servicio/);
 });
 
-test('shared sections and public cover photos stay in Privacy and Terms', () => {
-  const privacy = legalDocument('privacy', 'en').sections.map((section) => section.body).join('\n');
-  const terms = legalDocument('terms', 'en').sections.map((section) => section.body).join('\n');
-  assert.match(privacy, /shared section/i);
-  assert.match(privacy, /Cover photos are stored in the public event-photos bucket/);
+test('approved Privacy Policy is in the app without draft flags', () => {
+  const privacy = legalPlainText(legalDocument('privacy', 'en'));
+  assert.match(privacy, /Effective date: September 1, 2026/);
+  assert.match(privacy, /Planning is shared/);
+  assert.match(privacy, /Cover photos are stored at a web address that anyone with the link can open/);
+  assert.match(privacy, /Staff AI tools \(section 7\)/);
+  assert.match(privacy, /By booking with Xpress, you accept that we use these AI tools/);
+  assert.match(privacy, /Promotional texts/);
+  assert.equal(privacy.includes('[IF SHIPPED]'), false);
+  assert.equal(privacy.includes('Page-only'), false);
+  assert.equal(/\[(?!.*@)[A-Z]/.test(privacy), false);
+
+  const privacyEs = legalPlainText(legalDocument('privacy', 'es'));
+  assert.match(privacyEs, /Fecha de entrada en vigor: 1 de septiembre de 2026/);
+  assert.match(privacyEs, /La planificación es compartida/);
+  assert.match(privacyEs, /foto de portada/);
+  assert.match(privacyEs, /Herramientas de IA del personal/);
+  assert.match(privacyEs, /usted acepta que usemos estas herramientas de IA/);
+  assert.equal(privacyEs.includes('[IF SHIPPED]'), false);
+  assert.match(privacyEs, /\busted\b/);
+});
+
+test('Terms describe AI as a Privacy notice, not a separate opt-in', () => {
+  const terms = legalPlainText(legalDocument('terms', 'en'));
+  const termsEs = legalPlainText(legalDocument('terms', 'es'));
   assert.match(terms, /Shared sections are visible to other authorized participants and staff/);
   assert.match(terms, /Cover photos use public URLs/);
-
-  const privacyEs = legalDocument('privacy', 'es').sections.map((section) => section.body).join('\n');
-  const termsEs = legalDocument('terms', 'es').sections.map((section) => section.body).join('\n');
-  assert.match(privacyEs, /sección compartida/);
-  assert.match(privacyEs, /foto de portada/);
+  assert.match(terms, /Staff AI tools used to plan and run events are described in the Privacy Policy/);
+  assert.equal(terms.includes('AI opt-in'), false);
+  assert.equal(terms.includes('proposed separate authorization'), false);
+  assert.equal(terms.includes('not explicit permission for third-party AI'), false);
   assert.match(termsEs, /secciones compartidas/);
   assert.match(termsEs, /Las portadas utilizan URL públicas/);
+  assert.match(termsEs, /Política de privacidad/);
+  assert.equal(termsEs.includes('autorización de IA exigible'), false);
+  assert.equal(termsEs.includes('autorización independiente'), false);
 });

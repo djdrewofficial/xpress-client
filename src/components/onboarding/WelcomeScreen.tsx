@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SmsConsentSetting } from '@/components/SmsConsentSetting';
-import { Button, ContentColumn, ContinueAgreement, useC } from '@/components/ui';
+import { AiNotice, Button, ContentColumn, ContinueAgreement, useC } from '@/components/ui';
 import { LegalSheet } from '@/components/onboarding/LegalSheet';
 import { WelcomeHero } from '@/components/onboarding/WelcomeHero';
 import { coupleDisplayName } from '@/lib/coupleName';
@@ -63,6 +63,7 @@ export function WelcomeScreen({
       smsLine: t('welcome.smsLine'),
       phoneNote: t('sms.needPhone'),
       agreement: continueAgreement(locale, t('legal.termsTitle'), t('legal.privacyTitle')),
+      aiNotice: t('welcome.aiNotice'),
     },
   });
 
@@ -125,7 +126,7 @@ export function WelcomeScreen({
         />
         <View style={[sheetStyle, { backgroundColor: c.bg }]}>
           <ContentColumn>
-            <View style={{ paddingHorizontal: frame.horizontalPadding, paddingTop: 28, paddingBottom: Math.max(insets.bottom, 20), gap: 22 }}>
+            <View style={{ paddingHorizontal: frame.horizontalPadding, paddingTop: 16, paddingBottom: Math.max(insets.bottom, 20), gap: 14 }}>
               <View accessibilityLabel={t('welcome.langPrompt')} style={langRow}>
                 <Text style={[langLabel, { color: c.ink3, fontFamily: Fonts.medium }]}>{t('welcome.language')}</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -154,13 +155,14 @@ export function WelcomeScreen({
                 fontScale={scale}
                 layout="welcome"
               />
-              <View style={{ gap: 12, marginTop: 4 }}>
+              <View style={{ gap: 4 }}>
                 <ContinueAgreement
                   onTerms={() => setSheet('terms')}
                   onPrivacy={() => setSheet('privacy')}
                   fontScale={scale}
                 />
-                <Button label={t('welcome.continue')} onPress={finish} style={{ flexShrink: 0 }} />
+                <AiNotice onPrivacy={() => setSheet('privacy')} fontScale={scale} />
+                <Button label={t('welcome.continue')} onPress={finish} style={{ flexShrink: 0, marginTop: 4 }} />
               </View>
             </View>
           </ContentColumn>

@@ -39,6 +39,7 @@ export type WelcomeMeasureCopy = {
   smsLine: string;
   phoneNote: string;
   agreement: string;
+  aiNotice: string;
 };
 
 function sheetHeight(copy: WelcomeMeasureCopy, width: number, scale: number, locked: boolean, bottomInset: number): number {
@@ -49,22 +50,26 @@ function sheetHeight(copy: WelcomeMeasureCopy, width: number, scale: number, loc
   // Welcome keeps the locked phone note on one line (see SmsConsentSetting).
   const noteLines = locked ? 1 : 0;
   const agreeLines = wrappedLines(copy.agreement, width, Math.round(13 * scale));
+  const aiLines = wrappedLines(copy.aiNotice, width, Math.round(13 * scale));
   const padBottom = Math.max(20, bottomInset);
+  // Keep language, SMS, agreement, AI notice, and Continue on one phone screen.
   return (
-    28 +
+    16 +
     Math.round(36 * scale) +
-    22 +
+    14 +
     1 +
-    22 +
+    14 +
     sub +
     4 +
     bodyLines * foot +
     4 +
     foot +
     (noteLines ? 6 + noteLines * foot : 0) +
-    22 +
+    14 +
     agreeLines * foot +
-    12 +
+    4 +
+    aiLines * foot +
+    8 +
     WELCOME_BUTTON_HEIGHT +
     padBottom
   );
