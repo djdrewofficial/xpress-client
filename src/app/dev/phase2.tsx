@@ -11,15 +11,15 @@ import { WelcomeScreen } from '@/components/onboarding/WelcomeScreen';
 import { ForgotPasswordScreen } from '@/components/sign-in/ForgotPasswordScreen';
 import { SignInScreen } from '@/components/sign-in/SignInScreen';
 import { SignUpScreen } from '@/components/sign-in/SignUpScreen';
-import { useC } from '@/components/ui';
+import { Icon, useC } from '@/components/ui';
 import { useDevLocale } from '@/lib/devLocale';
 import { useT } from '@/lib/i18n';
-import { Radius, Type } from '@/lib/theme';
+import { Fonts, Radius, Type } from '@/lib/theme';
 import type { WelcomeSnapshot } from '@/lib/welcome';
 
 /**
  * Dev-only stills. Not linked from the app.
- * Open /dev/phase2?frame=login|signup|forgot|join|welcome|welcome-es|welcome-large|welcome-large-es|welcome-locked|welcome-offers|welcome-offers-es|privacy|music|song|my-event|my-event-es
+ * Open /dev/phase2?frame=login|signup|forgot|join|welcome|welcome-es|welcome-large|welcome-large-es|welcome-locked|welcome-offers|welcome-offers-es|privacy|music|song|my-event|my-event-es|music-ideas|music-ideas-swipe-left|music-ideas-swipe-right
  * Welcome/My Event stills accept chrome=iphone|iphonese|ipad for device insets. Sample data only.
  */
 
@@ -101,9 +101,100 @@ function MyEventSafetyStill() {
   );
 }
 
-function MusicIdeasStill() {
+function MusicIdeaCard({ title }: { title: string }) {
+  const c = useC();
+  return (
+    <View
+      style={{
+        backgroundColor: c.surface,
+        borderRadius: Radius.lg,
+        padding: 14,
+        gap: 8,
+        minHeight: 52,
+        flexDirection: 'row',
+        alignItems: 'center',
+      }}>
+      <View
+        style={{
+          width: 46,
+          height: 46,
+          borderRadius: 8,
+          backgroundColor: c.accent,
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+        }}>
+        <Icon name="music" size={18} color="#fff" />
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.35)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Icon name="play" size={14} color="#fff" />
+        </View>
+      </View>
+      <Text style={[Type.callout, { color: c.ink, flex: 1 }]}>{title}</Text>
+    </View>
+  );
+}
+
+function ConfirmStill({
+  tone,
+  label,
+  report,
+}: {
+  tone: 'remove' | 'must';
+  label: string;
+  report?: string;
+}) {
+  const { t } = useT();
+  const bg = tone === 'remove' ? '#e0584f' : '#2e8b62';
+  return (
+    <View
+      style={{
+        borderRadius: Radius.lg,
+        backgroundColor: bg,
+        minHeight: 52,
+        paddingHorizontal: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+      }}>
+      <Icon name={tone === 'remove' ? 'trash' : 'star'} size={18} color="#fff" />
+      <Text style={{ flex: 1, color: '#fff', fontFamily: Fonts.semibold, fontSize: 15, lineHeight: 20 }}>
+        {label}
+      </Text>
+      {report ? (
+        <Text style={{ color: '#fff', fontFamily: Fonts.semibold, fontSize: 13, textDecorationLine: 'underline' }}>
+          {report}
+        </Text>
+      ) : null}
+      <View
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          backgroundColor: 'rgba(0,0,0,0.18)',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        accessibilityLabel={t('common.cancel')}>
+        <Icon name="close" size={16} color="#fff" />
+      </View>
+    </View>
+  );
+}
+
+function MusicIdeasStill({ swipe = 'rest' }: { swipe?: 'rest' | 'left' | 'right' }) {
   const c = useC();
   const { t } = useT();
+  const title = "Can't Help Falling in Love · Elvis Presley";
   return (
     <View style={{ gap: 32, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40, backgroundColor: c.bg, flex: 1 }}>
       <View>
@@ -112,20 +203,33 @@ function MusicIdeasStill() {
       </View>
       <View style={{ gap: 12 }}>
         <Text style={[sectionLabel, { color: c.ink2 }]}>{t('safety.songIdeas')}</Text>
-        <View style={{ backgroundColor: c.surface, borderRadius: Radius.lg, padding: 14, gap: 8 }}>
-          <Text style={[Type.callout, { color: c.ink }]}>Sample First Dance · Sample Artist</Text>
-          <Text style={[Type.footnote, { color: c.accent }]}>{t('safety.reportIdea')}</Text>
-          <Text style={[Type.footnote, { color: c.red }]}>{t('safety.remove')}</Text>
-        </View>
+        <Text style={[Type.footnote, { color: c.ink3 }]}>{t('safety.swipeHint')}</Text>
+        {swipe === 'left' ? (
+          <View style={{ gap: 10 }}>
+            <ConfirmStill tone="remove" label={t('safety.tapToRemove')} report={t('safety.report')} />
+            <MusicIdeaCard title="Shut Up and Dance · Walk the Moon" />
+          </View>
+        ) : swipe === 'right' ? (
+          <View style={{ gap: 10 }}>
+            <ConfirmStill tone="must" label={t('safety.tapToMustPlay')} />
+            <MusicIdeaCard title="Shut Up and Dance · Walk the Moon" />
+          </View>
+        ) : (
+          <View style={{ gap: 10 }}>
+            <MusicIdeaCard title={title} />
+            <MusicIdeaCard title="Shut Up and Dance · Walk the Moon" />
+            <MusicIdeaCard title="Dancing Queen · ABBA" />
+          </View>
+        )}
       </View>
-      <View style={{ gap: 12 }}>
-        <Text style={[sectionLabel, { color: c.ink2 }]}>{t('safety.avoid')}</Text>
-        <View style={{ backgroundColor: c.surface, borderRadius: Radius.lg, padding: 14, gap: 8 }}>
-          <Text style={[Type.footnote, { color: c.ink2 }]}>No reggaeton, no line dances.</Text>
-          <Text style={[Type.footnote, { color: c.accent }]}>{t('safety.reportAvoid')}</Text>
-          <Text style={[Type.footnote, { color: c.red }]}>{t('safety.remove')}</Text>
+      {swipe === 'rest' ? (
+        <View style={{ gap: 12 }}>
+          <Text style={[sectionLabel, { color: c.ink2 }]}>{t('safety.avoid')}</Text>
+          <View style={{ backgroundColor: c.surface, borderRadius: Radius.lg, padding: 14 }}>
+            <Text style={[Type.footnote, { color: c.ink2 }]}>No heavy metal. No explicit lyrics during dinner.</Text>
+          </View>
         </View>
-      </View>
+      ) : null}
     </View>
   );
 }
@@ -237,6 +341,20 @@ export default function Phase2Preview() {
     return (
       <PreviewFrame>
         <MusicIdeasStill />
+      </PreviewFrame>
+    );
+  }
+  if (frame === 'music-ideas-swipe-left' || frame === 'music-ideas-swipe-left-es') {
+    return (
+      <PreviewFrame>
+        <MusicIdeasStill swipe="left" />
+      </PreviewFrame>
+    );
+  }
+  if (frame === 'music-ideas-swipe-right' || frame === 'music-ideas-swipe-right-es') {
+    return (
+      <PreviewFrame>
+        <MusicIdeasStill swipe="right" />
       </PreviewFrame>
     );
   }

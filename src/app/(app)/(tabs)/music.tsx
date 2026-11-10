@@ -22,6 +22,7 @@ export default function MusicScreen() {
   const [moments, setMoments] = useState<MusicMoment[] | null>(null);
   const [switcher, setSwitcher] = useState(false);
   const [safetyReload, setSafetyReload] = useState(0);
+  const [swipeDismiss, setSwipeDismiss] = useState(0);
 
   const load = useCallback(async () => {
     if (!eventId) {
@@ -87,13 +88,17 @@ export default function MusicScreen() {
         onImport={() => requireMoment((moment) => music.open({ sectionId: moment.id, segment: 'import' }))}
         onSearch={() => requireMoment((moment) => music.open({ sectionId: moment.id, segment: 'search' }))}
         onSwitchEvent={canSwitch ? () => (isStaff ? router.push('/events') : setSwitcher(true)) : undefined}
+        onScrollBeginDrag={() => setSwipeDismiss((n) => n + 1)}
         afterHero={
           eventId && session?.user.id ? (
             <MusicContentSafety
               eventId={eventId}
               userId={session.user.id}
               canManage={managesEvent(event, profile?.accountType)}
+              mustPlaySectionId={target?.id ?? null}
+              onCatalogChanged={() => { void load(); }}
               reloadSignal={safetyReload}
+              dismissSignal={swipeDismiss}
             />
           ) : null
         }

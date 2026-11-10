@@ -5,6 +5,8 @@ export type RecordTrack = {
   id: string;
   title: string;
   artist: string | null;
+  artworkUrl: string | null;
+  previewUrl: string | null;
   mustPlay: boolean;
   doNotPlay: boolean;
   note: string | null;
@@ -62,6 +64,8 @@ function toTrack(song: EventSong, doNotPlay: boolean): RecordTrack {
     id: song.id,
     title: song.title,
     artist: song.artist,
+    artworkUrl: song.artwork_url ?? null,
+    previewUrl: song.preview_url ?? null,
     mustPlay: doNotPlay ? false : song.must_play,
     doNotPlay,
     note: song.note,

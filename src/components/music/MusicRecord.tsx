@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SongArtPlay, useSongPreviewPlayer } from '@/components/music/SongArtPlay';
 import { FocusedStatusBar, Icon, TrackRow, useC } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
@@ -50,6 +51,7 @@ export function MusicRecord({
   onSearch,
   onSwitchEvent,
   afterHero,
+  onScrollBeginDrag,
 }: {
   moments: MusicMoment[];
   loading?: boolean;
@@ -62,10 +64,12 @@ export function MusicRecord({
   onSwitchEvent?: () => void;
   /** Song ideas / Music to avoid moderation cards. */
   afterHero?: ReactNode;
+  onScrollBeginDrag?: () => void;
 }) {
   const c = useC();
   const { t } = useT();
   const insets = useSafeAreaInsets();
+  const preview = useSongPreviewPlayer();
   const stats = musicStats(moments);
   const sideA = moments.filter((m) => m.side === 'A');
   const sideB = moments.filter((m) => m.side === 'B');
@@ -95,7 +99,10 @@ export function MusicRecord({
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: bottomPad, gap: 14 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: bottomPad, gap: 14 }}
+        showsVerticalScrollIndicator={false}
+        onScrollBeginDrag={onScrollBeginDrag}>
         <LinearGradient colors={['#241447', '#3d2278', '#5a2d88']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
           <View style={styles.vinyl} pointerEvents="none">
             <RecordVinyl />
@@ -135,8 +142,22 @@ export function MusicRecord({
           </View>
         ) : (
           <>
-            <Side label={t('record.sideA')} moments={sideA} onOpen={onOpenMoment} onAdd={onAddToMoment} />
-            <Side label={t('record.sideB')} moments={sideB} onOpen={onOpenMoment} onAdd={onAddToMoment} />
+            <Side
+              label={t('record.sideA')}
+              moments={sideA}
+              onOpen={onOpenMoment}
+              onAdd={onAddToMoment}
+              playingId={preview.playingId}
+              onTogglePlay={preview.togglePlay}
+            />
+            <Side
+              label={t('record.sideB')}
+              moments={sideB}
+              onOpen={onOpenMoment}
+              onAdd={onAddToMoment}
+              playingId={preview.playingId}
+              onTogglePlay={preview.togglePlay}
+            />
           </>
         )}
       </ScrollView>
@@ -158,11 +179,20 @@ function Side({
   moments,
   onOpen,
   onAdd,
+  playingId,
+  onTogglePlay,
 }: {
   label: string;
   moments: MusicMoment[];
   onOpen: (moment: MusicMoment) => void;
   onAdd: (moment: MusicMoment) => void;
+  playingId: string | null;
+  onTogglePlay: (track: {
+    id: string;
+    title: string;
+    artist?: string | null;
+    previewUrl?: string | null;
+  }) => void;
 }) {
   const c = useC();
   if (moments.length === 0) return null;
@@ -170,13 +200,37 @@ function Side({
     <View style={{ gap: 10 }}>
       <Text style={[Type.label, { color: c.ink3, marginTop: 4 }]}>{label}</Text>
       {moments.map((moment) => (
-        <MomentBlock key={moment.id} moment={moment} onOpen={() => onOpen(moment)} onAdd={() => onAdd(moment)} />
+        <MomentBlock
+          key={moment.id}
+          moment={moment}
+          onOpen={() => onOpen(moment)}
+          onAdd={() => onAdd(moment)}
+          playingId={playingId}
+          onTogglePlay={onTogglePlay}
+        />
       ))}
     </View>
   );
 }
 
-function MomentBlock({ moment, onOpen, onAdd }: { moment: MusicMoment; onOpen: () => void; onAdd: () => void }) {
+function MomentBlock({
+  moment,
+  onOpen,
+  onAdd,
+  playingId,
+  onTogglePlay,
+}: {
+  moment: MusicMoment;
+  onOpen: () => void;
+  onAdd: () => void;
+  playingId: string | null;
+  onTogglePlay: (track: {
+    id: string;
+    title: string;
+    artist?: string | null;
+    previewUrl?: string | null;
+  }) => void;
+}) {
   const c = useC();
   const { t, locale } = useT();
   const empty = momentSongCount(moment) === 0;
@@ -218,6 +272,14 @@ function MomentBlock({ moment, onOpen, onAdd }: { moment: MusicMoment; onOpen: (
           mustPlay={track.mustPlay}
           note={track.note}
           onPress={real ? onOpen : undefined}
+          leading={
+            <SongArtPlay
+              title={track.title}
+              artworkUrl={track.artworkUrl}
+              playing={playingId === track.id}
+              onPress={() => onTogglePlay(track)}
+            />
+          }
         />
       ))}
     </View>

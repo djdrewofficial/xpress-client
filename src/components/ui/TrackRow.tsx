@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useT } from '@/lib/i18n';
@@ -10,6 +11,7 @@ import { useC } from './useC';
  * - default: index, title, artist. Optional Must play tag (accent tint pill).
  * - with note: DJ note block under the track (`note` string).
  * - do not play: `ban` icon, muted crossed-out title.
+ * - optional `leading` (artwork + preview play) replaces the index/icon.
  */
 export function TrackRow({
   index,
@@ -18,6 +20,7 @@ export function TrackRow({
   mustPlay = false,
   doNotPlay = false,
   note,
+  leading,
   onPress,
 }: {
   index?: number;
@@ -26,6 +29,7 @@ export function TrackRow({
   mustPlay?: boolean;
   doNotPlay?: boolean;
   note?: string | null;
+  leading?: ReactNode;
   onPress?: () => void;
 }) {
   const c = useC();
@@ -36,7 +40,9 @@ export function TrackRow({
       onPress={onPress}
       style={({ pressed }) => [styles.wrap, { backgroundColor: pressed ? c.surface2 : c.surface, borderColor: c.line }]}>
       <View style={styles.row}>
-        {doNotPlay ? (
+        {leading ? (
+          leading
+        ) : doNotPlay ? (
           <Icon name="ban" size={20} color={c.danger} />
         ) : index != null ? (
           <Text style={[styles.index, { color: c.ink3 }]}>{index}</Text>
