@@ -18,6 +18,7 @@
     },
     "ios": {
       "supportsTablet": true,
+      "requireFullScreen": true,
       "bundleIdentifier": "com.xpressentertainment.client",
       "usesAppleSignIn": true,
       "associatedDomains": [
@@ -25,7 +26,14 @@
       ],
       "infoPlist": {
         "CFBundleDisplayName": "Xpress DJs",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIRequiresFullScreen": true,
+        "UISupportedInterfaceOrientations": [
+          "UIInterfaceOrientationPortrait"
+        ],
+        "UISupportedInterfaceOrientations~ipad": [
+          "UIInterfaceOrientationPortrait"
+        ]
       }
     },
     "android": {
