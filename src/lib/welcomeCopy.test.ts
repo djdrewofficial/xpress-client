@@ -52,8 +52,6 @@ test('My Event Safety is report/block only; Music owns song ideas and avoid note
   assert.equal(appEs['safety.reportContent'], 'Reportar contenido');
   assert.equal(appEn['safety.concern.answers'], 'Planning answers');
   assert.equal(appEs['safety.concern.answers'], 'Respuestas de planificación');
-  assert.equal(appEn['event.section.help'], 'Help and report');
-  assert.equal(appEs['event.section.help'], 'Ayuda y reportes');
   assert.equal(appEn['safety.reportRow'], 'Report a person or content');
   assert.equal(appEs['safety.reportRow'], 'Reportar a una persona o contenido');
   assert.equal(appEn['safety.songIdeas'], 'Song ideas');

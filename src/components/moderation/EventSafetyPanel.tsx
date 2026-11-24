@@ -34,14 +34,11 @@ export function EventSafetyPanel({
   userId,
   canManage,
   reloadSignal = 0,
-  embedded = false,
 }: {
   eventId: string;
   userId: string;
   canManage: boolean;
   reloadSignal?: number;
-  /** When true, omit the Safety heading (parent Section already labels Help). */
-  embedded?: boolean;
 }) {
   const c = useC();
   const { t } = useT();
@@ -143,8 +140,8 @@ export function EventSafetyPanel({
   }
 
   return (
-    <View style={{ gap: embedded ? 0 : 12 }}>
-      {embedded ? null : <Text style={[styles.sectionLabel, { color: c.ink2 }]}>{t('safety.heading')}</Text>}
+    <View style={{ gap: 12 }}>
+      <Text style={[styles.sectionLabel, { color: c.ink2 }]}>{t('safety.heading')}</Text>
       <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
         {loading ? (
           <View style={styles.pad}>

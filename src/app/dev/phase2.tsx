@@ -1,5 +1,5 @@
 import { useLayoutEffect, type ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -77,21 +77,24 @@ function MyEventSafetyStill() {
   const c = useC();
   const { t } = useT();
   return (
-    <View style={{ backgroundColor: c.surface, borderRadius: Radius.lg, overflow: 'hidden' }}>
-      <Text style={[Type.footnote, { color: c.ink2, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 }]}>
-        {t('safety.intro')}
-      </Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, minHeight: 58 }}>
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text style={[Type.subhead, { color: c.ink }]}>{t('safety.reportContent')}</Text>
-          <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.reportContentHint')}</Text>
+    <View style={{ gap: 12 }}>
+      <Text style={[sectionLabel, { color: c.ink2 }]}>{t('safety.heading')}</Text>
+      <View style={{ backgroundColor: c.surface, borderRadius: Radius.lg, overflow: 'hidden' }}>
+        <Text style={[Type.footnote, { color: c.ink2, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 }]}>
+          {t('safety.intro')}
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, minHeight: 58 }}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={[Type.subhead, { color: c.ink }]}>{t('safety.reportContent')}</Text>
+            <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.reportContentHint')}</Text>
+          </View>
         </View>
-      </View>
-      <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.line, marginLeft: 14 }} />
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, minHeight: 58 }}>
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text style={[Type.subhead, { color: c.ink }]}>{t('safety.blockedPeople')}</Text>
-          <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.noBlocked')}</Text>
+        <View style={{ height: 1, backgroundColor: c.line, marginLeft: 14 }} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, minHeight: 58 }}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={[Type.subhead, { color: c.ink }]}>{t('safety.blockedPeople')}</Text>
+            <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.noBlocked')}</Text>
+          </View>
         </View>
       </View>
     </View>

@@ -193,7 +193,7 @@ export default function AccountScreen() {
         onText={() => Linking.openURL(`sms:${phone}`)}
         onEmail={() => Linking.openURL(`mailto:${emailAddress}`)}
         showInvite={false}
-        hostTools={viewerRole(event, profile?.accountType) === 'host' && eventId ? <HostEventTools eventId={eventId} embedded /> : null}
+        hostTools={viewerRole(event, profile?.accountType) === 'host' && eventId ? <HostEventTools eventId={eventId} /> : null}
         onInvite={() => setShowInvite(true)}
         accountName={accountName}
         accountEmail={session?.user.email ?? null}
@@ -224,7 +224,6 @@ export default function AccountScreen() {
             userId={session.user.id}
             canManage={managesEvent(event, profile?.accountType)}
             reloadSignal={consentReload}
-            embedded
           />
         ) : null}
       />

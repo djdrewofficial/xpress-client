@@ -134,7 +134,7 @@ export function MyEventView({
           paddingBottom: insets.bottom + 120,
           paddingHorizontal: 20,
         }}>
-        <ContentColumn style={{ gap: 28 }}>
+        <ContentColumn style={{ gap: 32 }}>
         <View style={{ gap: 12 }}>
           {eyebrow ? (
             <Pressable onPress={onSwitch} disabled={!onSwitch} style={styles.eyebrowRow}>
@@ -162,89 +162,88 @@ export function MyEventView({
           </View>
         ) : (
           <>
-            <Section label={t('event.section.details')}>
-              {guest ? (
-                <View style={styles.guestRow}>
-                  <View style={[styles.rolePill, { backgroundColor: c.accentTint }]}>
-                    <Icon name="user" size={14} color={c.accent} />
-                    <Text style={[styles.roleTxt, { color: c.accent }]}>{guest.role}</Text>
+            {guest ? (
+              <View style={styles.guestRow}>
+                <View style={[styles.rolePill, { backgroundColor: c.accentTint }]}>
+                  <Icon name="user" size={14} color={c.accent} />
+                  <Text style={[styles.roleTxt, { color: c.accent }]}>{guest.role}</Text>
+                </View>
+                {guest.invitedBy ? (
+                  <Text style={[Type.footnote, { color: c.ink2, flex: 1 }]} numberOfLines={2}>
+                    {t('event.invitedBy', { name: guest.invitedBy })}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+
+            {banner ? (
+              <View style={[styles.banner, { backgroundColor: c.surface2 }]}>
+                <Icon name="lock" size={16} color={c.ink2} />
+                <Text style={[Type.footnote, { color: c.ink2, flex: 1 }]}>{banner}</Text>
+              </View>
+            ) : null}
+
+            {financials ? (
+              <>
+                <LinearGradient
+                  colors={[Brand.purpleDeep, '#3a2670']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.balance}>
+                  <Text style={styles.balanceLab}>{t('event.balance')}</Text>
+                  <Text style={styles.balanceAmt}>{financials.balance}</Text>
+                  {financials.nextLine ? <Text style={styles.balanceNext}>{financials.nextLine}</Text> : null}
+                  <View style={styles.track}>
+                    <View style={[styles.fill, { width: `${Math.max(0, Math.min(100, financials.progress))}%` }]} />
                   </View>
-                  {guest.invitedBy ? (
-                    <Text style={[Type.footnote, { color: c.ink2, flex: 1 }]} numberOfLines={2}>
-                      {t('event.invitedBy', { name: guest.invitedBy })}
-                    </Text>
-                  ) : null}
-                </View>
-              ) : null}
+                  <View style={styles.balanceFoot}>
+                    <Text style={styles.paidTxt}>{financials.paidLabel}</Text>
+                    <Text style={styles.ofTxt}>{financials.ofLabel}</Text>
+                  </View>
+                </LinearGradient>
 
-              {banner ? (
-                <View style={[styles.banner, { backgroundColor: c.surface2, borderColor: c.line }]}>
-                  <Icon name="lock" size={16} color={c.ink2} />
-                  <Text style={[Type.footnote, { color: c.ink2, flex: 1 }]}>{banner}</Text>
-                </View>
-              ) : null}
-
-              {financials ? (
-                <>
-                  <LinearGradient
-                    colors={[Brand.purpleDeep, '#3a2670']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.balance}>
-                    <Text style={styles.balanceLab}>{t('event.balance')}</Text>
-                    <Text style={styles.balanceAmt}>{financials.balance}</Text>
-                    {financials.nextLine ? <Text style={styles.balanceNext}>{financials.nextLine}</Text> : null}
-                    <View style={styles.track}>
-                      <View style={[styles.fill, { width: `${Math.max(0, Math.min(100, financials.progress))}%` }]} />
-                    </View>
-                    <View style={styles.balanceFoot}>
-                      <Text style={styles.paidTxt}>{financials.paidLabel}</Text>
-                      <Text style={styles.ofTxt}>{financials.ofLabel}</Text>
-                    </View>
-                  </LinearGradient>
-
-                  {financials.schedule.length > 0 ? (
-                    <View style={{ gap: 10 }}>
-                      <Text style={[styles.subLabel, { color: c.ink3 }]}>{t('event.schedule')}</Text>
-                      <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
-                        {financials.schedule.map((row, index) => (
-                          <View key={row.id}>
-                            {index > 0 ? <View style={[styles.div, { backgroundColor: c.line, marginLeft: 56 }]} /> : null}
-                            <View style={styles.payRow}>
-                              <Text style={[styles.seq, { color: c.red }]}>{row.seqLabel}</Text>
-                              <View style={{ flex: 1, gap: 2 }}>
-                                <Text style={[styles.cellTitle, { color: c.ink }]} numberOfLines={1}>
-                                  {row.title}
+                {financials.schedule.length > 0 ? (
+                  <Section label={t('event.schedule')}>
+                    <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
+                      {financials.schedule.map((row, index) => (
+                        <View key={row.id}>
+                          {index > 0 ? <View style={[styles.div, { backgroundColor: c.line, marginLeft: 56 }]} /> : null}
+                          <View style={styles.payRow}>
+                            <Text style={[styles.seq, { color: c.red }]}>{row.seqLabel}</Text>
+                            <View style={{ flex: 1, gap: 2 }}>
+                              <Text style={[styles.cellTitle, { color: c.ink }]} numberOfLines={1}>
+                                {row.title}
+                              </Text>
+                              <View style={styles.detailRow}>
+                                {row.paid ? <Icon name="check" size={12} color={c.success} /> : null}
+                                <Text style={[Type.footnote, { color: row.paid ? c.success : c.ink2 }]} numberOfLines={1}>
+                                  {row.detail}
                                 </Text>
-                                <View style={styles.detailRow}>
-                                  {row.paid ? <Icon name="check" size={12} color={c.success} /> : null}
-                                  <Text style={[Type.footnote, { color: row.paid ? c.success : c.ink2 }]} numberOfLines={1}>
-                                    {row.detail}
-                                  </Text>
-                                </View>
                               </View>
-                              <Text style={[styles.amount, { color: c.ink }]}>{row.amount}</Text>
                             </View>
+                            <Text style={[styles.amount, { color: c.ink }]}>{row.amount}</Text>
                           </View>
-                        ))}
-                      </View>
+                        </View>
+                      ))}
                     </View>
-                  ) : null}
+                  </Section>
+                ) : null}
 
-                  {financials.pendingNote || financials.footnote ? (
-                    <View style={{ gap: 6 }}>
-                      {financials.pendingNote ? (
-                        <Text style={[Type.footnote, { color: c.ink3 }]}>{financials.pendingNote}</Text>
-                      ) : null}
-                      {financials.footnote ? (
-                        <Text style={[Type.footnote, { color: c.ink3 }]}>{financials.footnote}</Text>
-                      ) : null}
-                    </View>
-                  ) : null}
-                </>
-              ) : null}
+                {financials.pendingNote || financials.footnote ? (
+                  <View style={{ gap: 6, marginTop: -10 }}>
+                    {financials.pendingNote ? (
+                      <Text style={[Type.footnote, { color: c.ink3 }]}>{financials.pendingNote}</Text>
+                    ) : null}
+                    {financials.footnote ? (
+                      <Text style={[Type.footnote, { color: c.ink3 }]}>{financials.footnote}</Text>
+                    ) : null}
+                  </View>
+                ) : null}
+              </>
+            ) : null}
 
-              {eventFacts ? (
+            {eventFacts ? (
+              <Section label={t('event.event')}>
                 <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
                   <Cell icon="calendar" title={t('event.date')} trailing={<Text style={[Type.footnote, { color: c.ink2 }]}>{eventFacts.dateLabel}</Text>} />
                   {eventFacts.venue ? (
@@ -260,17 +259,20 @@ export function MyEventView({
                     </>
                   ) : null}
                 </View>
-              ) : null}
+              </Section>
+            ) : null}
 
-              {packageInfo && !packageInsideEvent ? (
+            {packageInfo && !packageInsideEvent ? (
+              <Section label={t('event.package')}>
                 <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
                   <Cell icon="gem" title={packageInfo.name} subtitle={packageInfo.detail} onPress={onPackage} chevron />
                 </View>
-              ) : null}
+              </Section>
+            ) : null}
 
-              {team ? (
+            {team ? (
+              <Section label={t('event.team')}>
                 <View style={[styles.card, Shadow.card, { backgroundColor: c.surface, padding: 14, gap: 14 }]}>
-                  <Text style={[styles.subLabel, { color: c.ink3 }]}>{t('event.team')}</Text>
                   <View style={styles.teamTop}>
                     <View style={[styles.avatar, { backgroundColor: Brand.purple }]}>
                       <Text style={styles.avatarTxt}>{team.initials}</Text>
@@ -292,46 +294,21 @@ export function MyEventView({
                     </View>
                   ) : null}
                 </View>
-              ) : null}
-            </Section>
+              </Section>
+            ) : null}
 
-            {hostTools || (showInvite && !hostTools) ? (
-              <Section label={t('event.section.people')}>
-                {hostTools}
-                {showInvite && !hostTools ? (
-                  <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
-                    <Cell icon="users" title={t('event.invite')} subtitle={t('event.inviteSub')} onPress={onInvite} chevron />
-                  </View>
-                ) : null}
+            {hostTools}
+            {showInvite && !hostTools ? (
+              <Section label={t('event.people')}>
+                <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
+                  <Cell icon="users" title={t('event.invite')} subtitle={t('event.inviteSub')} onPress={onInvite} chevron />
+                </View>
               </Section>
             ) : null}
           </>
         )}
 
-        <Section label={t('event.section.preferences')}>
-          <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
-            <View style={styles.settingsLang}>
-              <Text style={[Type.subhead, { color: c.ink }]}>{t('event.language')}</Text>
-              <View style={styles.langPills}>
-                <LangPill
-                  label={t('event.english')}
-                  selected={language === 'en'}
-                  onPress={() => onLanguage('en')}
-                />
-                <LangPill
-                  label={t('event.spanish')}
-                  selected={language === 'es'}
-                  onPress={() => onLanguage('es')}
-                />
-              </View>
-            </View>
-          </View>
-          {smsConsent}
-        </Section>
-
-        {safety ? <Section label={t('event.section.help')}>{safety}</Section> : null}
-
-        <Section label={t('event.section.account')}>
+        <Section label={t('event.account')}>
           <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
             <Cell icon="user" title={accountName} subtitle={accountEmail} />
             <View style={[styles.div, { backgroundColor: c.line, marginLeft: 62 }]} />
@@ -354,6 +331,29 @@ export function MyEventView({
           </View>
         </Section>
 
+        <Section label={t('event.settings')}>
+          <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
+            <View style={styles.settingsLang}>
+              <Text style={[Type.footnote, { color: c.ink3, fontFamily: Fonts.medium }]}>{t('event.language')}</Text>
+              <View style={styles.langPills}>
+                <LangPill
+                  label={t('event.english')}
+                  selected={language === 'en'}
+                  onPress={() => onLanguage('en')}
+                />
+                <LangPill
+                  label={t('event.spanish')}
+                  selected={language === 'es'}
+                  onPress={() => onLanguage('es')}
+                />
+              </View>
+            </View>
+          </View>
+        </Section>
+
+        {smsConsent ? <Section label={t('event.marketing')}>{smsConsent}</Section> : null}
+        {safety}
+
         <View style={styles.logo}>
           <Logo variant="full" height={28} />
         </View>
@@ -366,9 +366,9 @@ export function MyEventView({
 function Section({ label, children }: { label: string; children: ReactNode }) {
   const c = useC();
   return (
-    <View style={{ gap: 14 }}>
+    <View style={{ gap: 12 }}>
       <Text style={[styles.sectionLabel, { color: c.ink2 }]}>{label}</Text>
-      <View style={{ gap: 12 }}>{children}</View>
+      {children}
     </View>
   );
 }
@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
   guestRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rolePill: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: Radius.pill, paddingHorizontal: 10, paddingVertical: 6 },
   roleTxt: { fontFamily: Fonts.semibold, fontSize: 13 },
-  banner: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Radius.md, paddingHorizontal: 14, paddingVertical: 12, borderWidth: StyleSheet.hairlineWidth },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Radius.md, paddingHorizontal: 14, paddingVertical: 12 },
   balance: { borderRadius: Radius.lg, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 16, gap: 6 },
   balanceLab: { fontFamily: Fonts.bold, fontSize: 11, letterSpacing: 1.6, textTransform: 'uppercase', color: 'rgba(255,255,255,0.72)' },
   balanceAmt: { fontFamily: Fonts.display, fontSize: 44, lineHeight: 48, color: '#ffffff', marginTop: 2 },
@@ -519,21 +519,14 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
-  subLabel: {
-    fontFamily: Fonts.semibold,
-    fontSize: 12,
-    lineHeight: 16,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
   settingsLang: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
     paddingHorizontal: 14,
-    paddingVertical: 14,
-    minHeight: 58,
+    paddingVertical: 12,
+    minHeight: 52,
   },
   langPills: { flexDirection: 'row', gap: 8 },
   marketRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
