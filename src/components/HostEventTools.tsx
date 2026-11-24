@@ -17,7 +17,7 @@ const ROLE_KEY: Record<JoinRole, TranslationKey> = {
  * Host link and guest link for this event. Replaces emailing a partner a one-time code.
  * Staff use XOS for these links. A 403 hides the card.
  */
-export function HostEventTools({ eventId }: { eventId: string }) {
+export function HostEventTools({ eventId, embedded = false }: { eventId: string; embedded?: boolean }) {
   const c = useC();
   const { t } = useT();
   const router = useRouter();
@@ -80,8 +80,8 @@ export function HostEventTools({ eventId }: { eventId: string }) {
   if (hidden) return null;
 
   return (
-    <View style={{ gap: 8 }}>
-      <Text style={[Type.label, { color: c.ink3 }]}>{t('links.title')}</Text>
+    <View style={{ gap: embedded ? 0 : 8 }}>
+      {embedded ? null : <Text style={[Type.label, { color: c.ink3 }]}>{t('links.title')}</Text>}
       <View style={[styles.card, Shadow.card, { backgroundColor: c.surface }]}>
         <Text style={[Type.footnote, { color: c.ink2, paddingHorizontal: 16, paddingTop: 14 }]}>{t('links.help')}</Text>
         {(links ?? []).map((link) => (

@@ -428,28 +428,24 @@ function AnswerSafety({
   authorId,
   authorLabel,
   safety,
-  reportKey = 'safety.reportAnswer',
   targetType = 'answer',
 }: {
   questionId: string;
   authorId: string | null;
   authorLabel?: string | null;
   safety?: MomentSafety;
-  reportKey?: 'safety.reportAnswer' | 'safety.reportNote';
   targetType?: 'answer' | 'section_note';
 }) {
   const { t } = useT();
   if (!safety) return null;
   const mine = !!safety.userId && authorId === safety.userId;
   const canHide = safety.canManage || mine;
-  const canReport = !mine;
   const canBlock = !!authorId && !mine;
-  if (!canHide && !canReport && !canBlock) return null;
+  // Report answer / note moved to My Event → Report content (event-level UGC reporting).
+  if (!canHide && !canBlock) return null;
   const name = authorLabel || null;
   return (
     <SafetyLinks
-      reportLabel={canReport ? t(reportKey) : undefined}
-      onReport={canReport ? () => safety.onReport({ targetType, targetId: questionId }) : undefined}
       hideLabel={canHide ? t('safety.remove') : undefined}
       onHide={canHide ? () => safety.onHide({ targetType, targetId: questionId }) : undefined}
       blockLabel={canBlock ? (name ? t('safety.blockNamed', { name }) : t('safety.block')) : undefined}
@@ -933,7 +929,6 @@ function NotesPane({
           authorId={safety.noteAuthorId}
           authorLabel={safety.noteAuthorLabel}
           safety={safety}
-          reportKey="safety.reportNote"
           targetType="section_note"
         />
       ) : null}
