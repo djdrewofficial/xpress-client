@@ -112,6 +112,9 @@ export const appEn = {
   'tab.music': 'Music',
   'tab.my-event': 'My Event',
 
+  'demo.badge': 'Demo',
+  'demo.body': "You're exploring with sample info. Once your agreement is signed, this switches to your real plan.",
+
   'cd.moment1': 'your first dance as newlyweds',
   'cd.moment2': 'you say “I do”',
   'cd.moment3': 'your first kiss as newlyweds',
@@ -644,6 +647,9 @@ export const appEs: Record<keyof typeof appEn, string> = {
   'tab.timeline': 'Cronograma',
   'tab.music': 'Música',
   'tab.my-event': 'Mi evento',
+
+  'demo.badge': 'Demo',
+  'demo.body': 'Estás explorando con información de ejemplo. Cuando firmes el acuerdo, esto cambia a tu plan real.',
 
   'cd.moment1': 'su primer baile de recién casados',
   'cd.moment2': 'digan “sí, acepto”',

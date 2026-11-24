@@ -17,6 +17,8 @@ export type EventLite = {
   // Booking essentials the DJ already set — drive the endowed-progress seed below.
   venue_id?: string | null;
   package_id?: string | null;
+  /** Sample planner data until the booking agreement is signed (XOS `demo_mode` / `demoMode`). */
+  demoMode?: boolean;
 };
 
 export type SetupMilestone = { key: 'account' | 'date' | 'package' | 'venue'; label: string; short: string; done: boolean };
@@ -176,23 +178,64 @@ export async function getMyEvents(account: { clientId: string | null; eventGuest
 
   if (account.clientId) {
     const [{ data: primary }, { data: linked }] = await Promise.all([
-      supabase.from('events').select('id, name, event_date, cover_photo_url, venue_id, package_id').eq('client_id', account.clientId).is('archived_at', null),
-      supabase.from('event_clients').select('event:events(id, name, event_date, cover_photo_url, venue_id, package_id, archived_at)').eq('client_id', account.clientId),
+      supabase.from('events').select('id, name, event_date, cover_photo_url, venue_id, package_id, demo_mode').eq('client_id', account.clientId).is('archived_at', null),
+      supabase.from('event_clients').select('event:events(id, name, event_date, cover_photo_url, venue_id, package_id, demo_mode, archived_at)').eq('client_id', account.clientId),
     ]);
-    for (const event of primary ?? []) add({ ...(event as EventLite), contractClient: true }, 'host');
+    for (const event of primary ?? []) {
+      const row = event as EventLite & { demo_mode?: boolean | null };
+      add({ ...row, demoMode: row.demoMode ?? row.demo_mode === true, contractClient: true }, 'host');
+    }
     for (const row of linked ?? []) {
-      const event = (row as unknown as { event: (EventLite & { archived_at: string | null }) | null }).event;
-      if (event && !event.archived_at) add(event, 'host');
+      const event = (row as unknown as { event: (EventLite & { demo_mode?: boolean | null; archived_at: string | null }) | null }).event;
+      if (event && !event.archived_at) {
+        add({ ...event, demoMode: event.demoMode ?? event.demo_mode === true }, 'host');
+      }
     }
   }
   if (account.eventGuestId) {
-    const { data: guest } = await supabase
+    const { data: guestRow } = await supabase
       .from('event_guests')
-      .select('event:events(id, name, event_date, cover_photo_url, venue_id, package_id)')
+      .select('event_id')
       .eq('id', account.eventGuestId)
       .maybeSingle();
-    const event = (guest as unknown as { event: EventLite | null } | null)?.event;
-    if (event) add(event, 'guest');
+    const guestEventId = typeof guestRow?.event_id === 'string' ? guestRow.event_id : null;
+    // event_guest_card exposes demo_mode for guests (migration 00240).
+    const { data: card } = guestEventId
+      ? await supabase
+          .from('event_guest_card')
+          .select('id, name, event_date, cover_photo_url, demo_mode, venue_name')
+          .eq('id', guestEventId)
+          .maybeSingle()
+      : { data: null };
+    if (card && typeof (card as { id?: string }).id === 'string') {
+      const row = card as {
+        id: string;
+        name: string;
+        event_date: string | null;
+        cover_photo_url: string | null;
+        demo_mode?: boolean | null;
+        venue_name?: string | null;
+      };
+      add(
+        {
+          id: row.id,
+          name: row.name,
+          event_date: row.event_date,
+          cover_photo_url: row.cover_photo_url,
+          venueName: row.venue_name ?? null,
+          demoMode: row.demo_mode === true,
+        },
+        'guest',
+      );
+    } else {
+      const { data: guest } = await supabase
+        .from('event_guests')
+        .select('event:events(id, name, event_date, cover_photo_url, venue_id, package_id, demo_mode)')
+        .eq('id', account.eventGuestId)
+        .maybeSingle();
+      const event = (guest as unknown as { event: (EventLite & { demo_mode?: boolean | null }) | null } | null)?.event;
+      if (event) add({ ...event, demoMode: event.demoMode ?? event.demo_mode === true }, 'guest');
+    }
   }
 
   const { data: session } = await supabase.auth.getSession();
@@ -221,6 +264,7 @@ export async function getMyEvents(account: { clientId: string | null; eventGuest
               event_date: card.eventDate,
               cover_photo_url: card.coverPhotoUrl,
               venueName: card.venueName,
+              demoMode: card.demoMode,
               role: card.role === 'staff' ? 'host' : card.role,
             }
           : { id: member.event_id, name: '', event_date: null, cover_photo_url: null, role };

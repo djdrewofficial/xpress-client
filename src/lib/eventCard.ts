@@ -1,3 +1,4 @@
+import { readDemoModeFlag } from '@/lib/demoMode';
 import { asRecord, mobileJson } from '@/lib/mobileJson';
 
 export type EventAccessRole = 'host' | 'guest' | 'staff';
@@ -14,11 +15,15 @@ export type EventCard = {
   eventTypeId: string | null;
   eventType: string | null;
   venueName: string | null;
+  /** True while XOS Demo Mode is on (sample planner data). From `event.demoMode`. */
+  demoMode: boolean;
 };
+
+export { readDemoModeFlag } from '@/lib/demoMode';
 
 /**
  * GET /api/mobile/events/:eventId
- * 200: { role, event: { id, name, eventDate, startTime, endTime, guestCount, coverPhotoUrl, eventTypeId, eventType, venueName } }
+ * 200: { role, event: { id, name, eventDate, …, demoMode } }
  * 401 no session. 403 not on the event. 404 unknown id.
  * This card has no prices, pay link, notes, or client ids.
  */
@@ -42,5 +47,6 @@ export async function fetchEventCard(eventId: string): Promise<EventCard | null>
     eventTypeId: typeof event.eventTypeId === 'string' ? event.eventTypeId : null,
     eventType: typeof event.eventType === 'string' ? event.eventType : null,
     venueName: typeof event.venueName === 'string' ? event.venueName : null,
+    demoMode: readDemoModeFlag(event),
   };
 }
