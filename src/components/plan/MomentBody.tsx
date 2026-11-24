@@ -16,12 +16,12 @@ import {
   useC,
 } from '@/components/ui';
 import { SafetyLinks } from '@/components/moderation/SafetyLinks';
+import { ANSWER_SAVE_MS, answerSaveVisible, type AnswerSaveState } from '@/lib/answerAutosave';
 import { useT } from '@/lib/i18n';
 import type { ModerationTarget } from '@/lib/moderation';
 import { questionVisible, type QuestionRow } from '@/lib/planning';
 import { getSectionNotes, normalizeNoteText, saveSectionNotes, type SectionNotesSave } from '@/lib/sectionNotes';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
-import { answerText } from './model';
 
 export type MomentTab = 'questions' | 'songs' | 'notes';
 
@@ -93,6 +93,7 @@ export function MomentBody({
   sectionId,
   isStaff,
   notesReadOnly,
+  questionsReadOnly,
   initialNotes,
   initialStaffNotes,
   safety,
@@ -108,7 +109,7 @@ export function MomentBody({
   questions: QuestionRow[];
   answers: Record<string, string>;
   onChange: (id: string, value: string) => void;
-  onPersist: (id: string, value: string) => void;
+  onPersist: (id: string, value: string) => void | Promise<boolean | void>;
   onPick: (id: string, value: string) => void;
   songs: MomentSong[];
   isDanceFloor: boolean;
@@ -129,6 +130,8 @@ export function MomentBody({
   isStaff?: boolean;
   /** When true, the moment notes cannot be edited. Guests can edit notes on open sections. */
   notesReadOnly?: boolean;
+  /** When true, question answers are visible but not editable (view-only guests). */
+  questionsReadOnly?: boolean;
   /** From the section row (`client_notes`). Undefined means the payload didn't include it. */
   initialNotes?: string | null;
   /** From the section row (`staff_notes`), staff only. */
@@ -138,9 +141,6 @@ export function MomentBody({
   const c = useC();
   const { t } = useT();
   const insets = useSafeAreaInsets();
-  const [editingAll, setEditingAll] = useState(false);
-  const [focusId, setFocusId] = useState<string | null>(null);
-  const [reeditId, setReeditId] = useState<string | null>(null);
   const [menu, setMenu] = useState<MomentSong | null>(null);
   const [noteFor, setNoteFor] = useState<MomentSong | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
@@ -148,26 +148,11 @@ export function MomentBody({
 
   const visible = useMemo(() => questions.filter((q) => questionVisible(q, answers)), [questions, answers]);
   const answeredCount = visible.filter((q) => (answers[q.id] ?? '').trim() !== '').length;
-  const activeId = editingAll
-    ? null
-    : reeditId && visible.some((q) => q.id === reeditId)
-      ? reeditId
-      : (visible.find((q) => q.id === focusId && !(answers[q.id] ?? '').trim())?.id ??
-        visible.find((q) => !(answers[q.id] ?? '').trim())?.id ??
-        null);
 
   // Open Dancing groups its playable songs under Must play. Do-not-play songs stay on their own moment.
   const ownMust = songs.filter((s) => !s.doNotPlay);
   const showSplit = isDanceFloor;
   const mustShown = showAllMust || ownMust.length <= 2 ? ownMust : ownMust.slice(0, 2);
-
-  function saveAndContinue() {
-    if (!editingAll && activeId) onPersist(activeId, answers[activeId] ?? '');
-    setReeditId(null);
-    const next = visible.find((q) => q.id !== activeId && !(answers[q.id] ?? '').trim());
-    if (next) setFocusId(next.id);
-    else if (songsEnabled) onTab('songs');
-  }
 
   const showQuestions = visible.length > 0;
   const showSongs = songsEnabled;
@@ -194,28 +179,16 @@ export function MomentBody({
   }, [activeTab, tab, onTab]);
 
   const bottom =
-    special || activeTab === 'notes'
+    special || activeTab === 'notes' || activeTab === 'questions'
       ? null
-      : activeTab === 'questions'
-        ? visible.length > 0
-          ? { label: t('moment.saveContinue'), arrow: true as const, onPress: saveAndContinue }
-          : null
-        : songsEnabled
-          ? { label: t('moment.addMusic'), arrow: false as const, onPress: onAddMusic }
-          : null;
+      : songsEnabled
+        ? { label: t('moment.addMusic'), arrow: false as const, onPress: onAddMusic }
+        : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <SafeAreaView edges={['top']} style={{ backgroundColor: c.bg }}>
-        <NavBar
-          title={backLabel}
-          onBack={onBack}
-          trailing={
-            !special && activeTab === 'questions' && visible.length > 0
-              ? { label: editingAll ? t('common.done') : t('common.edit'), onPress: () => { setEditingAll((e) => !e); setReeditId(null); } }
-              : undefined
-          }
-        />
+        <NavBar title={backLabel} onBack={onBack} />
       </SafeAreaView>
 
       <ContentColumn fill>
@@ -248,12 +221,10 @@ export function MomentBody({
               <QuestionPane
                 visible={visible}
                 answers={answers}
-                activeId={activeId}
-                editingAll={editingAll}
                 onChange={onChange}
                 onPersist={onPersist}
                 onPick={onPick}
-                onFocus={(id) => { setEditingAll(false); setReeditId(id); setFocusId(id); }}
+                readOnly={!!questionsReadOnly}
                 safety={safety}
               />
             ) : null}
@@ -457,28 +428,24 @@ function AnswerSafety({
   authorId,
   authorLabel,
   safety,
-  reportKey = 'safety.reportAnswer',
   targetType = 'answer',
 }: {
   questionId: string;
   authorId: string | null;
   authorLabel?: string | null;
   safety?: MomentSafety;
-  reportKey?: 'safety.reportAnswer' | 'safety.reportNote';
   targetType?: 'answer' | 'section_note';
 }) {
   const { t } = useT();
   if (!safety) return null;
   const mine = !!safety.userId && authorId === safety.userId;
   const canHide = safety.canManage || mine;
-  const canReport = !mine;
   const canBlock = !!authorId && !mine;
-  if (!canHide && !canReport && !canBlock) return null;
+  // Report answer / note moved to My Event → Report content (event-level UGC reporting).
+  if (!canHide && !canBlock) return null;
   const name = authorLabel || null;
   return (
     <SafetyLinks
-      reportLabel={canReport ? t(reportKey) : undefined}
-      onReport={canReport ? () => safety.onReport({ targetType, targetId: questionId }) : undefined}
       hideLabel={canHide ? t('safety.remove') : undefined}
       onHide={canHide ? () => safety.onHide({ targetType, targetId: questionId }) : undefined}
       blockLabel={canBlock ? (name ? t('safety.blockNamed', { name }) : t('safety.block')) : undefined}
@@ -492,91 +459,51 @@ function AnswerSafety({
 function QuestionPane({
   visible,
   answers,
-  activeId,
-  editingAll,
   onChange,
   onPersist,
   onPick,
-  onFocus,
+  readOnly,
   safety,
 }: {
   visible: QuestionRow[];
   answers: Record<string, string>;
-  activeId: string | null;
-  editingAll: boolean;
   onChange: (id: string, value: string) => void;
-  onPersist: (id: string, value: string) => void;
+  onPersist: (id: string, value: string) => void | Promise<boolean | void>;
   onPick: (id: string, value: string) => void;
-  onFocus: (id: string) => void;
+  readOnly: boolean;
   safety?: MomentSafety;
 }) {
-  const c = useC();
-  const { t } = useT();
   if (visible.length === 0) return null;
-  const folded = editingAll ? [] : visible.filter((q) => (answers[q.id] ?? '').trim() && q.id !== activeId);
-  const rest = editingAll ? [] : visible.filter((q) => !(answers[q.id] ?? '').trim() && q.id !== activeId);
-  const expanded = editingAll ? visible : visible.filter((q) => q.id === activeId);
 
   return (
     <View style={{ gap: 16 }}>
-      {folded.length > 0 ? (
-        <View style={[styles.fold, { backgroundColor: c.surface, borderColor: c.line }]}>
-          {folded.map((q, i) => {
-            const n = visible.indexOf(q) + 1;
-            return (
-              <View key={q.id}>
-                {i > 0 ? <View style={[styles.hair, { backgroundColor: c.line }]} /> : null}
-                <View style={styles.foldRow}>
-                  <Text style={[styles.foldNum, { color: c.red }]}>{String(n).padStart(2, '0')}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[Type.footnote, { color: c.ink2 }]} numberOfLines={2}>{q.prompt}</Text>
-                    <Text style={[Type.subhead, { color: c.ink }]} numberOfLines={1}>{answerText(q, answers[q.id] ?? '')}</Text>
-                  </View>
-                  <Pressable onPress={() => onFocus(q.id)} hitSlop={8} accessibilityLabel={t('moment.editAnswer')}>
-                    <Icon name="edit" size={16} color={c.ink3} />
-                  </Pressable>
-                </View>
-                {(answers[q.id] ?? '').trim() ? (
-                  <View style={{ paddingLeft: 44, paddingBottom: 8 }}>
-                    <AnswerSafety questionId={q.id} authorId={safety?.answerAuthors[q.id] ?? null} authorLabel={safety?.answerLabels[q.id] ?? null} safety={safety} />
-                  </View>
-                ) : null}
-              </View>
-            );
-          })}
+      {visible.map((q, i) => (
+        <View key={q.id} style={{ gap: 8 }}>
+          <InlineQuestion
+            q={q}
+            index={i + 1}
+            total={visible.length}
+            value={answers[q.id] ?? ''}
+            onChange={(v) => onChange(q.id, v)}
+            onPersist={(v) => onPersist(q.id, v)}
+            onPick={(v) => onPick(q.id, v)}
+            readOnly={readOnly}
+          />
+          {(answers[q.id] ?? '').trim() ? (
+            <AnswerSafety
+              questionId={q.id}
+              authorId={safety?.answerAuthors[q.id] ?? null}
+              authorLabel={safety?.answerLabels[q.id] ?? null}
+              safety={safety}
+            />
+          ) : null}
         </View>
-      ) : null}
-
-      {expanded.map((q) => (
-        <ActiveQuestion
-          key={q.id}
-          q={q}
-          index={visible.indexOf(q) + 1}
-          total={visible.length}
-          value={answers[q.id] ?? ''}
-          onChange={(v) => onChange(q.id, v)}
-          onPersist={(v) => onPersist(q.id, v)}
-          onPick={(v) => onPick(q.id, v)}
-        />
       ))}
-      {expanded.filter((q) => (answers[q.id] ?? '').trim()).map((q) => (
-        <AnswerSafety key={`safety-${q.id}`} questionId={q.id} authorId={safety?.answerAuthors[q.id] ?? null} authorLabel={safety?.answerLabels[q.id] ?? null} safety={safety} />
-      ))}
-
-      {rest.map((q) => {
-        const n = visible.indexOf(q) + 1;
-        return (
-          <Pressable key={q.id} onPress={() => onFocus(q.id)} style={styles.later}>
-            <Text style={[styles.laterNum, { color: c.ink3 }]}>{String(n).padStart(2, '0')}</Text>
-            <Text style={[Type.callout, { color: c.ink3, flex: 1 }]}>{q.prompt}</Text>
-          </Pressable>
-        );
-      })}
     </View>
   );
 }
 
-function ActiveQuestion({
+function InlineQuestion({
   q,
   index,
   total,
@@ -584,24 +511,37 @@ function ActiveQuestion({
   onChange,
   onPersist,
   onPick,
+  readOnly,
 }: {
   q: QuestionRow;
   index: number;
   total: number;
   value: string;
   onChange: (v: string) => void;
-  onPersist: (v: string) => void;
+  onPersist: (v: string) => void | Promise<boolean | void>;
   onPick: (v: string) => void;
+  readOnly: boolean;
 }) {
   const c = useC();
   const { t } = useT();
+  const save = useAnswerAutosave(value, onPersist, readOnly);
   const opts = q.options.map((o) => (typeof o === 'string' ? o : o.label));
   const entries = q.options.map((o) =>
     typeof o === 'string' ? { label: o, children: [] as string[] } : { label: o.label, children: Array.isArray(o.children) ? o.children : [] },
   );
   const hasTree = entries.some((e) => e.children.length > 0);
   const sel = new Set(value ? value.split('|').filter(Boolean) : []);
-  const setMulti = (next: Set<string>) => onPick(Array.from(next).join('|'));
+  const setMulti = (next: Set<string>) => {
+    if (readOnly) return;
+    const joined = Array.from(next).join('|');
+    onPick(joined);
+    void save.markChoiceSaved();
+  };
+  const pick = (v: string) => {
+    if (readOnly) return;
+    onPick(v);
+    void save.markChoiceSaved();
+  };
   const textLike = q.answer_type === 'long' || q.answer_type === 'short' || (opts.length === 0 && q.answer_type !== 'yesno' && q.answer_type !== 'scale' && q.answer_type !== 'image_select');
 
   return (
@@ -620,28 +560,29 @@ function ActiveQuestion({
             styles.input,
             {
               color: c.ink,
-              borderColor: c.red,
-              backgroundColor: c.surface,
+              borderColor: readOnly ? c.line : c.red,
+              backgroundColor: readOnly ? c.surface2 : c.surface,
               minHeight: q.answer_type === 'short' ? 48 : 96,
             },
           ])}
           value={value}
-          onChangeText={onChange}
-          onBlur={() => onPersist(value)}
+          onChangeText={(v) => { if (!readOnly) { onChange(v); save.onEdit(v); } }}
+          onBlur={() => { if (!readOnly) save.flush(); }}
+          editable={!readOnly}
           multiline={q.answer_type !== 'short'}
-          placeholder={t('moment.placeholder')}
+          placeholder={readOnly ? undefined : t('moment.placeholder')}
           placeholderTextColor={c.ink3}
         />
       ) : q.answer_type === 'yesno' ? (
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {(['Yes', 'No'] as const).map((o) => (
-            <Chip key={o} label={o === 'Yes' ? t('moment.yes') : t('moment.no')} active={value === o} onPress={() => onPick(o)} grow />
+            <Chip key={o} label={o === 'Yes' ? t('moment.yes') : t('moment.no')} active={value === o} onPress={() => pick(o)} grow disabled={readOnly} />
           ))}
         </View>
       ) : q.answer_type === 'scale' ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {Array.from({ length: 10 }, (_, i) => String(i + 1)).map((n) => (
-            <Chip key={n} label={n} active={value === n} onPress={() => onPick(n)} square />
+            <Chip key={n} label={n} active={value === n} onPress={() => pick(n)} square disabled={readOnly} />
           ))}
         </View>
       ) : q.answer_type === 'image_select' ? (
@@ -651,7 +592,11 @@ function ActiveQuestion({
             const image = typeof o === 'string' ? null : o.image;
             const active = value === label;
             return (
-              <Pressable key={i} onPress={() => onPick(label)} style={[styles.imgOpt, { borderColor: active ? c.accent : c.line }]}>
+              <Pressable
+                key={i}
+                onPress={() => pick(label)}
+                disabled={readOnly}
+                style={[styles.imgOpt, { borderColor: active ? c.accent : c.line, opacity: readOnly && !active ? 0.7 : 1 }]}>
                 {image ? <Image source={{ uri: image }} style={{ width: 96, height: 96 }} /> : <View style={{ width: 96, height: 96, backgroundColor: c.surface2 }} />}
                 <Text style={[Type.footnote, { color: active ? c.accent : c.ink2, padding: 6 }]} numberOfLines={1}>{label}</Text>
               </Pressable>
@@ -664,7 +609,7 @@ function ActiveQuestion({
             const on = sel.has(e.label);
             return (
               <View key={e.label} style={{ gap: 6 }}>
-                <Chip label={e.label} active={on} onPress={() => {
+                <Chip label={e.label} active={on} disabled={readOnly} onPress={() => {
                   const next = new Set(sel);
                   if (next.has(e.label)) { next.delete(e.label); e.children.forEach((ch) => next.delete(ch)); }
                   else next.add(e.label);
@@ -673,7 +618,7 @@ function ActiveQuestion({
                 {on && e.children.length > 0 ? (
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingLeft: 12 }}>
                     {e.children.map((ch) => (
-                      <Chip key={ch} label={ch} active={sel.has(ch)} onPress={() => {
+                      <Chip key={ch} label={ch} active={sel.has(ch)} disabled={readOnly} onPress={() => {
                         const next = new Set(sel);
                         if (next.has(ch)) next.delete(ch); else next.add(ch);
                         setMulti(next);
@@ -694,36 +639,142 @@ function ActiveQuestion({
                 key={o}
                 label={o}
                 active={selected}
+                disabled={readOnly}
                 onPress={() => {
                   if (q.answer_type === 'multiselect') {
                     const next = new Set(sel);
                     if (next.has(o)) next.delete(o); else next.add(o);
                     setMulti(next);
-                  } else onPick(o);
+                  } else pick(o);
                 }}
               />
             );
           })}
         </View>
       )}
+
+      {!readOnly ? <AnswerSaveLine state={save.state} /> : null}
     </View>
   );
 }
 
-function Chip({ label, active, onPress, square, grow }: { label: string; active: boolean; onPress: () => void; square?: boolean; grow?: boolean }) {
+function Chip({
+  label,
+  active,
+  onPress,
+  square,
+  grow,
+  disabled,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  square?: boolean;
+  grow?: boolean;
+  disabled?: boolean;
+}) {
   const c = useC();
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       style={[
         styles.chip,
         square && { minWidth: 44, paddingHorizontal: 0, alignItems: 'center' },
         grow && { flex: 1, alignItems: 'center' },
-        { borderColor: active ? c.accent : c.line, backgroundColor: active ? c.accent : c.surface2 },
+        {
+          borderColor: active ? c.accent : c.line,
+          backgroundColor: active ? c.accent : c.surface2,
+          opacity: disabled && !active ? 0.7 : 1,
+        },
       ]}>
       <Text style={{ color: active ? c.onAccent : c.ink, fontFamily: Fonts.semibold, fontSize: 14 }}>{label}</Text>
     </Pressable>
   );
+}
+
+function AnswerSaveLine({ state }: { state: AnswerSaveState }) {
+  const c = useC();
+  const { t } = useT();
+  if (!answerSaveVisible(state)) return null;
+  const label =
+    state === 'saving' ? t('common.saving')
+    : state === 'saved' ? t('moment.notesSaved')
+    : state === 'failed' ? t('common.couldntSave')
+    : null;
+  if (!label) return null;
+  return <Text style={[Type.footnote, { color: c.ink3 }]}>{label}</Text>;
+}
+
+/**
+ * Debounced persist for text answers; choices call markChoiceSaved after onPick.
+ * Reuses the same save API the parent already wires to `saveAnswer`.
+ */
+function useAnswerAutosave(
+  value: string,
+  onPersist: (v: string) => void | Promise<boolean | void>,
+  readOnly: boolean,
+) {
+  const [state, setState] = useState<AnswerSaveState>('idle');
+  const valueRef = useRef(value);
+  const savedRef = useRef(value);
+  const dirtyRef = useRef(false);
+  const genRef = useRef(0);
+  const immediateRef = useRef(false);
+  const persistRef = useRef(onPersist);
+  persistRef.current = onPersist;
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    valueRef.current = value;
+    if (!dirtyRef.current) savedRef.current = value;
+  }, [value]);
+
+  useEffect(() => {
+    if (readOnly || !dirtyRef.current) return;
+    if (valueRef.current === savedRef.current) return;
+    const immediate = immediateRef.current;
+    immediateRef.current = false;
+    const gen = ++genRef.current;
+    const timer = setTimeout(() => {
+      const snapshot = valueRef.current;
+      if (snapshot === savedRef.current) return;
+      setState('saving');
+      void Promise.resolve(persistRef.current(snapshot)).then((ok) => {
+        if (genRef.current !== gen) return;
+        if (valueRef.current !== snapshot) return;
+        if (ok === false) {
+          setState('failed');
+          return;
+        }
+        savedRef.current = snapshot;
+        dirtyRef.current = false;
+        setState('saved');
+      });
+    }, immediate ? 0 : ANSWER_SAVE_MS);
+    return () => clearTimeout(timer);
+  }, [value, tick, readOnly]);
+
+  function onEdit(next: string) {
+    dirtyRef.current = true;
+    valueRef.current = next;
+    if (state === 'saved' || state === 'failed') setState('idle');
+  }
+
+  function flush() {
+    if (!dirtyRef.current) return;
+    if (valueRef.current === savedRef.current) return;
+    immediateRef.current = true;
+    setTick((n) => n + 1);
+  }
+
+  async function markChoiceSaved() {
+    dirtyRef.current = false;
+    savedRef.current = valueRef.current;
+    setState('saved');
+  }
+
+  return { state, onEdit, flush, markChoiceSaved };
 }
 
 function PlainSongs({
@@ -878,7 +929,6 @@ function NotesPane({
           authorId={safety.noteAuthorId}
           authorLabel={safety.noteAuthorLabel}
           safety={safety}
-          reportKey="safety.reportNote"
           targetType="section_note"
         />
       ) : null}
@@ -1073,16 +1123,11 @@ const styles = StyleSheet.create({
   identity: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   iconBox: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   momentTitle: { fontFamily: Fonts.display, fontSize: 32, lineHeight: 36 },
-  fold: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  foldRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
-  foldNum: { fontFamily: Fonts.display, fontSize: 18, width: 32 },
   hair: { height: StyleSheet.hairlineWidth, marginLeft: 56 },
   active: { borderRadius: Radius.lg, padding: 16, gap: 8 },
   bigNum: { fontFamily: Fonts.display, fontSize: 28, lineHeight: 32 },
   prompt: { fontFamily: Fonts.display, fontSize: 26, lineHeight: 30 },
   input: { borderWidth: 1.5, borderRadius: Radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, fontFamily: Fonts.body },
-  later: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },
-  laterNum: { fontFamily: Fonts.display, fontSize: 18, width: 32 },
   chip: { borderWidth: 1, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 16 },
   imgOpt: { width: 96, borderWidth: 2, borderRadius: Radius.md, overflow: 'hidden' },
   stack: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },

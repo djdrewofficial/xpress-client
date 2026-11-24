@@ -85,8 +85,8 @@ function MyEventSafetyStill() {
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, minHeight: 58 }}>
           <View style={{ flex: 1, gap: 2 }}>
-            <Text style={[Type.subhead, { color: c.ink }]}>{t('safety.reportRow')}</Text>
-            <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.reportRowHint')}</Text>
+            <Text style={[Type.subhead, { color: c.ink }]}>{t('safety.reportContent')}</Text>
+            <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.reportContentHint')}</Text>
           </View>
         </View>
         <View style={{ height: 1, backgroundColor: c.line, marginLeft: 14 }} />

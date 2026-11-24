@@ -48,6 +48,10 @@ test('welcome shows a plain AI notice without a consent question', () => {
 test('My Event Safety is report/block only; Music owns song ideas and avoid notes', () => {
   assert.equal(appEn['safety.intro'], 'Report or block people and content on this event.');
   assert.equal(appEs['safety.intro'], 'Reporte o bloquee personas y contenido de este evento.');
+  assert.equal(appEn['safety.reportContent'], 'Report content');
+  assert.equal(appEs['safety.reportContent'], 'Reportar contenido');
+  assert.equal(appEn['safety.concern.answers'], 'Planning answers');
+  assert.equal(appEs['safety.concern.answers'], 'Respuestas de planificación');
   assert.equal(appEn['safety.reportRow'], 'Report a person or content');
   assert.equal(appEs['safety.reportRow'], 'Reportar a una persona o contenido');
   assert.equal(appEn['safety.songIdeas'], 'Song ideas');

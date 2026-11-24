@@ -3,7 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon, Sheet, useC } from '@/components/ui';
-import { useT } from '@/lib/i18n';
+import { useT, type TranslationKey } from '@/lib/i18n';
 import {
   listBlocks,
   loadEventContent,
@@ -11,13 +11,23 @@ import {
   type ModerationKind,
   type ModerationPerson,
 } from '@/lib/moderation';
+import { REPORT_CONCERNS, targetForConcern, type ReportConcern } from '@/lib/reportConcerns';
 import { Fonts, Radius, Shadow, Type } from '@/lib/theme';
 import { SafetyLinks } from './SafetyLinks';
 import { useModeration } from './useModeration';
 
+const CONCERN_KEY: Record<ReportConcern, TranslationKey> = {
+  answers: 'safety.concern.answers',
+  notes: 'safety.concern.notes',
+  songs: 'safety.concern.songs',
+  person: 'safety.concern.person',
+  cover: 'safety.concern.cover',
+  other: 'safety.concern.other',
+};
+
 /**
- * My Event Safety card: report/block people and content, plus the unblock list.
- * Song ideas and Music-to-avoid live on the Music tab.
+ * My Event help card: event-level Report content, blocked list, and like review.
+ * Per-question "Report answer" links were removed — reporting still uses submitReport.
  */
 export function EventSafetyPanel({
   eventId,
@@ -38,7 +48,8 @@ export function EventSafetyPanel({
   const [blocked, setBlocked] = useState<ModerationPerson[]>([]);
   const [content, setContent] = useState<EventContent | null>(null);
   const [tick, setTick] = useState(0);
-  const [sheet, setSheet] = useState<'report' | 'blocked' | null>(null);
+  const [sheet, setSheet] = useState<'concern' | 'person' | 'likes' | 'blocked' | null>(null);
+  const [concern, setConcern] = useState<ReportConcern | null>(null);
   const seenEvent = useRef(eventId);
   const moderation = useModeration(eventId, () => setTick((n) => n + 1));
 
@@ -97,6 +108,36 @@ export function EventSafetyPanel({
   const blockedCount = namedBlocked.length + (namedBlocked.length === 0 && unlabeledBlocked.length === 1 ? 1 : unlabeledBlocked.length > 1 ? unlabeledBlocked.length : 0);
   const songTitle = (songId: string) => songs.find((song) => song.id === songId)?.title ?? t('safety.likes');
   const reportItems = labeledLikes.length + singleUnlabeled.length;
+  const people = (content?.people ?? []).filter((person) => person.userId !== userId);
+
+  function startReport() {
+    setConcern(null);
+    setSheet('concern');
+  }
+
+  function pickConcern(next: ReportConcern) {
+    setConcern(next);
+    if (next === 'songs' && reportItems > 0) {
+      setSheet('likes');
+      return;
+    }
+    if (next === 'person') {
+      if (people.length === 0) {
+        setSheet(null);
+        moderation.openReport(targetForConcern('person'));
+        return;
+      }
+      setSheet('person');
+      return;
+    }
+    setSheet(null);
+    moderation.openReport(targetForConcern(next, { eventId }));
+  }
+
+  function pickPerson(person: ModerationPerson) {
+    setSheet(null);
+    moderation.openReport(targetForConcern('person', { personId: person.userId }));
+  }
 
   return (
     <View style={{ gap: 12 }}>
@@ -116,14 +157,20 @@ export function EventSafetyPanel({
               {t('safety.intro')}
             </Text>
             <Row
-              title={t('safety.reportRow')}
-              detail={
-                reportItems > 0
-                  ? t('safety.reportRowCount', { count: reportItems })
-                  : t('safety.reportRowHint')
-              }
-              onPress={() => setSheet('report')}
+              title={t('safety.reportContent')}
+              detail={t('safety.reportContentHint')}
+              onPress={startReport}
             />
+            {reportItems > 0 ? (
+              <>
+                <View style={[styles.div, { backgroundColor: c.line, marginLeft: 14 }]} />
+                <Row
+                  title={t('safety.reportRow')}
+                  detail={t('safety.reportRowCount', { count: reportItems })}
+                  onPress={() => setSheet('likes')}
+                />
+              </>
+            ) : null}
             <View style={[styles.div, { backgroundColor: c.line, marginLeft: 14 }]} />
             <Row
               title={t('safety.blockedPeople')}
@@ -138,7 +185,45 @@ export function EventSafetyPanel({
         )}
       </View>
 
-      <Sheet visible={sheet === 'report'} onClose={() => setSheet(null)} title={t('safety.reportRow')}>
+      <Sheet visible={sheet === 'concern'} onClose={() => setSheet(null)} title={t('safety.concernTitle')}>
+        <View style={{ gap: 10, paddingBottom: 8 }}>
+          <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.concernHelp')}</Text>
+          {REPORT_CONCERNS.map((item) => (
+            <Pressable
+              key={item}
+              onPress={() => pickConcern(item)}
+              accessibilityRole="button"
+              style={[
+                styles.reason,
+                {
+                  borderColor: concern === item ? c.accent : c.line,
+                  backgroundColor: concern === item ? c.accentTint : c.surface,
+                },
+              ]}>
+              <Text style={[Type.callout, { color: c.ink }]}>{t(CONCERN_KEY[item])}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </Sheet>
+
+      <Sheet visible={sheet === 'person'} onClose={() => setSheet(null)} title={t('safety.concern.person')}>
+        <View style={{ gap: 12, paddingBottom: 8 }}>
+          {people.length === 0 ? (
+            <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.reportEmpty')}</Text>
+          ) : null}
+          {people.map((person) => (
+            <Pressable
+              key={person.userId}
+              onPress={() => pickPerson(person)}
+              accessibilityRole="button"
+              style={[styles.reason, { borderColor: c.line, backgroundColor: c.surface }]}>
+              <Text style={[Type.callout, { color: c.ink }]}>{person.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </Sheet>
+
+      <Sheet visible={sheet === 'likes'} onClose={() => setSheet(null)} title={t('safety.reportRow')}>
         <View style={{ gap: 12, paddingBottom: 8 }}>
           {ambiguousLikes ? (
             <Text style={[Type.footnote, { color: c.ink2 }]}>{t('safety.namesUnavailable')}</Text>
@@ -304,4 +389,5 @@ const styles = {
     minHeight: 58,
   },
   rowTitle: { fontFamily: Fonts.semibold, fontSize: 15, lineHeight: 20 },
+  reason: { borderWidth: 1.5, borderRadius: Radius.md, paddingVertical: 12, paddingHorizontal: 14 },
 };
