@@ -1,6 +1,8 @@
 export { AddMusicSheet, SongPicker, useAddMusic } from './AddMusicSheet';
 export type { AddMusicFixtures, AddMusicSection, AddMusicSegment } from './AddMusicSheet';
 export { MusicRecord, RecordVinyl } from './MusicRecord';
+export { PlaylistsHome } from './PlaylistsHome';
+export { PlaylistDetail } from './PlaylistDetail';
 export {
   buildMusicRecord,
   classifyMusicPaste,
