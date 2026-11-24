@@ -203,14 +203,15 @@ export default function SectionScreen() {
   function setLocal(qid: string, v: string) {
     setAnswers((prev) => ({ ...prev, [qid]: v }));
   }
-  async function persist(qid: string, v: string) {
-    if (!session?.user.id) return;
+  async function persist(qid: string, v: string): Promise<boolean> {
+    if (!session?.user.id) return false;
     const ok = await saveAnswer(eventId, qid, v, session.user.id);
     if (!ok) Alert.alert(t('common.couldntSave'), t('moment.saveFailBody'));
+    return ok;
   }
   function pick(qid: string, v: string) {
     setLocal(qid, v);
-    persist(qid, v);
+    void persist(qid, v);
   }
 
   const failed = () => Alert.alert(t('common.couldntSave'), t('common.checkConnection'));
