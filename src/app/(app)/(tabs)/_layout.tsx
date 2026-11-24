@@ -1,7 +1,11 @@
-import { Redirect, Tabs } from 'expo-router';
+import { useCallback, useMemo } from 'react';
+import { View } from 'react-native';
+import { Redirect, Tabs, useFocusEffect } from 'expo-router';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { TabBar } from '@/components/ui';
+import { DemoModeBanner } from '@/components/DemoModeBanner';
+import { TabBar, useC } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useEvent } from '@/lib/events';
 
@@ -34,8 +38,16 @@ function PlannerTabBar({ state, navigation }: BottomTabBarProps) {
 }
 
 export default function TabsLayout() {
+  const c = useC();
+  const insets = useSafeAreaInsets();
   const { profile } = useAuth();
-  const { eventId, loading } = useEvent();
+  const { eventId, loading, demoMode, refreshDemoFlag } = useEvent();
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshDemoFlag();
+    }, [refreshDemoFlag]),
+  );
 
   // Staff's home is the events list — the planner tabs only make sense once
   // they've opened a specific event. (Couples always have their own event here.)
@@ -43,15 +55,33 @@ export default function TabsLayout() {
     return <Redirect href="/events" />;
   }
 
+  // Banner consumes the top safe area; child screens keep their usual insets.top = 0
+  // so Home / Timeline / Music / My Event don't double-pad under the notch.
+  const childInsets = useMemo(
+    () => (demoMode ? { ...insets, top: 0 } : insets),
+    [demoMode, insets],
+  );
+
   return (
-    <Tabs
-      safeAreaInsets={{ bottom: 0 }}
-      tabBar={(props) => <PlannerTabBar {...props} />}
-      screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="(plan)" options={{ title: 'Home' }} />
-      <Tabs.Screen name="timeline" options={{ title: 'Timeline' }} />
-      <Tabs.Screen name="music" options={{ title: 'Music' }} />
-      <Tabs.Screen name="you" options={{ title: 'My Event' }} />
-    </Tabs>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      {demoMode ? (
+        <View style={{ paddingTop: insets.top, backgroundColor: c.bg }}>
+          <DemoModeBanner />
+        </View>
+      ) : null}
+      <SafeAreaInsetsContext.Provider value={childInsets}>
+        <View style={{ flex: 1 }}>
+          <Tabs
+            safeAreaInsets={{ bottom: 0 }}
+            tabBar={(props) => <PlannerTabBar {...props} />}
+            screenOptions={{ headerShown: false }}>
+            <Tabs.Screen name="(plan)" options={{ title: 'Home' }} />
+            <Tabs.Screen name="timeline" options={{ title: 'Timeline' }} />
+            <Tabs.Screen name="music" options={{ title: 'Music' }} />
+            <Tabs.Screen name="you" options={{ title: 'My Event' }} />
+          </Tabs>
+        </View>
+      </SafeAreaInsetsContext.Provider>
+    </View>
   );
 }

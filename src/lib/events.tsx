@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useAuth } from '@/lib/auth';
+import { fetchEventCard } from '@/lib/eventCard';
 import { getMyEvents, type EventLite } from '@/lib/planning';
 import { selectedEventKey } from '@/lib/selectedEvent';
 
@@ -17,10 +18,14 @@ type EventState = {
   /** The currently-selected event (name/date/cover for the header + screens). */
   event: EventLite | null;
   eventId: string | null;
+  /** True while XOS Demo Mode is on for the current event (sample planner data). */
+  demoMode: boolean;
   /** Select an event (from the switcher or the staff list) and remember it. */
   selectEvent: (e: EventLite) => void;
   /** Prefer this event the next time the list reloads (after a link or a join code). */
   focusEvent: (id: string) => void;
+  /** Re-read `event.demoMode` from the mobile event card (banner hides when false). */
+  refreshDemoFlag: () => Promise<void>;
   reload: () => Promise<void>;
 };
 
@@ -29,8 +34,10 @@ const EventContext = createContext<EventState>({
   events: [],
   event: null,
   eventId: null,
+  demoMode: false,
   selectEvent: () => {},
   focusEvent: () => {},
+  refreshDemoFlag: async () => {},
   reload: async () => {},
 });
 
@@ -42,9 +49,11 @@ export function EventProvider({ children }: PropsWithChildren) {
   const [events, setEvents] = useState<EventLite[]>([]);
   const [eventId, setEventId] = useState<string | null>(null);
   const [selected, setSelected] = useState<EventLite | null>(null); // resolves the header title for staff picks
+  const [demoMode, setDemoMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const preferId = useRef<string | null>(null);
   const loadGen = useRef(0);
+  const demoGen = useRef(0);
 
   const persist = useCallback(
     (id: string | null) => {
@@ -55,13 +64,27 @@ export function EventProvider({ children }: PropsWithChildren) {
     [uid],
   );
 
+  /** Authoritative Demo Mode flag from GET /api/mobile/events/:id (`event.demoMode`). */
+  const refreshDemoMode = useCallback(async (id: string | null, hint?: boolean) => {
+    const gen = ++demoGen.current;
+    if (!id) {
+      setDemoMode(false);
+      return;
+    }
+    if (hint === true) setDemoMode(true);
+    const card = await fetchEventCard(id);
+    if (gen !== demoGen.current) return;
+    setDemoMode(card?.demoMode === true);
+  }, []);
+
   const selectEvent = useCallback(
     (e: EventLite) => {
       setSelected(e);
       setEventId(e.id);
       persist(e.id);
+      void refreshDemoMode(e.id, e.demoMode === true);
     },
-    [persist],
+    [persist, refreshDemoMode],
   );
 
   const focusEvent = useCallback(
@@ -78,6 +101,7 @@ export function EventProvider({ children }: PropsWithChildren) {
       setEvents([]);
       setEventId(null);
       setSelected(null);
+      setDemoMode(false);
       setLoading(false);
       return;
     }
@@ -92,6 +116,7 @@ export function EventProvider({ children }: PropsWithChildren) {
       setEvents([]);
       setSelected(null);
       setEventId(null);
+      setDemoMode(false);
       setLoading(false);
       return;
     }
@@ -106,8 +131,9 @@ export function EventProvider({ children }: PropsWithChildren) {
     setSelected(initial);
     setEventId(initial?.id ?? null);
     if (initial) persist(initial.id);
+    void refreshDemoMode(initial?.id ?? null, initial?.demoMode === true);
     setLoading(false);
-  }, [profile, uid, persist]);
+  }, [profile, uid, persist, refreshDemoMode]);
 
   useEffect(() => {
     load();
@@ -118,8 +144,13 @@ export function EventProvider({ children }: PropsWithChildren) {
     [events, eventId, selected],
   );
 
+  const refreshDemoFlag = useCallback(async () => {
+    await refreshDemoMode(eventId, event?.demoMode === true);
+  }, [refreshDemoMode, eventId, event?.demoMode]);
+
   return (
-    <EventContext.Provider value={{ loading, events, event, eventId, selectEvent, focusEvent, reload: load }}>
+    <EventContext.Provider
+      value={{ loading, events, event, eventId, demoMode, selectEvent, focusEvent, refreshDemoFlag, reload: load }}>
       {children}
     </EventContext.Provider>
   );
