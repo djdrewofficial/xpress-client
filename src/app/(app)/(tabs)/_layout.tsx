@@ -49,18 +49,20 @@ export default function TabsLayout() {
     }, [refreshDemoFlag]),
   );
 
+  // Banner consumes the top safe area; child screens keep their usual insets.top = 0
+  // so Home / Timeline / Music / My Event don't double-pad under the notch.
+  // Must run before any early return — PR 41 put this after the staff Redirect and
+  // crashed release builds with "Rendered fewer hooks than expected".
+  const childInsets = useMemo(
+    () => (demoMode ? { ...insets, top: 0 } : insets),
+    [demoMode, insets],
+  );
+
   // Staff's home is the events list — the planner tabs only make sense once
   // they've opened a specific event. (Couples always have their own event here.)
   if (profile?.accountType === 'staff' && !loading && !eventId) {
     return <Redirect href="/events" />;
   }
-
-  // Banner consumes the top safe area; child screens keep their usual insets.top = 0
-  // so Home / Timeline / Music / My Event don't double-pad under the notch.
-  const childInsets = useMemo(
-    () => (demoMode ? { ...insets, top: 0 } : insets),
-    [demoMode, insets],
-  );
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
