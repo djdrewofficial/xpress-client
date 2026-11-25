@@ -115,10 +115,10 @@ function EmbedPreview({ chrome }: { chrome: ReactNode }) {
           djName: 'DJ Alex',
           ink: c.ink,
           ink2: c.ink2,
-          surface: c.surface,
+          surface: c.bg,
         }),
         allowedOrigins: [],
-        buttons: [{ label: 'Done', action: 'dismiss' }],
+        buttons: [],
         djName: 'DJ Alex',
         bookingUrl: 'https://xos.xpressdjs.com',
       }}
