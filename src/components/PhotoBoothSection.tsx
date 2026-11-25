@@ -112,7 +112,8 @@ export function PhotoBoothSection({ eventId, safety, reloadSignal = 0 }: { event
     if (userId) saveBoothDesign(eventId, d, userId);
   };
   // From the preview modal — confirm before replacing an existing pick.
-  const useDesign = (d: BoothDesign) => {
+  // Named without a `use*` prefix so react-hooks/rules-of-hooks does not treat it as a Hook.
+  const confirmDesign = (d: BoothDesign) => {
     if (design && design.src !== d.src) {
       Alert.alert(
         'Replace your design?',
@@ -259,7 +260,7 @@ export function PhotoBoothSection({ eventId, safety, reloadSignal = 0 }: { event
                       </View>
                     </View>
                   ) : (
-                    <Pressable onPress={() => useDesign(preview)} style={styles.useBtn}>
+                    <Pressable onPress={() => confirmDesign(preview)} style={styles.useBtn}>
                       <Text style={styles.useBtnTxt}>Use This Design</Text>
                     </Pressable>
                   )}
