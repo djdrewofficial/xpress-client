@@ -61,6 +61,7 @@ export function MyEventView({
   language,
   onLanguage,
   smsConsent,
+  notificationPrefs,
   safety,
 }: {
   loading: boolean;
@@ -96,6 +97,8 @@ export function MyEventView({
   onLanguage: (language: AppLanguage) => void;
   /** Promotional texts. Omitted for staff. */
   smsConsent?: ReactNode;
+  /** Push + in-app popup toggles. */
+  notificationPrefs?: ReactNode;
   /** Reports, blocks, and the unblock list. */
   safety?: ReactNode;
 }) {
@@ -351,6 +354,7 @@ export function MyEventView({
           </View>
         </Section>
 
+        {notificationPrefs ? <Section label={t('notif.section')}>{notificationPrefs}</Section> : null}
         {smsConsent ? <Section label={t('event.marketing')}>{smsConsent}</Section> : null}
         {safety}
 
