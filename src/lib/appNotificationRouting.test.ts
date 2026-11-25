@@ -122,6 +122,6 @@ test('buildScreenDocument wraps body and a scrollable iframe embed', () => {
   });
   assert.match(html, /<p>Hello<\/p>/);
   assert.match(html, /iframe src="https:\/\/calendar\.example\.com\/x"/);
-  assert.match(html, /min-height: 640px/);
+  assert.match(html, /min-height: 520px/);
   assert.match(html, /-webkit-overflow-scrolling: touch/);
 });

@@ -1,11 +1,12 @@
 import { Redirect } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NotificationPopup } from '@/components/notifications/NotificationPopup';
-import { SafeEmbedWebView } from '@/components/notifications/SafeEmbedWebView';
+import { NotificationScreenView } from '@/components/notifications/NotificationScreenView';
 import { ThemeSchemeOverride, useC } from '@/components/ui';
+import { sampleBookingBodyHtml, sampleBookingEmbedHtml } from '@/lib/notificationEmbedSample';
 import { Fonts, Radius, Type, type Scheme } from '@/lib/theme';
 
 /**
@@ -28,29 +29,38 @@ function DevNotificationsBody() {
   const [mode, setMode] = useState<'popup' | 'embed'>(initialMode);
   const [popupOpen, setPopupOpen] = useState(true);
 
+  const chrome = (
+    <PreviewChrome
+      scheme={scheme}
+      mode={mode}
+      onScheme={setScheme}
+      onMode={setMode}
+      onShowPopup={() => setPopupOpen(true)}
+    />
+  );
+
   return (
     <ThemeSchemeOverride scheme={scheme}>
-      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
-        <PreviewChrome
-          scheme={scheme}
-          mode={mode}
-          onScheme={setScheme}
-          onMode={setMode}
-          onShowPopup={() => setPopupOpen(true)}
-        />
-        {mode === 'embed' ? <EmbedPreview /> : null}
-        {mode === 'popup' ? (
-          <NotificationPopup
-            visible={popupOpen}
-            popup={{
-              id: 'preview',
-              title: 'Time to book your planning call',
-              body: 'Pick a time that works — your DJ left a calendar just for you.',
-            }}
-            onOpen={() => setPopupOpen(false)}
-            onDismiss={() => setPopupOpen(false)}
-          />
-        ) : null}
+      <SafeAreaView style={{ flex: 1 }} edges={mode === 'embed' ? [] : ['top', 'bottom']}>
+        {mode === 'embed' ? (
+          <EmbedPreview chrome={chrome} />
+        ) : (
+          <>
+            {chrome}
+            <View style={{ flex: 1 }} />
+            <NotificationPopup
+              visible={popupOpen}
+              brand={{ djName: 'DJ Alex' }}
+              popup={{
+                id: 'preview',
+                title: 'Time to book your planning call',
+                body: 'Pick a time that works for you. Your DJ set up a calendar just for your event.',
+              }}
+              onOpen={() => setPopupOpen(false)}
+              onDismiss={() => setPopupOpen(false)}
+            />
+          </>
+        )}
       </SafeAreaView>
     </ThemeSchemeOverride>
   );
@@ -70,8 +80,17 @@ function PreviewChrome({
   onShowPopup: () => void;
 }) {
   const c = useC();
+  const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.chrome, { backgroundColor: c.bg, borderBottomColor: c.line }]}>
+    <View
+      style={[
+        styles.chrome,
+        {
+          backgroundColor: c.bg,
+          borderBottomColor: c.line,
+          paddingTop: mode === 'embed' ? insets.top + 12 : 12,
+        },
+      ]}>
       <Text style={[Type.headline, { color: c.ink }]}>Notifications preview</Text>
       <View style={styles.row}>
         <Chip label="Light" selected={scheme === 'light'} onPress={() => onScheme('light')} />
@@ -84,22 +103,28 @@ function PreviewChrome({
   );
 }
 
-function EmbedPreview() {
+function EmbedPreview({ chrome }: { chrome: ReactNode }) {
   const c = useC();
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <View style={[styles.nav, { borderBottomColor: c.line }]}>
-        <Text style={[styles.navTitle, { color: c.ink }]}>Schedule with your DJ</Text>
-      </View>
-      <SafeEmbedWebView
-        bodyHtml="<p>Choose a planning-meeting time below. This calendar is just for your event.</p>"
-        embedHtml={`<iframe src="https://api.leadconnectorhq.com/widget/booking/example" title="Booking" style="width:100%;min-height:640px;border:0;"></iframe>`}
-        allowedOrigins={['https://api.leadconnectorhq.com']}
-        background={c.bg}
-        ink={c.ink}
-        ink2={c.ink2}
-      />
-    </View>
+    <NotificationScreenView
+      chrome={chrome}
+      screen={{
+        heading: 'Schedule with your DJ',
+        bodyHtml: sampleBookingBodyHtml(),
+        embedHtml: sampleBookingEmbedHtml({
+          djName: 'DJ Alex',
+          ink: c.ink,
+          ink2: c.ink2,
+          surface: c.surface,
+        }),
+        allowedOrigins: [],
+        buttons: [{ label: 'Done', action: 'dismiss' }],
+        djName: 'DJ Alex',
+        bookingUrl: 'https://xos.xpressdjs.com',
+      }}
+      onClose={() => {}}
+      onButton={() => {}}
+    />
   );
 }
 
@@ -137,10 +162,4 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  nav: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  navTitle: { fontFamily: Fonts.semibold, fontSize: 16, textAlign: 'center' },
 });

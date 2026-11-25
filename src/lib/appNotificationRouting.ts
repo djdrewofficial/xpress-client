@@ -153,11 +153,12 @@ export function buildScreenDocument(opts: {
 <style>
   html, body { margin: 0; padding: 0; background: ${opts.background}; color: ${opts.ink};
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-  .wrap { padding: 16px; box-sizing: border-box; }
-  .body { font-size: 16px; line-height: 1.45; color: ${opts.ink}; }
+  .wrap { padding: 14px; box-sizing: border-box; }
+  .body { font-size: 16px; line-height: 1.45; color: ${opts.ink}; margin: 0 0 12px; }
+  .body p { margin: 0 0 10px; }
   .body a { color: #4b328e; }
-  .embed { margin-top: 16px; width: 100%; overflow: auto; -webkit-overflow-scrolling: touch; }
-  .embed iframe { width: 100% !important; min-height: 640px; border: 0; display: block; }
+  .embed { width: 100%; overflow: auto; -webkit-overflow-scrolling: touch; }
+  .embed iframe { width: 100% !important; min-height: 520px; border: 0; display: block; }
 </style>
 </head>
 <body>
