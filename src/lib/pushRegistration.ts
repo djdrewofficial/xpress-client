@@ -31,66 +31,78 @@ export async function syncPushRegistration(authUserId: string | null): Promise<{
   if (!authUserId) return { registered: false, token: null, reason: 'signed_out' };
 
   // Dynamic requires keep expo-notifications / expo-device off the web SSR graph.
-  const Notifications = require('expo-notifications') as typeof import('expo-notifications');
-  const Device = require('expo-device') as typeof import('expo-device');
+  // Guard so a native-module failure never takes down sign-in.
+  let Notifications: typeof import('expo-notifications');
+  let Device: typeof import('expo-device');
+  try {
+    Notifications = require('expo-notifications') as typeof import('expo-notifications');
+    Device = require('expo-device') as typeof import('expo-device');
+  } catch {
+    return { registered: false, token: null, reason: 'native_unavailable' };
+  }
 
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
-  });
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
 
-  if (!Device.isDevice) return { registered: false, token: null, reason: 'simulator' };
+    if (!Device.isDevice) return { registered: false, token: null, reason: 'simulator' };
 
-  const prefs = await loadNotificationPrefs(authUserId);
-  if (prefs.ok && !prefs.prefs.pushEnabled) {
-    const existing = await readStoredPushToken();
-    if (existing) {
-      await unregisterPushToken(existing);
-      await storePushToken(null);
+    const prefs = await loadNotificationPrefs(authUserId);
+    if (prefs.ok && !prefs.prefs.pushEnabled) {
+      const existing = await readStoredPushToken();
+      if (existing) {
+        await unregisterPushToken(existing);
+        await storePushToken(null);
+      }
+      return { registered: false, token: null, reason: 'prefs_off' };
     }
-    return { registered: false, token: null, reason: 'prefs_off' };
-  }
 
-  // expo-notifications types import PermissionResponse from 'expo', which this
-  // SDK build does not re-export cleanly — read the runtime fields via a narrow shape.
-  type Perm = { granted?: boolean; canAskAgain?: boolean; ios?: { status?: number } };
-  const current = (await Notifications.getPermissionsAsync()) as Perm;
-  let granted =
-    current.granted === true ||
-    current.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
-  if (!granted && current.canAskAgain !== false) {
-    await AsyncStorage.setItem(PUSH_ASKED_KEY, '1').catch(() => {});
-    const asked = (await Notifications.requestPermissionsAsync()) as Perm;
-    granted =
-      asked.granted === true ||
-      asked.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
-  }
-  if (!granted) {
-    return { registered: false, token: null, reason: 'denied' };
-  }
+    // expo-notifications types import PermissionResponse from 'expo', which this
+    // SDK build does not re-export cleanly — read the runtime fields via a narrow shape.
+    type Perm = { granted?: boolean; canAskAgain?: boolean; ios?: { status?: number } };
+    const current = (await Notifications.getPermissionsAsync()) as Perm;
+    let granted =
+      current.granted === true ||
+      current.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
+    if (!granted && current.canAskAgain !== false) {
+      await AsyncStorage.setItem(PUSH_ASKED_KEY, '1').catch(() => {});
+      const asked = (await Notifications.requestPermissionsAsync()) as Perm;
+      granted =
+        asked.granted === true ||
+        asked.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
+    }
+    if (!granted) {
+      return { registered: false, token: null, reason: 'denied' };
+    }
 
-  const id = projectId();
-  const tokenResult = id
-    ? await Notifications.getExpoPushTokenAsync({ projectId: id })
-    : await Notifications.getExpoPushTokenAsync();
-  const token = tokenResult.data;
-  if (!token) return { registered: false, token: null, reason: 'no_token' };
+    const id = projectId();
+    // projectId is required for Expo push tokens in release; omit only as fallback.
+    const tokenResult = id
+      ? await Notifications.getExpoPushTokenAsync({ projectId: id })
+      : await Notifications.getExpoPushTokenAsync();
+    const token = tokenResult.data;
+    if (!token) return { registered: false, token: null, reason: 'no_token' };
 
-  const previous = await readStoredPushToken();
-  const result = await registerPushToken({
-    expoPushToken: token,
-    platform: Platform.OS,
-    deviceName: Device.deviceName,
-  });
-  if (!result.ok) return { registered: false, token, reason: 'register_failed' };
+    const previous = await readStoredPushToken();
+    const result = await registerPushToken({
+      expoPushToken: token,
+      platform: Platform.OS,
+      deviceName: Device.deviceName,
+    });
+    if (!result.ok) return { registered: false, token, reason: 'register_failed' };
 
-  await storePushToken(token);
-  if (previous && previous !== token) {
-    await unregisterPushToken(previous);
+    await storePushToken(token);
+    if (previous && previous !== token) {
+      await unregisterPushToken(previous);
+    }
+    return { registered: true, token };
+  } catch {
+    return { registered: false, token: null, reason: 'native_error' };
   }
-  return { registered: true, token };
 }
