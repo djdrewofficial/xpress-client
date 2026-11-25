@@ -52,11 +52,16 @@ export function PushRegistration() {
     if (Platform.OS === 'web') return;
     const uid = session?.user.id;
     if (!uid) return;
-    const Notifications = require('expo-notifications') as typeof import('expo-notifications');
-    const sub = Notifications.addPushTokenListener(() => {
-      syncPushRegistration(uid).then(() => {});
-    });
-    return () => sub.remove();
+    let sub: { remove: () => void } | null = null;
+    try {
+      const Notifications = require('expo-notifications') as typeof import('expo-notifications');
+      sub = Notifications.addPushTokenListener(() => {
+        syncPushRegistration(uid).then(() => {});
+      });
+    } catch {
+      /* native module unavailable — leave push listeners off */
+    }
+    return () => sub?.remove();
   }, [session?.user.id]);
 
   useEffect(() => {
@@ -105,18 +110,22 @@ export function PushRegistration() {
 
     let responseSub: { remove: () => void } | null = null;
     if (Platform.OS !== 'web') {
-      const Notifications = require('expo-notifications') as typeof import('expo-notifications');
-      responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-        const data = response.notification.request.content.data as Record<string, unknown> | undefined;
-        void openFromPushData(data);
-      });
-      Notifications.getLastNotificationResponseAsync()
-        .then((response) => {
-          if (!response) return;
+      try {
+        const Notifications = require('expo-notifications') as typeof import('expo-notifications');
+        responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
           const data = response.notification.request.content.data as Record<string, unknown> | undefined;
           void openFromPushData(data);
-        })
-        .catch(() => {});
+        });
+        Notifications.getLastNotificationResponseAsync()
+          .then((response) => {
+            if (!response) return;
+            const data = response.notification.request.content.data as Record<string, unknown> | undefined;
+            void openFromPushData(data);
+          })
+          .catch(() => {});
+      } catch {
+        /* native module unavailable — deep-link listeners still work below */
+      }
     }
 
     Linking.getInitialURL()
