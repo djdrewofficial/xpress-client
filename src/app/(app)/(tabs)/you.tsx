@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 
 import { EventSafetyPanel } from '@/components/moderation/EventSafetyPanel';
 import { DeleteAccountSheet, InviteSentSheet } from '@/components/AccountSheets';
+import { NotificationPrefsSetting } from '@/components/notifications/NotificationPrefsSetting';
 import { SmsConsentSetting } from '@/components/SmsConsentSetting';
 import { HostEventTools } from '@/components/HostEventTools';
 import { InvitePersonSheet } from '@/components/InvitePersonSheet';
@@ -208,6 +209,7 @@ export default function AccountScreen() {
         deleting={deletePhase === 'working'}
         language={locale}
         onLanguage={setLocale}
+        notificationPrefs={<NotificationPrefsSetting reloadSignal={consentReload} />}
         smsConsent={
           profile?.accountType === 'staff' ? null : (
             <SmsConsentSetting

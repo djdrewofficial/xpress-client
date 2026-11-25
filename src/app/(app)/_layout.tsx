@@ -1,6 +1,8 @@
 import { Stack } from 'expo-router';
 
 import { JoinGate } from '@/components/JoinGate';
+import { NotificationPopupHost } from '@/components/notifications/NotificationPopupHost';
+import { PushRegistration } from '@/components/notifications/PushRegistration';
 import { OnboardingGate } from '@/components/onboarding/OnboardingGate';
 import { SocialPrompt } from '@/components/SocialPrompt';
 import { EventProvider } from '@/lib/events';
@@ -15,6 +17,9 @@ export default function AppLayout() {
       <JoinGate>
         <OnboardingGate>
           <Stack screenOptions={{ headerShown: false }} />
+          {/* Push + popups only after sign-in (this layout is gated). */}
+          <PushRegistration />
+          <NotificationPopupHost />
           {/* Shows ~24h after first sign-in to collect IG/TikTok handles. */}
           <SocialPrompt />
         </OnboardingGate>

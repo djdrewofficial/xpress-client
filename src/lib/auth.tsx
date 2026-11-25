@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 
 import { claimEventInvites } from '@/lib/claimInvites';
 import { hydrateMembership, noteAccountType, resetMembershipMemory } from '@/lib/membership';
+import { teardownPushRegistration } from '@/lib/pushTokenStore';
 import { applyLocalSignOutHold, authLoading, recoveryUserIdForAuthEvent } from '@/lib/recoveryGate';
 import { passwordChangeAllowed } from '@/lib/recoveryLink';
 import { supabase } from '@/lib/supabase';
@@ -266,7 +267,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
         reloadProfile,
         // Local scope ends this device only. The default (global) revokes every
         // session for the user, including XOS in the browser.
-        signOut: () => {
+        signOut: async () => {
+          const uid = sessionRef.current?.user.id ?? null;
+          // Deactivate push tokens while the JWT is still valid for RLS.
+          await teardownPushRegistration(uid).catch(() => {});
           const held = applyLocalSignOutHold();
           profileReq.current += 1;
           resetMembershipMemory();
@@ -274,7 +278,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
           setReadyFor(held.readyForUserId);
           setRecoveryUserId(held.recoveryUserId);
           AsyncStorage.removeItem(RESET_KEY).catch(() => {});
-          return supabase.auth.signOut({ scope: 'local' }).then(() => {});
+          await supabase.auth.signOut({ scope: 'local' });
         },
       }}>
       {children}
